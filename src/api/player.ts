@@ -33,7 +33,13 @@ const performPerPlayerCommandFallback = async (
     for (const p of players) {
       const primaryUrl = `${apiBaseUrl}/player/${encodeURIComponent(p.name)}/command/${primaryCommand}`
       try {
-        const r = await apiFetch(primaryUrl, { method: 'POST' })
+        const r = await apiFetch(primaryUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({})
+        })
         if (r.ok) {
           succeeded++
           continue
@@ -41,7 +47,13 @@ const performPerPlayerCommandFallback = async (
         // Try fallback command if primary failed and fallback provided
         if (fallbackCommand) {
           const fallbackUrl = `${apiBaseUrl}/player/${encodeURIComponent(p.name)}/command/${fallbackCommand}`
-          const s = await apiFetch(fallbackUrl, { method: 'POST' })
+          const s = await apiFetch(fallbackUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({})
+          })
           if (s.ok) succeeded++
         }
       } catch (e) {
@@ -147,6 +159,7 @@ export const sendPlayerCommand = async (playerName: string, command: string): Pr
       headers: {
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({})
     })
 
     if (!response.ok) {
@@ -183,7 +196,11 @@ export const pauseAllPlayers = async (): Promise<boolean> => {
     const url = `${apiBaseUrl}/players/pause-all`
     console.log('Pausing all players (bulk endpoint):', url)
 
-    const response = await apiFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+    const response = await apiFetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    })
 
     if (response.ok) {
       const result = await response.json().catch(() => ({}))
@@ -215,7 +232,11 @@ export const stopAllPlayers = async (): Promise<boolean> => {
     const url = `${apiBaseUrl}/players/stop-all`
     console.log('Stopping all players (bulk endpoint):', url)
 
-    const response = await apiFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+    const response = await apiFetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    })
 
     if (response.ok) {
       const result = await response.json().catch(() => ({}))

@@ -381,6 +381,7 @@ export const executeSystemdOperation = async (
 /**
  * Enable and start a systemd service
  * @param service - Service name
+ * @throws Error if operation fails with exception during API communication
  */
 export const enableService = async (service: string): Promise<boolean> => {
   try {
@@ -409,6 +410,7 @@ export const enableService = async (service: string): Promise<boolean> => {
 /**
  * Stop and disable a systemd service
  * @param service - Service name
+ * @throws Error if operation fails with exception during API communication
  */
 export const disableService = async (service: string): Promise<boolean> => {
   try {
@@ -435,8 +437,10 @@ export const disableService = async (service: string): Promise<boolean> => {
 }
 
 /**
- * Enable and start a systemd service immediately
+ * Enable and start a systemd service immediately (atomically)
  * @param service - Service name
+ * @throws Error if operation fails with exception during API communication
+ * @returns true if operation succeeded, false if API returned error status
  */
 export const enableNowService = async (service: string): Promise<boolean> => {
   try {
@@ -449,8 +453,10 @@ export const enableNowService = async (service: string): Promise<boolean> => {
 }
 
 /**
- * Disable and stop a systemd service immediately
+ * Disable and stop a systemd service immediately (atomically)
  * @param service - Service name
+ * @throws Error if operation fails with exception during API communication
+ * @returns true if operation succeeded, false if API returned error status
  */
 export const disableNowService = async (service: string): Promise<boolean> => {
   try {
@@ -465,6 +471,8 @@ export const disableNowService = async (service: string): Promise<boolean> => {
 /**
  * Restart a systemd service
  * @param service - Service name
+ * @throws Error if operation fails with exception during API communication
+ * @returns true if operation succeeded, false if API returned error status
  */
 export const restartService = async (service: string): Promise<boolean> => {
   try {

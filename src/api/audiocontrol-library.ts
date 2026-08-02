@@ -6,6 +6,7 @@ export interface LibraryPlayer {
   player_id: string
   has_library: boolean
   is_loaded: boolean
+  supports_delete?: boolean
 }
 
 export interface LibraryPlayerListResponse {

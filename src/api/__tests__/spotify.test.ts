@@ -11,6 +11,7 @@ import {
   disconnectSpotify,
   getSpotifyLoginUrl,
   getSpotifyStatus,
+  logoutSpotify,
   pollSpotifyAuth,
   storeSpotifyTokens,
 } from '@/api/spotify'
@@ -37,6 +38,7 @@ const riskyCalls: Array<[string, () => Promise<unknown>]> = [
     () => storeSpotifyTokens({ access_token: 'a', refresh_token: 'r', expires_in: 3600 }),
   ],
   ['disconnectSpotify', () => disconnectSpotify()],
+  ['logoutSpotify', () => logoutSpotify()],
 ]
 
 describe('spotify api auth handling', () => {
@@ -144,25 +146,25 @@ describe('spotify api regression tests', () => {
     it('getSpotifyStatus throws on 500 error', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(500, { error: 'Server error' })))
 
-      await expect(getSpotifyStatus()).rejects.toThrow(/Failed to get Spotify status/)
+      await expect(getSpotifyStatus()).rejects.toThrow(/getSpotifyStatus: 500/)
     })
 
     it('createSpotifySession throws on 503 error', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(503, { error: 'Service unavailable' })))
 
-      await expect(createSpotifySession()).rejects.toThrow(/Failed to create Spotify session/)
+      await expect(createSpotifySession()).rejects.toThrow(/createSpotifySession: 503/)
     })
 
     it('getSpotifyLoginUrl throws on 400 error', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(400, { error: 'Bad request' })))
 
-      await expect(getSpotifyLoginUrl('invalid-session')).rejects.toThrow(/Failed to get Spotify login URL/)
+      await expect(getSpotifyLoginUrl('invalid-session')).rejects.toThrow(/getSpotifyLoginUrl: 400/)
     })
 
     it('pollSpotifyAuth throws on 404 error', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(404, { error: 'Not found' })))
 
-      await expect(pollSpotifyAuth('nonexistent-session')).rejects.toThrow(/Failed to poll Spotify auth/)
+      await expect(pollSpotifyAuth('nonexistent-session')).rejects.toThrow(/pollSpotifyAuth: 404/)
     })
 
     it('storeSpotifyTokens throws on 400 error', async () => {
@@ -170,13 +172,13 @@ describe('spotify api regression tests', () => {
 
       await expect(
         storeSpotifyTokens({ access_token: '', refresh_token: '', expires_in: 0 }),
-      ).rejects.toThrow(/Failed to store Spotify tokens/)
+      ).rejects.toThrow(/storeSpotifyTokens: 400/)
     })
 
     it('disconnectSpotify throws on 500 error', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(500, { error: 'Server error' })))
 
-      await expect(disconnectSpotify()).rejects.toThrow(/Failed to disconnect from Spotify/)
+      await expect(disconnectSpotify()).rejects.toThrow(/logoutSpotify: 500/)
     })
   })
 
@@ -295,7 +297,7 @@ describe('spotify api regression tests', () => {
       })
       vi.stubGlobal('fetch', fetchMock)
 
-      await expect(createSpotifySession()).rejects.toThrow(/503 Service Unavailable/)
+      await expect(createSpotifySession()).rejects.toThrow(/createSpotifySession: 503 Service Unavailable/)
     })
 
     it('includes status code in error message for 400', async () => {
@@ -308,7 +310,7 @@ describe('spotify api regression tests', () => {
       })
       vi.stubGlobal('fetch', fetchMock)
 
-      await expect(getSpotifyLoginUrl('session')).rejects.toThrow(/400 Bad Request/)
+      await expect(getSpotifyLoginUrl('session')).rejects.toThrow(/getSpotifyLoginUrl: 400 Bad Request/)
     })
   })
 
@@ -352,6 +354,28 @@ describe('spotify api regression tests', () => {
 
       const [url, init] = fetchMock.mock.calls[0]
       expect(url).toContain('/spotify/tokens')
+      expect(init.method).toBe('POST')
+    })
+
+    it('logoutSpotify calls logout endpoint with POST method', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { authenticated: false }))
+      vi.stubGlobal('fetch', fetchMock)
+
+      await logoutSpotify()
+
+      const [url, init] = fetchMock.mock.calls[0]
+      expect(url).toContain('/spotify/logout')
+      expect(init.method).toBe('POST')
+    })
+
+    it('disconnectSpotify delegates to logoutSpotify for backwards compatibility', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { authenticated: false }))
+      vi.stubGlobal('fetch', fetchMock)
+
+      await disconnectSpotify()
+
+      const [url, init] = fetchMock.mock.calls[0]
+      expect(url).toContain('/spotify/logout')
       expect(init.method).toBe('POST')
     })
   })

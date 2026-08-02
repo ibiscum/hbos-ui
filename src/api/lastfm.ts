@@ -114,7 +114,8 @@ export const disconnectLastFM = async (): Promise<LastFMDisconnectResponse> => {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-    }
+    },
+    body: JSON.stringify({})
   })
 
   if (!response.ok) {

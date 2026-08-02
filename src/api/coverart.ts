@@ -26,11 +26,20 @@ export interface CoverArtMethodsResponse {
 
 /**
  * Update the custom image URL for a specific artist
- * @param artistName - The artist name (will be base64 encoded)
- * @param imageUrl - The URL of the custom image to set for the artist
+ * @param artistName - The artist name (will be base64 encoded). Must be a non-empty string.
+ * @param imageUrl - The URL of the custom image to set for the artist. Must be a valid URL string.
  * @returns Promise<CoverArtUpdateResponse>
+ * @throws Error if artistName or imageUrl is empty, or if the API request fails
  */
 export async function updateArtistImage(artistName: string, imageUrl: string): Promise<CoverArtUpdateResponse> {
+  // Validate inputs
+  if (!artistName?.trim()) {
+    throw new Error('Artist name cannot be empty')
+  }
+  if (!imageUrl?.trim()) {
+    throw new Error('Image URL cannot be empty')
+  }
+
   const configStore = useAppConfigStore()
   const apiBaseUrl = configStore.getApiBaseUrl()
 
@@ -58,7 +67,8 @@ export async function updateArtistImage(artistName: string, imageUrl: string): P
     const response = await apiFetch(url, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       body: JSON.stringify(requestBody)
     })
@@ -71,13 +81,18 @@ export async function updateArtistImage(artistName: string, imageUrl: string): P
     })
 
     if (!response.ok) {
-      const errorText = await response.text()
+      let errorText = ''
+      try {
+        errorText = await response.text()
+      } catch {
+        errorText = '(unable to read error response body)'
+      }
       console.error('Artist image update failed:', {
         status: response.status,
         statusText: response.statusText,
         errorText
       })
-      throw new Error(`HTTP error! status: ${response.status}`)
+      throw new Error(`HTTP error! status: ${response.status} - ${errorText}`)
     }
 
     const data: CoverArtUpdateResponse = await response.json()
@@ -91,7 +106,8 @@ export async function updateArtistImage(artistName: string, imageUrl: string): P
 
 /**
  * Get available cover art methods and providers
- * @returns Promise<CoverArtMethodsResponse>
+ * @returns Promise<CoverArtMethodsResponse> - Object containing array of available cover art methods and their providers
+ * @throws Error if the API request fails
  */
 export async function getCoverArtMethods(): Promise<CoverArtMethodsResponse> {
   const configStore = useAppConfigStore()
@@ -116,13 +132,18 @@ export async function getCoverArtMethods(): Promise<CoverArtMethodsResponse> {
     })
 
     if (!response.ok) {
-      const errorText = await response.text()
+      let errorText = ''
+      try {
+        errorText = await response.text()
+      } catch {
+        errorText = '(unable to read error response body)'
+      }
       console.error('Cover art methods fetch failed:', {
         status: response.status,
         statusText: response.statusText,
         errorText
       })
-      throw new Error(`HTTP error! status: ${response.status}`)
+      throw new Error(`HTTP error! status: ${response.status} - ${errorText}`)
     }
 
     const data: CoverArtMethodsResponse = await response.json()

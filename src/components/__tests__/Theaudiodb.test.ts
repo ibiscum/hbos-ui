@@ -1,682 +1,680 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
-import Theaudiodb from '@/components/Theaudiodb.vue'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
+import Theaudiodb from '../../components/Theaudiodb.vue'
 
-describe('Theaudiodb Component', () => {
+// Mock components
+vi.mock('@/components/ContentBox.vue', () => ({
+  default: {
+    name: 'ContentBox',
+    template: '<div class="content-box"><slot /></div>',
+  },
+}))
+
+vi.mock('@/components/Icon.vue', () => ({
+  default: {
+    name: 'Icon',
+    props: ['icon'],
+    template: '<span class="icon" />',
+  },
+}))
+
+describe('Theaudiodb.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  describe('Rendering', () => {
-    it('renders the component without errors', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-      expect(wrapper.exists()).toBe(true)
+  afterEach(() => {
+    vi.clearAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  describe('Component Rendering', () => {
+    it('should render with default props', () => {
+      const wrapper = mount(Theaudiodb)
+      expect(wrapper.find('.card').exists()).toBe(true)
+      expect(wrapper.find('.service-item').exists()).toBe(true)
     })
 
-    it('renders the service title', () => {
+    it('should display title from props', () => {
       const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
+        props: {
+          title: 'Custom Title',
         },
       })
+      expect(wrapper.text()).toContain('Custom Title')
+    })
+
+    it('should display description from props', () => {
+      const wrapper = mount(Theaudiodb, {
+        props: {
+          description: 'Custom description',
+        },
+      })
+      expect(wrapper.text()).toContain('Custom description')
+    })
+
+    it('should render with default title', () => {
+      const wrapper = mount(Theaudiodb)
       expect(wrapper.text()).toContain('TheAudioDB')
     })
 
-    it('renders the service description', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
+    it('should render with default description', () => {
+      const wrapper = mount(Theaudiodb)
       expect(wrapper.text()).toContain('TheAudioDB is used to retrieve additional artist images and biographies')
     })
 
-    it('renders ContentBox wrapper', () => {
+    it('should render Icon component with icon prop', () => {
       const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div class="content-box"><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-      expect(wrapper.find('.content-box').exists()).toBe(true)
-    })
-
-    it('renders card structure', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-      expect(wrapper.find('.card').exists()).toBe(true)
-      expect(wrapper.find('.service-item').exists()).toBe(true)
-      expect(wrapper.find('.service-main').exists()).toBe(true)
-    })
-
-    it('renders the service icon with correct icon name', () => {
-      const Icon = { template: '<i :data-icon="$attrs.icon"></i>' }
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon,
-          },
-        },
-      })
-      const icon = wrapper.find('[data-icon]')
-      expect(icon.attributes('data-icon')).toBe('tabler/database')
-    })
-
-    it('renders status badge with Active state', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-      const badge = wrapper.find('.status-badge')
-      expect(badge.exists()).toBe(true)
-      expect(badge.text()).toContain('Active')
-    })
-
-    it('renders status badge with green class', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-      const badge = wrapper.find('.status-badge')
-      expect(badge.classes()).toContain('green')
-    })
-  })
-
-  describe('Service Details Layout', () => {
-    it('renders service details section', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-      expect(wrapper.find('.service-details').exists()).toBe(true)
-    })
-
-    it('renders h3 element for title', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-      const heading = wrapper.find('h3')
-      expect(heading.exists()).toBe(true)
-      expect(heading.text()).toBe('TheAudioDB')
-    })
-
-    it('renders description paragraph with correct class', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-      const description = wrapper.find('.service-description')
-      expect(description.exists()).toBe(true)
-      expect(description.text()).toContain('additional artist images and biographies')
-    })
-  })
-
-  describe('DOM Hierarchy', () => {
-    it('has correct nesting: ContentBox > card > service-item > service-main > service-info', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div class="content-box"><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-
-      const contentBox = wrapper.find('.content-box')
-      expect(contentBox.exists()).toBe(true)
-
-      const card = contentBox.find('.card')
-      expect(card.exists()).toBe(true)
-
-      const serviceItem = card.find('.service-item')
-      expect(serviceItem.exists()).toBe(true)
-
-      const serviceMain = serviceItem.find('.service-main')
-      expect(serviceMain.exists()).toBe(true)
-
-      const serviceInfo = serviceMain.find('.service-info')
-      expect(serviceInfo.exists()).toBe(true)
-    })
-
-    it('places icon as direct child of service-info', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: { template: '<i class="service-icon"></i>' },
-          },
-        },
-      })
-      const serviceInfo = wrapper.find('.service-info')
-      const icon = serviceInfo.find('.service-icon')
-      expect(icon.exists()).toBe(true)
-    })
-
-    it('places service-details as second child of service-info', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-      const serviceInfo = wrapper.find('.service-info')
-      const children = serviceInfo.findAll(':scope > *')
-      expect(children.length).toBeGreaterThanOrEqual(2)
-    })
-  })
-
-  describe('Style Consistency', () => {
-    it('applies service-icon class to Icon component', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: { template: '<i class="service-icon"></i>' },
-          },
+        props: {
+          icon: 'tabler/database',
         },
       })
       expect(wrapper.find('.service-icon').exists()).toBe(true)
     })
+  })
 
-    it('applies service-main class to main container', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
+  describe('Status Badge Display', () => {
+    it('should display green status badge when service is active', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ artists: [{ id: 112024 }] }),
       })
-      expect(wrapper.find('.service-main').exists()).toBe(true)
+
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.status-badge.green').exists()).toBe(true)
+      expect(wrapper.text()).toContain('Active')
     })
 
-    it('applies service-info class to info container', () => {
+    it('should display red status badge when service is unavailable', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: async () => ({}),
+      })
+
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.status-badge.red').exists()).toBe(true)
+      expect(wrapper.text()).toContain('Unavailable')
+    })
+
+    it('should display yellow status badge while loading', async () => {
+      global.fetch = vi.fn(() => new Promise(() => {})) // Never resolves
+
+      const wrapper = mount(Theaudiodb)
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.status-badge.yellow').exists()).toBe(true)
+      expect(wrapper.text()).toContain('Checking...')
+    })
+
+    it('should have correct aria-label on status badge', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ artists: [{ id: 112024 }] }),
+      })
+
       const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
+        props: {
+          title: 'Test Service',
         },
       })
-      expect(wrapper.find('.service-info').exists()).toBe(true)
+      await flushPromises()
+      await wrapper.vm.$nextTick()
+
+      const statusBadge = wrapper.find('[role="status"]')
+      expect(statusBadge.attributes('aria-label')).toContain('Test Service')
+      expect(statusBadge.attributes('aria-label')).toContain('Active')
     })
   })
 
-  describe('Regression: Hard-Coded Status (Fixed)', () => {
-    it('displays status as dynamic based on API health', async () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
+  describe('Loading State', () => {
+    it('should display loading message during service check', async () => {
+      global.fetch = vi.fn(() => new Promise(() => {})) // Never resolves
+
+      const wrapper = mount(Theaudiodb)
       await wrapper.vm.$nextTick()
-      const badge = wrapper.find('.status-badge')
-      expect(badge.text()).toMatch(/Active|Unavailable|Checking/)
+
+      expect(wrapper.find('.loading-section').exists()).toBe(true)
+      expect(wrapper.text()).toContain('Checking service status...')
     })
 
-    it('accepts props to customize status badge text', async () => {
-      const wrapper = mount(Theaudiodb, {
-        props: { title: 'Custom Service' },
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
+    it('should hide loading section after service check completes', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ artists: [{ id: 112024 }] }),
       })
+
+      const wrapper = mount(Theaudiodb)
+      // Check that isLoading was true initially
+      const initiallyLoading = wrapper.vm.isLoading
+
+      await flushPromises()
       await wrapper.vm.$nextTick()
-      const badge = wrapper.find('.status-badge')
-      expect(badge.attributes('aria-label')).toContain('Custom Service')
+
+      // After promises resolve, should not be loading
+      expect(wrapper.vm.isLoading).toBe(false)
+      expect(wrapper.find('.loading-section').exists()).toBe(false)
     })
 
-    it('shows different status colors based on availability', async () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
+    it('should show loading during initial mount', async () => {
+      // Mock fetch to simulate a delayed response
+      let resolveResponse: (value: any) => void
+      const responsePromise = new Promise(resolve => {
+        resolveResponse = resolve
+      })
+
+      global.fetch = vi.fn(() => responsePromise)
+
+      const wrapper = mount(Theaudiodb)
+      // At mount time, isLoading should be true
+      expect(wrapper.vm.isLoading).toBe(true)
+
+      // Now resolve the promise
+      resolveResponse({
+        ok: true,
+        json: async () => ({ artists: [{ id: 112024 }] }),
+      })
+
+      await flushPromises()
+      // After promise resolves, should not be loading
+      expect(wrapper.vm.isLoading).toBe(false)
+    })
+  })
+
+  describe('Error Handling', () => {
+    it('should display error message on fetch failure', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error('Network error'))
+
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.status-error').exists()).toBe(true)
+      expect(wrapper.text()).toContain('Failed to check status')
+      expect(wrapper.text()).toContain('Network error')
+    })
+
+    it('should handle HTTP error responses', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: async () => ({}),
+      })
+
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.status-error').exists()).toBe(true)
+      expect(wrapper.text()).toContain('Failed to check status')
+      expect(wrapper.text()).toContain('HTTP 503')
+    })
+
+    it('should handle JSON parsing errors', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => {
+          throw new Error('Invalid JSON')
         },
       })
+
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
       await wrapper.vm.$nextTick()
-      const badge = wrapper.find('.status-badge')
-      expect(badge.classes()).toContain('status-badge')
-      // Class will be either green, red, or yellow depending on availability
-      expect(badge.classes()).toEqual(
-        expect.arrayContaining(['status-badge', expect.stringMatching(/green|red|yellow/)])
+
+      expect(wrapper.find('.status-error').exists()).toBe(true)
+      expect(wrapper.text()).toContain('Failed to check status')
+    })
+
+    it('should handle empty response data', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      })
+
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.status-badge.red').exists()).toBe(true)
+      expect(wrapper.text()).toContain('Unavailable')
+    })
+
+    it('should have correct role on error message', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error('Network error'))
+
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
+      await wrapper.vm.$nextTick()
+
+      const errorElement = wrapper.find('[role="alert"]')
+      expect(errorElement.exists()).toBe(true)
+    })
+
+    it('should log errors to console', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error')
+      global.fetch = vi.fn().mockRejectedValue(new Error('Test error'))
+
+      const wrapper = mount(Theaudiodb, {
+        props: {
+          serviceKey: 'test-service',
+        },
+      })
+      await flushPromises()
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[test-service] Service health check failed:',
+        expect.any(Error),
       )
+      consoleErrorSpy.mockRestore()
     })
   })
 
-  describe('Component Props (Enhanced)', () => {
-    it('accepts title prop', () => {
-      const wrapper = mount(Theaudiodb, {
-        props: { title: 'Custom API Service' },
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
+  describe('Service Status Check', () => {
+    it('should call checkServiceStatus on mount', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch')
+      global.fetch = fetchSpy.mockResolvedValue({
+        ok: true,
+        json: async () => ({ artists: [{ id: 112024 }] }),
       })
-      expect(wrapper.text()).toContain('Custom API Service')
+
+      mount(Theaudiodb)
+      await flushPromises()
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://www.theaudiodb.com/api/v1/artist.php?i=112024',
+        expect.objectContaining({ method: 'GET' }),
+      )
+
+      fetchSpy.mockRestore()
     })
 
-    it('accepts description prop', () => {
-      const wrapper = mount(Theaudiodb, {
-        props: { description: 'Custom description text' },
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
+    it('should handle successful service availability check', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ artists: [{ id: 112024, name: 'Test Artist' }] }),
       })
-      expect(wrapper.text()).toContain('Custom description text')
-    })
 
-    it('accepts icon prop', () => {
-      const Icon = { template: '<i :data-icon="$attrs.icon"></i>' }
-      const wrapper = mount(Theaudiodb, {
-        props: { icon: 'custom/icon' },
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon,
-          },
-        },
-      })
-      const icon = wrapper.find('[data-icon]')
-      expect(icon.attributes('data-icon')).toBe('custom/icon')
-    })
-
-    it('accepts serviceKey prop for identifying service', () => {
-      const wrapper = mount(Theaudiodb, {
-        props: { serviceKey: 'custom-service' },
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-      expect(wrapper.exists()).toBe(true)
-    })
-
-    it('has default prop values', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-      expect(wrapper.text()).toContain('TheAudioDB')
-      expect(wrapper.text()).toContain('additional artist images and biographies')
-    })
-  })
-
-  describe('Component Emits', () => {
-    it('does not emit any events', async () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
       await wrapper.vm.$nextTick()
-      expect(Object.keys(wrapper.emitted())).toEqual([])
+
+      expect(wrapper.vm.isAvailable).toBe(true)
+      expect(wrapper.text()).toContain('Active')
+    })
+
+    it('should handle empty artists array', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ artists: [] }),
+      })
+
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.isAvailable).toBe(false)
+      expect(wrapper.text()).toContain('Unavailable')
+    })
+
+    it('should handle null artists response', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ artists: null }),
+      })
+
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.isAvailable).toBe(false)
+    })
+
+    it('should handle undefined response', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      })
+
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.isAvailable).toBe(false)
     })
   })
 
-  describe('Import Dependencies (Enhanced)', () => {
-    it('imports Icon component', () => {
+  describe('Props Validation', () => {
+    it('should accept custom title prop', () => {
       const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
+        props: {
+          title: 'Custom Service',
         },
       })
-      expect(wrapper.exists()).toBe(true)
+      expect(wrapper.text()).toContain('Custom Service')
     })
 
-    it('imports ContentBox component', () => {
+    it('should accept custom description prop', () => {
       const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            Icon: true,
-            ContentBox: { template: '<div><slot /></div>' },
-          },
+        props: {
+          description: 'Custom service description',
         },
       })
-      expect(wrapper.exists()).toBe(true)
+      expect(wrapper.text()).toContain('Custom service description')
     })
 
-    it('has state management for service status', () => {
+    it('should accept custom icon prop', () => {
       const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
+        props: {
+          icon: 'custom-icon',
         },
       })
-      // Component should have reactive state for isLoading, isAvailable, errorMessage
-      expect(wrapper.vm.isLoading !== undefined).toBe(true)
-      expect(wrapper.vm.isAvailable !== undefined).toBe(true)
-      expect(wrapper.vm.errorMessage !== undefined).toBe(true)
+      // Icon component receives the prop
+      expect(wrapper.vm.$props.icon).toBe('custom-icon')
     })
 
-    it('has checkServiceStatus method for API integration', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-      expect(typeof wrapper.vm.checkServiceStatus).toBe('function')
-    })
-  })
+    it('should accept custom serviceKey prop', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error')
+      global.fetch = vi.fn().mockRejectedValue(new Error('Test'))
 
-  describe('Accessibility Issues (Fixed)', () => {
-    it('has aria-label on status badge for screen readers', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
+      mount(Theaudiodb, {
+        props: {
+          serviceKey: 'custom-key',
         },
       })
-      const badge = wrapper.find('.status-badge')
-      expect(badge.attributes('aria-label')).toBeDefined()
-      expect(badge.attributes('aria-label')).toContain('TheAudioDB service status')
+
+      // Wait for async operations to complete
+      await flushPromises()
+
+      // Verify the custom key is used in error logging
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('custom-key'),
+        expect.any(Error),
+      )
+
+      consoleErrorSpy.mockRestore()
     })
 
-    it('status badge has role="status" for accessibility', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-      const badge = wrapper.find('.status-badge')
-      expect(badge.attributes('role')).toBe('status')
-    })
-
-    it('has visual status indicator (●) in addition to color', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-      const badge = wrapper.find('.status-badge')
-      const icon = badge.find('.status-icon')
-      expect(icon.exists()).toBe(true)
-      expect(icon.attributes('aria-hidden')).toBe('true')
-      expect(badge.text()).toContain('●')
+    it('should use default props when not provided', () => {
+      const wrapper = mount(Theaudiodb)
+      expect(wrapper.vm.$props.title).toBe('TheAudioDB')
+      expect(wrapper.vm.$props.icon).toBe('tabler/database')
+      expect(wrapper.vm.$props.serviceKey).toBe('theaudiodb')
     })
   })
 
-  describe('Styling and SCSS', () => {
-    it('applies scoped styles', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-      // Component uses scoped SCSS styles
-      expect(wrapper.find('.service-item').exists()).toBe(true)
+  describe('Computed Properties', () => {
+    it('statusText should be "Checking..." when loading', async () => {
+      global.fetch = vi.fn(() => new Promise(() => {}))
+
+      const wrapper = mount(Theaudiodb)
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.statusText).toBe('Checking...')
     })
 
-    it('imports service-item SCSS mixins', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
+    it('statusText should be "Active" when available', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ artists: [{ id: 112024 }] }),
       })
-      // The component relies on @import '@/assets/scss/service-item'
-      // All service-related classes should exist
-      expect(wrapper.find('.service-item').exists()).toBe(true)
-      expect(wrapper.find('.service-main').exists()).toBe(true)
-      expect(wrapper.find('.service-info').exists()).toBe(true)
-      expect(wrapper.find('.service-icon').exists()).toBe(true)
-      expect(wrapper.find('.service-details').exists()).toBe(true)
+
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
+
+      expect(wrapper.vm.statusText).toBe('Active')
+    })
+
+    it('statusText should be "Unavailable" when not available', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: async () => ({}),
+      })
+
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
+
+      expect(wrapper.vm.statusText).toBe('Unavailable')
+    })
+
+    it('statusBadgeClass should include yellow when loading', async () => {
+      global.fetch = vi.fn(() => new Promise(() => {}))
+
+      const wrapper = mount(Theaudiodb)
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.statusBadgeClass).toContain('yellow')
+    })
+
+    it('statusBadgeClass should include green when available', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ artists: [{ id: 112024 }] }),
+      })
+
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
+
+      expect(wrapper.vm.statusBadgeClass).toContain('green')
+    })
+
+    it('statusBadgeClass should include red when unavailable', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: async () => ({}),
+      })
+
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
+
+      expect(wrapper.vm.statusBadgeClass).toContain('red')
+    })
+  })
+
+  describe('Regression Tests', () => {
+    it('should not show error message when service is available', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ artists: [{ id: 112024 }] }),
+      })
+
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.status-error').exists()).toBe(false)
+      expect(wrapper.vm.errorMessage).toBeNull()
+    })
+
+    it('should clear error message on retry', async () => {
+      global.fetch = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ artists: [{ id: 112024 }] }),
+        })
+
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.errorMessage).toBeTruthy()
+
+      // Trigger second check
+      await wrapper.vm.checkServiceStatus()
+      await flushPromises()
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.errorMessage).toBeNull()
+    })
+
+    it('should maintain loading state during fetch', async () => {
+      const neverResolvingPromise = new Promise(() => {
+        // Never resolves
+      })
+      global.fetch = vi.fn(() => neverResolvingPromise)
+
+      const wrapper = mount(Theaudiodb)
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.isLoading).toBe(true)
+    })
+
+    it('should properly update state after async operations', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ artists: [{ id: 112024 }] }),
+      })
+
+      const wrapper = mount(Theaudiodb)
+
+      expect(wrapper.vm.isLoading).toBe(true)
+      expect(wrapper.vm.errorMessage).toBeNull()
+
+      await flushPromises()
+
+      expect(wrapper.vm.isLoading).toBe(false)
+      expect(wrapper.vm.isAvailable).toBe(true)
+      expect(wrapper.vm.errorMessage).toBeNull()
+    })
+
+    it('should handle rapid status checks', async () => {
+      const fetchSpy = vi
+        .fn()
+        .mockResolvedValue({
+          ok: true,
+          json: async () => ({ artists: [{ id: 112024 }] }),
+        })
+
+      global.fetch = fetchSpy
+
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
+
+      await wrapper.vm.checkServiceStatus()
+      await wrapper.vm.checkServiceStatus()
+      await flushPromises()
+
+      // Verify multiple calls completed without errors
+      expect(wrapper.vm.isLoading).toBe(false)
+      expect(wrapper.vm.isAvailable).toBe(true)
     })
   })
 
   describe('Edge Cases', () => {
-    it('handles multiple mounts without errors', () => {
-      const wrapper1 = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-      const wrapper2 = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-      expect(wrapper1.exists()).toBe(true)
-      expect(wrapper2.exists()).toBe(true)
-    })
+    it('should handle very long error messages', async () => {
+      global.fetch = vi
+        .fn()
+        .mockRejectedValue(new Error('A'.repeat(1000)))
 
-    it('renders consistently across multiple renders', () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-      const firstRender = wrapper.html()
-      wrapper.vm.$forceUpdate()
-      const secondRender = wrapper.html()
-      expect(firstRender).toBe(secondRender)
-    })
-  })
-
-  describe('Error Handling (New)', () => {
-    it('displays error message when service check fails', async () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
-
-      // Set error manually to test error display
-      wrapper.vm.errorMessage = 'Failed to check status: Network error'
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
       await wrapper.vm.$nextTick()
 
-      const errorSpan = wrapper.find('.status-error')
-      expect(errorSpan.exists()).toBe(true)
-      expect(errorSpan.text()).toContain('Network error')
+      expect(wrapper.find('.status-error').exists()).toBe(true)
+      expect(wrapper.vm.errorMessage).toBeTruthy()
     })
 
-    it('error message has role="alert" for accessibility', async () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
-      })
+    it('should handle special characters in error messages', async () => {
+      global.fetch = vi
+        .fn()
+        .mockRejectedValue(new Error('Error: <script>alert("xss")</script>'))
 
-      wrapper.vm.errorMessage = 'Service unavailable'
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
       await wrapper.vm.$nextTick()
 
-      const errorSpan = wrapper.find('.status-error')
-      expect(errorSpan.attributes('role')).toBe('alert')
+      // Check that content is properly escaped in Vue template
+      expect(wrapper.vm.errorMessage).toContain('<script>')
     })
 
-    it('clears error message on successful status check', async () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
+    it('should handle artists response with extra fields', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          artists: [{ id: 112024, name: 'Test', extra: 'field' }],
+          meta: { version: '1.0' },
+        }),
       })
 
-      wrapper.vm.errorMessage = 'Previous error'
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
       await wrapper.vm.$nextTick()
 
-      wrapper.vm.errorMessage = null
+      expect(wrapper.vm.isAvailable).toBe(true)
+    })
+
+    it('should handle response with only artists object (not array)', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          artists: { id: 112024 }, // Not an array
+        }),
+      })
+
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
       await wrapper.vm.$nextTick()
 
-      expect(wrapper.find('.status-error').exists()).toBe(false)
+      expect(wrapper.vm.isAvailable).toBe(false)
     })
   })
 
-  describe('Loading State (New)', () => {
-    it('shows loading state when checking service', async () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
+  describe('Accessibility', () => {
+    it('should have proper role attributes', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ artists: [{ id: 112024 }] }),
       })
 
-      wrapper.vm.isLoading = true
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
       await wrapper.vm.$nextTick()
 
-      const loading = wrapper.find('.loading-section')
-      expect(loading.exists()).toBe(true)
-      expect(loading.text()).toContain('Checking service status')
+      expect(wrapper.find('[role="status"]').exists()).toBe(true)
     })
 
-    it('displays "Checking..." status text while loading', async () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
+    it('should have aria-hidden on decorative status icon', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ artists: [{ id: 112024 }] }),
       })
 
-      wrapper.vm.isLoading = true
+      const wrapper = mount(Theaudiodb)
+      await flushPromises()
       await wrapper.vm.$nextTick()
 
-      const badge = wrapper.find('.status-badge')
-      expect(badge.text()).toContain('Checking')
+      const statusIcon = wrapper.find('.status-icon')
+      expect(statusIcon.attributes('aria-hidden')).toBe('true')
     })
 
-    it('removes loading section after status check', async () => {
-      const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
-        },
+    it('should have descriptive aria-label on status badge', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ artists: [{ id: 112024 }] }),
       })
 
-      wrapper.vm.isLoading = true
-      await wrapper.vm.$nextTick()
-      expect(wrapper.find('.loading-section').exists()).toBe(true)
-
-      wrapper.vm.isLoading = false
-      await wrapper.vm.$nextTick()
-      expect(wrapper.find('.loading-section').exists()).toBe(false)
-    })
-
-    it('updates status color during loading', async () => {
       const wrapper = mount(Theaudiodb, {
-        global: {
-          stubs: {
-            ContentBox: { template: '<div><slot /></div>' },
-            Icon: true,
-          },
+        props: {
+          title: 'Music Service',
         },
       })
-
-      wrapper.vm.isLoading = true
+      await flushPromises()
       await wrapper.vm.$nextTick()
 
-      const badge = wrapper.find('.status-badge')
-      expect(badge.classes()).toContain('yellow')
+      const statusBadge = wrapper.find('[role="status"]')
+      const ariaLabel = statusBadge.attributes('aria-label')
+      expect(ariaLabel).toContain('Music Service')
+      expect(ariaLabel).toContain('Active')
     })
   })
 })

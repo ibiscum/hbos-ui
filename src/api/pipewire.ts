@@ -777,6 +777,7 @@ export async function setSpeakerEQBandEnabled(
 export async function clearSpeakerEQBlock(block: string): Promise<ApiResponse<EQClearResponse>> {
   return apiRequest<EQClearResponse>(`${SPEAKEREQ_BASE}/eq/${block}/clear`, {
     method: 'PUT',
+    body: JSON.stringify({}),
   })
 }
 
@@ -916,7 +917,10 @@ export async function refreshSpeakerEQCache(): Promise<ApiResponse<RefreshRespon
  * Reset all parameters to default values
  */
 export async function resetSpeakerEQToDefaults(): Promise<ApiResponse<DefaultResponse>> {
-  return apiRequest<DefaultResponse>(`${SPEAKEREQ_BASE}/default`, { method: 'POST' })
+  return apiRequest<DefaultResponse>(`${SPEAKEREQ_BASE}/default`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
 }
 
 /**
@@ -1052,7 +1056,10 @@ export async function setRIAANotch(
  * Reset RIAA parameters to defaults
  */
 export async function resetRIAAToDefaults(): Promise<ApiResponse<DefaultResponse>> {
-  return apiRequest<DefaultResponse>(`${RIAA_BASE}/set-default`, { method: 'PUT' })
+  return apiRequest<DefaultResponse>(`${RIAA_BASE}/set-default`, {
+    method: 'PUT',
+    body: JSON.stringify({}),
+  })
 }
 
 // ============================================================================

@@ -1,11 +1,16 @@
 import { useAppConfigStore } from '@/stores/appconfig'
 import { apiFetch } from '@/api/http'
 
-// Types for Spotify API
-export interface SpotifyAuthResponse {
+/**
+ * Standardized Spotify API response types.
+ * All responses follow a consistent structure with optional error fields.
+ */
+
+export interface SpotifySessionResponse {
   session_id: string
   status: string
   message?: string
+  error?: string
 }
 
 export interface SpotifyStatusResponse {
@@ -17,14 +22,15 @@ export interface SpotifyStatusResponse {
 }
 
 export interface SpotifyTokensResponse {
-  status: string
+  authenticated?: boolean
+  status?: string
   message?: string
   error?: string
 }
 
-export interface SpotifyDisconnectResponse {
+export interface SpotifyLogoutResponse {
   authenticated: boolean
-  status: string
+  status?: string
   message?: string
   error?: string
 }
@@ -40,91 +46,108 @@ export interface SpotifyPollResponse {
 }
 
 /**
- * Get Spotify authentication status
+ * Helper function to handle common error patterns in Spotify API responses
+ * @param operation - Human-readable operation name for error messages
+ * @param url - The API endpoint URL
+ * @throws {Error} With formatted error message including status code and text
+ */
+const handleApiError = (operation: string, status: number, statusText: string): void => {
+  throw new Error(`${operation}: ${status} ${statusText}`)
+}
+
+/**
+ * Generic handler for API calls to reduce boilerplate
+ * @param operation - Operation name for error messages
+ * @param url - Full API endpoint URL
+ * @param options - Optional fetch options (method, headers, body)
+ * @returns Parsed JSON response
+ */
+const callSpotifyApi = async <T>(
+  operation: string,
+  url: string,
+  options?: RequestInit,
+): Promise<T> => {
+  try {
+    const response = await apiFetch(url, options)
+    if (!response.ok) {
+      handleApiError(operation, response.status, response.statusText)
+    }
+    return (await response.json()) as T
+  } catch (error) {
+    if (error instanceof Error && error.message.includes(':')) {
+      // Already formatted by handleApiError
+      throw error
+    }
+    console.error(`Error ${operation}:`, error)
+    throw error
+  }
+}
+
+/**
+ * Get Spotify authentication status.
+ * Checks if the user is authenticated with Spotify and retrieves session info.
+ * @returns Authentication status with optional user info and expiration
+ * @throws {Error} If the API call fails
  */
 export const getSpotifyStatus = async (): Promise<SpotifyStatusResponse> => {
   const appConfigStore = useAppConfigStore()
   const baseUrl = appConfigStore.getApiBaseUrl()
-
-  try {
-    const response = await apiFetch(`${baseUrl}/spotify/status`)
-
-    if (!response.ok) {
-      throw new Error(`Failed to get Spotify status: ${response.status} ${response.statusText}`)
-    }
-
-    return await response.json()
-  } catch (error) {
-    console.error('Error getting Spotify status:', error)
-    throw error
-  }
+  return callSpotifyApi<SpotifyStatusResponse>('getSpotifyStatus', `${baseUrl}/spotify/status`)
 }
 
 /**
- * Create Spotify authentication session
+ * Create a new Spotify authentication session.
+ * Initiates the Spotify OAuth flow by creating a session on the server.
+ * @returns Session response with session ID and status
+ * @throws {Error} If session creation fails
  */
-export const createSpotifySession = async (): Promise<SpotifyAuthResponse> => {
+export const createSpotifySession = async (): Promise<SpotifySessionResponse> => {
   const appConfigStore = useAppConfigStore()
   const baseUrl = appConfigStore.getApiBaseUrl()
-
-  try {
-    const response = await apiFetch(`${baseUrl}/spotify/create_session`)
-
-    if (!response.ok) {
-      throw new Error(`Failed to create Spotify session: ${response.status} ${response.statusText}`)
-    }
-
-    return await response.json()
-  } catch (error) {
-    console.error('Error creating Spotify session:', error)
-    throw error
-  }
+  return callSpotifyApi<SpotifySessionResponse>(
+    'createSpotifySession',
+    `${baseUrl}/spotify/create_session`,
+  )
 }
 
 /**
- * Get Spotify login URL
+ * Get the Spotify login URL for a session.
+ * Returns the URL to redirect the user to for Spotify authorization.
+ * @param sessionId - The session ID from createSpotifySession
+ * @returns Response containing the login URL and session info
+ * @throws {Error} If the API call fails
  */
-export const getSpotifyLoginUrl = async (sessionId: string): Promise<SpotifyAuthResponse> => {
+export const getSpotifyLoginUrl = async (sessionId: string): Promise<SpotifySessionResponse> => {
   const appConfigStore = useAppConfigStore()
   const baseUrl = appConfigStore.getApiBaseUrl()
-
-  try {
-    const response = await apiFetch(`${baseUrl}/spotify/login/${sessionId}`)
-
-    if (!response.ok) {
-      throw new Error(`Failed to get Spotify login URL: ${response.status} ${response.statusText}`)
-    }
-
-    return await response.json()
-  } catch (error) {
-    console.error('Error getting Spotify login URL:', error)
-    throw error
-  }
+  return callSpotifyApi<SpotifySessionResponse>(
+    'getSpotifyLoginUrl',
+    `${baseUrl}/spotify/login/${sessionId}`,
+  )
 }
 
 /**
- * Poll for Spotify authentication completion
+ * Poll for Spotify authentication completion.
+ * Checks if the user has completed the Spotify authorization process.
+ * @param sessionId - The session ID to poll for
+ * @returns Poll status with optional token data on completion
+ * @throws {Error} If the poll request fails
  */
 export const pollSpotifyAuth = async (sessionId: string): Promise<SpotifyPollResponse> => {
   const appConfigStore = useAppConfigStore()
   const baseUrl = appConfigStore.getApiBaseUrl()
-
-  try {
-    const response = await apiFetch(`${baseUrl}/spotify/poll/${sessionId}`)
-
-    if (!response.ok) {
-      throw new Error(`Failed to poll Spotify auth: ${response.status} ${response.statusText}`)
-    }
-
-    return await response.json()
-  } catch (error) {
-    console.error('Error polling Spotify auth:', error)
-    throw error
-  }
+  return callSpotifyApi<SpotifyPollResponse>(
+    'pollSpotifyAuth',
+    `${baseUrl}/spotify/poll/${sessionId}`,
+  )
 }
 
 /**
- * Store Spotify tokens
+ * Store Spotify authentication tokens.
+ * Securely transmits tokens to the server for storage and future use.
+ * @param tokenData - Object containing access_token, refresh_token, and expires_in
+ * @returns Response confirming token storage
+ * @throws {Error} If token storage fails
  */
 export const storeSpotifyTokens = async (tokenData: {
   access_token: string
@@ -133,46 +156,40 @@ export const storeSpotifyTokens = async (tokenData: {
 }): Promise<SpotifyTokensResponse> => {
   const appConfigStore = useAppConfigStore()
   const baseUrl = appConfigStore.getApiBaseUrl()
-
-  try {
-    const response = await apiFetch(`${baseUrl}/spotify/tokens`, {
+  return callSpotifyApi<SpotifyTokensResponse>(
+    'storeSpotifyTokens',
+    `${baseUrl}/spotify/tokens`,
+    {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(tokenData)
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to store Spotify tokens: ${response.status} ${response.statusText}`)
-    }
-
-    return await response.json()
-  } catch (error) {
-    console.error('Error storing Spotify tokens:', error)
-    throw error
-  }
+      body: JSON.stringify(tokenData),
+    },
+  )
 }
 
 /**
- * Disconnect from Spotify
+ * Log out from Spotify and disconnect the session.
+ * Removes stored tokens and clears the Spotify connection on the server.
+ * @returns Response confirming logout
+ * @throws {Error} If logout fails
+ * @deprecated Use logoutSpotify() instead. This is kept for backwards compatibility.
  */
-export const disconnectSpotify = async (): Promise<SpotifyDisconnectResponse> => {
+export const disconnectSpotify = async (): Promise<SpotifyLogoutResponse> => {
+  return logoutSpotify()
+}
+
+/**
+ * Log out from Spotify and disconnect the session.
+ * Removes stored tokens and clears the Spotify connection on the server.
+ * @returns Response confirming logout with authentication status
+ * @throws {Error} If logout fails
+ */
+export const logoutSpotify = async (): Promise<SpotifyLogoutResponse> => {
   const appConfigStore = useAppConfigStore()
   const baseUrl = appConfigStore.getApiBaseUrl()
-
-  try {
-    const response = await apiFetch(`${baseUrl}/spotify/logout`, {
-      method: 'POST'
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to disconnect from Spotify: ${response.status} ${response.statusText}`)
-    }
-
-    return await response.json()
-  } catch (error) {
-    console.error('Error disconnecting from Spotify:', error)
-    throw error
-  }
+  return callSpotifyApi<SpotifyLogoutResponse>('logoutSpotify', `${baseUrl}/spotify/logout`, {
+    method: 'POST',
+  })
 }

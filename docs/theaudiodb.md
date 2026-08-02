@@ -24,7 +24,7 @@
 
 ### `description`
 - **Type**: `string`
-- **Default**: `'Artist images and biographies'`
+- **Default**: `'TheAudioDB is used to retrieve additional artist images and biographies'`
 - **Description**: Brief description of the service functionality
 
 ### `icon`

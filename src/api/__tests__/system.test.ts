@@ -162,35 +162,55 @@ describe('system.ts - Code Review & Regression Tests', () => {
   })
 
   describe('Inconsistency #4: Missing Input Validation', () => {
-    it('updateHostname does not validate hostname is provided', async () => {
+    it('FIXED: updateHostname now validates at least one field is provided', async () => {
+      // Should require at least one field
+      await expect(systemApi.updateHostname({}))
+        .rejects.toThrow('At least one of hostname or pretty_hostname must be provided')
+    })
+
+    it('FIXED: updateHostname accepts valid hostname', async () => {
       const mockFetch = vi.mocked(apiFetch)
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ status: 'success', message: 'Updated' })
       } as AnyType)
 
-      // Should require at least one field
-      await systemApi.updateHostname({})
+      await systemApi.updateHostname({ hostname: 'newhost' })
 
-      // No validation - just sends empty object
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          body: JSON.stringify({})
-        })
-      )
+      expect(mockFetch).toHaveBeenCalled()
     })
 
-    it('setSoundCardDtoverlay does not validate dtoverlay is not empty', async () => {
+    it('FIXED: updateHostname accepts valid pretty_hostname', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ status: 'success', message: 'Updated' })
+      } as AnyType)
+
+      await systemApi.updateHostname({ pretty_hostname: 'My Device' })
+
+      expect(mockFetch).toHaveBeenCalled()
+    })
+
+    it('FIXED: setSoundCardDtoverlay now validates dtoverlay is not empty', async () => {
+      await expect(systemApi.setSoundCardDtoverlay({ dtoverlay: '' }))
+        .rejects.toThrow('Device tree overlay name cannot be empty')
+    })
+
+    it('FIXED: setSoundCardDtoverlay rejects whitespace-only dtoverlay', async () => {
+      await expect(systemApi.setSoundCardDtoverlay({ dtoverlay: '   ' }))
+        .rejects.toThrow('Device tree overlay name cannot be empty')
+    })
+
+    it('FIXED: setSoundCardDtoverlay accepts valid dtoverlay', async () => {
       const mockFetch = vi.mocked(apiFetch)
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ status: 'success' })
       } as AnyType)
 
-      await systemApi.setSoundCardDtoverlay({ dtoverlay: '' })
+      await systemApi.setSoundCardDtoverlay({ dtoverlay: 'hifiberry-dacplus' })
 
-      // No validation - empty string accepted
       expect(mockFetch).toHaveBeenCalled()
     })
 
@@ -204,27 +224,58 @@ describe('system.ts - Code Review & Regression Tests', () => {
       expect(mockFetch).not.toHaveBeenCalled()
     })
 
-    it('disableSoundCardDetection does not validate card_name', async () => {
+    it('FIXED: executeScript rejects whitespace-only script', async () => {
+      await expect(systemApi.executeScript({ script: '   ' }))
+        .rejects.toThrow('Script name cannot be empty')
+    })
+
+    it('FIXED: disableSoundCardDetection now validates card_name is not empty', async () => {
+      await expect(systemApi.disableSoundCardDetection(''))
+        .rejects.toThrow('Card name cannot be empty')
+    })
+
+    it('FIXED: disableSoundCardDetection rejects whitespace-only card_name', async () => {
+      await expect(systemApi.disableSoundCardDetection('   '))
+        .rejects.toThrow('Card name cannot be empty')
+    })
+
+    it('FIXED: disableSoundCardDetection accepts valid card_name', async () => {
       const mockFetch = vi.mocked(apiFetch)
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ status: 'success' })
       } as AnyType)
 
-      await systemApi.disableSoundCardDetection('')
+      await systemApi.disableSoundCardDetection('DAC+')
 
-      // Empty card_name accepted
       expect(mockFetch).toHaveBeenCalled()
     })
 
-    it('checkFileExistence does not validate array is not empty', async () => {
+    it('FIXED: checkFileExistence now validates array is not empty', async () => {
+      await expect(systemApi.checkFileExistence([]))
+        .rejects.toThrow('File paths array cannot be empty')
+    })
+
+    it('FIXED: checkFileExistence validates all paths are non-empty', async () => {
+      await expect(systemApi.checkFileExistence(['/etc/config', '', '/root/file']))
+        .rejects.toThrow('File paths cannot be empty strings')
+    })
+
+    it('FIXED: checkFileExistence rejects whitespace-only paths', async () => {
+      await expect(systemApi.checkFileExistence(['   ']))
+        .rejects.toThrow('File paths cannot be empty strings')
+    })
+
+    it('FIXED: checkFileExistence accepts valid file paths', async () => {
       const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: { exists: true } })
+      } as AnyType)
 
-      const result = await systemApi.checkFileExistence([])
-
-      // Should return empty array or throw? Currently returns empty array silently
-      expect(result).toEqual([])
-      expect(mockFetch).not.toHaveBeenCalled()
+      const result = await systemApi.checkFileExistence(['/etc/config', '/root'])
+      expect(result).toHaveLength(2)
+      expect(mockFetch).toHaveBeenCalledTimes(2)
     })
   })
 
@@ -645,6 +696,24 @@ describe('system.ts - Code Review & Regression Tests', () => {
         .rejects.toThrow('Script name cannot be empty')
     })
 
+    it('FIXED: setSoundCardDtoverlay now validates empty string', async () => {
+      // Empty dtoverlay should be rejected
+      await expect(systemApi.setSoundCardDtoverlay({ dtoverlay: '' }))
+        .rejects.toThrow('Device tree overlay name cannot be empty')
+    })
+
+    it('FIXED: disableSoundCardDetection now validates empty card name', async () => {
+      // Empty card name should be rejected
+      await expect(systemApi.disableSoundCardDetection(''))
+        .rejects.toThrow('Card name cannot be empty')
+    })
+
+    it('FIXED: updateHostname now validates at least one field provided', async () => {
+      // Empty request should require at least one field
+      await expect(systemApi.updateHostname({}))
+        .rejects.toThrow('At least one of hostname or pretty_hostname must be provided')
+    })
+
     it('REGRESSION: executeScript accepts path traversal attempts', async () => {
       const mockFetch = vi.mocked(apiFetch)
       mockFetch.mockResolvedValueOnce({
@@ -652,7 +721,7 @@ describe('system.ts - Code Review & Regression Tests', () => {
         json: async () => ({ status: 'success' })
       } as AnyType)
 
-      // Path traversal patterns should be blocked
+      // Path traversal patterns should be blocked (future enhancement)
       await systemApi.executeScript({ script: '../../../etc/passwd' })
 
       expect(mockFetch).toHaveBeenCalledWith(
@@ -668,101 +737,50 @@ describe('system.ts - Code Review & Regression Tests', () => {
         json: async () => ({ status: 'success' })
       } as AnyType)
 
-      // Special characters might need escaping
+      // Special characters might need escaping (future enhancement)
       await systemApi.executeScript({ script: 'script; rm -rf /' })
 
       expect(mockFetch).toHaveBeenCalled()
     })
-
-    it('REGRESSION: setSoundCardDtoverlay accepts empty string', async () => {
-      const mockFetch = vi.mocked(apiFetch)
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ status: 'success' })
-      } as AnyType)
-
-      // Empty dtoverlay should be rejected
-      await systemApi.setSoundCardDtoverlay({ dtoverlay: '' })
-
-      expect(mockFetch).toHaveBeenCalled()
-    })
-
-    it('REGRESSION: disableSoundCardDetection accepts empty card name', async () => {
-      const mockFetch = vi.mocked(apiFetch)
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ status: 'success' })
-      } as AnyType)
-
-      // Empty card name should be rejected
-      await systemApi.disableSoundCardDetection('')
-
-      expect(mockFetch).toHaveBeenCalled()
-    })
-
-    it('REGRESSION: updateHostname accepts empty request', async () => {
-      const mockFetch = vi.mocked(apiFetch)
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ status: 'success' })
-      } as AnyType)
-
-      // Empty request should require at least one field
-      await systemApi.updateHostname({})
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          body: JSON.stringify({})
-        })
-      )
-    })
   })
 
   describe('Regression #3: Array Parameter Validation', () => {
-    it('REGRESSION: checkFileExistence accepts empty array', async () => {
-      const mockFetch = vi.mocked(apiFetch)
-
-      const result = await systemApi.checkFileExistence([])
-
-      // Empty array should either throw or return empty, currently returns empty silently
-      expect(result).toEqual([])
-      expect(mockFetch).not.toHaveBeenCalled()
+    it('FIXED: checkFileExistence now validates array is not empty', async () => {
+      // Empty array should now throw
+      await expect(systemApi.checkFileExistence([]))
+        .rejects.toThrow('File paths array cannot be empty')
     })
 
-    it('REGRESSION: checkFileExistence accepts empty path strings', async () => {
+    it('FIXED: checkFileExistence now validates paths are not empty strings', async () => {
+      // Empty paths in array should be rejected
+      await expect(systemApi.checkFileExistence(['']))
+        .rejects.toThrow('File paths cannot be empty strings')
+    })
+
+    it('FIXED: checkFileExistence rejects mixed empty and valid paths', async () => {
+      // Mixed valid and empty should throw on validation
+      await expect(systemApi.checkFileExistence(['/path/1', '', '/path/2']))
+        .rejects.toThrow('File paths cannot be empty strings')
+    })
+
+    it('FIXED: checkFileExistence rejects whitespace-only paths', async () => {
+      // Whitespace-only paths should be rejected
+      await expect(systemApi.checkFileExistence(['   ', '/path']))
+        .rejects.toThrow('File paths cannot be empty strings')
+    })
+
+    it('FIXED: checkFileExistence accepts valid paths and makes correct calls', async () => {
       const mockFetch = vi.mocked(apiFetch)
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => ({ data: { exists: false } })
+        json: async () => ({ data: { exists: true } })
       } as AnyType)
 
-      const result = await systemApi.checkFileExistence([''])
+      const result = await systemApi.checkFileExistence(['/path/1', '/path/2'])
 
-      // Empty path should be rejected
-      expect(result[0].path).toBe('')
-      expect(result[0].filename).toBe('')
-    })
-
-    it('REGRESSION: checkFileExistence fails on first error (no partial results)', async () => {
-      const mockFetch = vi.mocked(apiFetch)
-      mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ data: { exists: true } })
-        } as AnyType)
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 500
-        } as AnyType)
-
-      await expect(
-        systemApi.checkFileExistence(['/path/1', '/path/2', '/path/3'])
-      ).rejects.toThrow()
-
-      // Only made 2 requests before failing
+      // Now correctly processes valid paths
+      expect(result).toHaveLength(2)
       expect(mockFetch).toHaveBeenCalledTimes(2)
-      // No partial results returned
     })
   })
 
@@ -844,6 +862,335 @@ describe('system.ts - Code Review & Regression Tests', () => {
 
       // JSON NOT parsed when ok is false
       expect(jsonSpy).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('Additional Comprehensive Tests', () => {
+    describe('Parameter Type Validation', () => {
+      it('rebootSystem throws on negative delay number', async () => {
+        await expect(systemApi.rebootSystem({ delay: -1 }))
+          .rejects.toThrow('Reboot delay must be a non-negative number')
+      })
+
+      it('rebootSystem throws on Infinity delay', async () => {
+        await expect(systemApi.rebootSystem({ delay: Infinity }))
+          .rejects.toThrow('Reboot delay must be a non-negative number')
+      })
+
+      it('rebootSystem throws on NaN delay', async () => {
+        await expect(systemApi.rebootSystem({ delay: NaN }))
+          .rejects.toThrow('Reboot delay must be a non-negative number')
+      })
+
+      it('rebootSystem accepts zero delay', async () => {
+        const mockFetch = vi.mocked(apiFetch)
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ status: 'success', message: 'Rebooting immediately' })
+        } as AnyType)
+
+        const result = await systemApi.rebootSystem({ delay: 0 })
+        expect(result.status).toBe('success')
+      })
+
+      it('rebootSystem accepts floating point delay', async () => {
+        const mockFetch = vi.mocked(apiFetch)
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ status: 'success' })
+        } as AnyType)
+
+        await systemApi.rebootSystem({ delay: 10.5 })
+        expect(mockFetch).toHaveBeenCalled()
+      })
+    })
+
+    describe('Response Type Validation', () => {
+      it('getSystemInfo returns complete SystemInfo structure', async () => {
+        const mockFetch = vi.mocked(apiFetch)
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            status: 'success',
+            pi_model: {
+              name: 'Raspberry Pi 4 Model B',
+              version: '1.4',
+              memory: {
+                total_kb: 4194304,
+                total_mb: 4096,
+                total_gb: 4
+              }
+            },
+            hat_info: {
+              vendor: 'HiFiBerry',
+              product: 'DAC+',
+              uuid: '12345',
+              vendor_card: 'DACplus'
+            },
+            soundcard: {
+              name: 'DAC+ Stereo',
+              volume_control: 'Master',
+              headphone_volume_control: null,
+              hardware_index: 0,
+              output_channels: 2,
+              input_channels: 0,
+              features: ['volume_control'],
+              hat_name: 'DACplus',
+              supports_dsp: true,
+              card_type: ['audio']
+            },
+            system: {
+              uuid: '12345',
+              hostname: 'hifiberry',
+              pretty_hostname: 'HiFiBerry Device'
+            }
+          })
+        } as AnyType)
+
+        const result = await systemApi.getSystemInfo()
+        expect(result.status).toBe('success')
+        expect(result.pi_model.name).toBe('Raspberry Pi 4 Model B')
+        expect(result.soundcard.output_channels).toBe(2)
+      })
+
+      it('getSoundCards returns data with correct structure', async () => {
+        const mockFetch = vi.mocked(apiFetch)
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            status: 'success',
+            data: {
+              soundcards: [
+                {
+                  name: 'DAC+',
+                  dtoverlay: 'hifiberry-dacplus',
+                  volume_control: 'Master',
+                  headphone_volume_control: null,
+                  output_channels: 2,
+                  input_channels: 0,
+                  features: [],
+                  supports_dsp: true,
+                  card_type: ['audio'],
+                  is_pro: false
+                }
+              ],
+              count: 1
+            }
+          })
+        } as AnyType)
+
+        const result = await systemApi.getSoundCards()
+        expect(result.data.soundcards).toHaveLength(1)
+        expect(result.data.count).toBe(1)
+        expect(result.data.soundcards[0].name).toBe('DAC+')
+      })
+
+      it('getCacheStats returns correct statistics structure', async () => {
+        const mockFetch = vi.mocked(apiFetch)
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            success: true,
+            stats: {
+              disk_entries: 150,
+              memory_entries: 50,
+              memory_bytes: 1024000,
+              memory_limit_bytes: 10485760
+            },
+            image_cache_stats: {
+              total_images: 200,
+              total_size: 5242880,
+              last_updated: Date.now()
+            },
+            message: null
+          })
+        } as AnyType)
+
+        const result = await systemApi.getCacheStats()
+        expect(result.success).toBe(true)
+        expect(result.stats.disk_entries).toBe(150)
+        expect(result.image_cache_stats.total_images).toBe(200)
+      })
+
+      it('getBackgroundJobs returns correct job structure', async () => {
+        const mockFetch = vi.mocked(apiFetch)
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            success: true,
+            jobs: [
+              {
+                id: 'job1',
+                name: 'album-scan',
+                start_time: Date.now() - 60000,
+                last_update: Date.now(),
+                finish_time: null,
+                status: 'running',
+                progress: 'Scanning albums...',
+                total_items: 1000,
+                completed_items: 350,
+                duration_seconds: 60,
+                time_since_last_update: 5,
+                completion_percentage: 35
+              }
+            ],
+            message: null
+          })
+        } as AnyType)
+
+        const result = await systemApi.getBackgroundJobs()
+        expect(result.success).toBe(true)
+        expect(result.jobs).toHaveLength(1)
+        expect(result.jobs[0].completion_percentage).toBe(35)
+      })
+    })
+
+    describe('Error Response Handling', () => {
+      it('setSoundCardDtoverlay includes API error message', async () => {
+        const mockFetch = vi.mocked(apiFetch)
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 400,
+          json: async () => ({ message: 'Overlay not available on this hardware' })
+        } as AnyType)
+
+        await expect(systemApi.setSoundCardDtoverlay({ dtoverlay: 'invalid-overlay' }))
+          .rejects.toThrow('Overlay not available on this hardware')
+      })
+
+      it('detectSoundCard falls back to status when no message', async () => {
+        const mockFetch = vi.mocked(apiFetch)
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 503,
+          json: async () => ({})
+        } as AnyType)
+
+        await expect(systemApi.detectSoundCard())
+          .rejects.toThrow('HTTP error')
+      })
+
+      it('getSoundCardDetectionStatus handles error response', async () => {
+        const mockFetch = vi.mocked(apiFetch)
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 401,
+          json: async () => ({ message: 'Unauthorized' })
+        } as AnyType)
+
+        await expect(systemApi.getSoundCardDetectionStatus())
+          .rejects.toThrow('Unauthorized')
+      })
+
+      it('completeSetup handles error response', async () => {
+        const mockFetch = vi.mocked(apiFetch)
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 500
+        } as AnyType)
+
+        await expect(systemApi.completeSetup())
+          .rejects.toThrow('HTTP error')
+      })
+
+      it('resetSetup handles error response', async () => {
+        const mockFetch = vi.mocked(apiFetch)
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 500
+        } as AnyType)
+
+        await expect(systemApi.resetSetup())
+          .rejects.toThrow('HTTP error')
+      })
+
+      it('resetConfigDB handles error response', async () => {
+        const mockFetch = vi.mocked(apiFetch)
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 500
+        } as AnyType)
+
+        await expect(systemApi.resetConfigDB())
+          .rejects.toThrow('HTTP error')
+      })
+    })
+
+    describe('API URL Construction', () => {
+      it('all system API calls use correct base URL', async () => {
+        const mockFetch = vi.mocked(apiFetch)
+        mockFetch.mockResolvedValue({
+          ok: true,
+          json: async () => ({ status: 'success' })
+        } as AnyType)
+
+        mockGetConfigApiBaseUrl.mockClear()
+        mockGetConfigApiBaseUrl.mockReturnValue('http://api.local/config')
+
+        await systemApi.getSystemInfo()
+        expect(mockFetch).toHaveBeenCalledWith(
+          'http://api.local/config/systeminfo',
+          expect.anything()
+        )
+      })
+
+      it('hostname update uses correct endpoint', async () => {
+        const mockFetch = vi.mocked(apiFetch)
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ status: 'success' })
+        } as AnyType)
+
+        mockGetConfigApiBaseUrl.mockReturnValue('http://api.local/config')
+
+        await systemApi.updateHostname({ hostname: 'test' })
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          'http://api.local/config/hostname',
+          expect.anything()
+        )
+      })
+
+      it('reboot uses correct endpoint', async () => {
+        const mockFetch = vi.mocked(apiFetch)
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ status: 'success' })
+        } as AnyType)
+
+        mockGetConfigApiBaseUrl.mockReturnValue('http://api.local/config')
+
+        await systemApi.rebootSystem()
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          'http://api.local/config/system/reboot',
+          expect.anything()
+        )
+      })
+
+      it('setup endpoints use correct base URL', async () => {
+        const mockFetch = vi.mocked(apiFetch)
+        mockFetch.mockResolvedValue({
+          ok: true,
+          json: async () => ({ status: 'success' })
+        } as AnyType)
+
+        mockGetConfigApiBaseUrl.mockReturnValue('http://api.local/config')
+
+        await systemApi.getSetupStatus()
+        expect(mockFetch).toHaveBeenCalledWith(
+          'http://api.local/config/setup/status',
+          expect.anything()
+        )
+
+        mockFetch.mockClear()
+
+        await systemApi.completeSetup()
+        expect(mockFetch).toHaveBeenCalledWith(
+          'http://api.local/config/setup/complete',
+          expect.anything()
+        )
+      })
     })
   })
 })

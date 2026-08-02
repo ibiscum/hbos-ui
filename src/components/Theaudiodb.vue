@@ -63,7 +63,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   title: 'TheAudioDB',
-  description: 'Artist images and biographies',
+  description: 'TheAudioDB is used to retrieve additional artist images and biographies',
   icon: 'tabler/database',
   serviceKey: 'theaudiodb',
 })
