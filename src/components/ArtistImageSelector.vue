@@ -90,14 +90,16 @@ const emit = defineEmits<Emits>()
 const loading = ref(false)
 const error = ref<string | null>(null)
 const artistImages = ref<ArtistImage[]>([])
+const failedImageUrls = ref<Set<string>>(new Set())
 
 // Fetch artist images from the cover art API
 const fetchArtistImages = async () => {
-  if (!props.artistName) return
+  if (!props.artistName || !props.artistName.trim()) return
 
   loading.value = true
   error.value = null
   artistImages.value = []
+  failedImageUrls.value.clear()
 
   try {
     console.log(`Fetching artist images for: ${props.artistName}`)
@@ -114,7 +116,7 @@ const fetchArtistImages = async () => {
       result.images.forEach(image => {
         // Filter out images with grade < -10
         if (image.grade !== undefined && image.grade < -10) {
-          console.log(`Skipping image with low grade (${image.grade}):`, image.url)
+          console.debug(`Skipping low-grade image (grade: ${image.grade}): ${image.url}`)
           return
         }
 
@@ -144,11 +146,12 @@ const fetchArtistImages = async () => {
       }
 
       // Secondary sort: by provider name for consistent ordering
-      return a.provider.localeCompare(b.provider)
+      const compareResult = a.provider.localeCompare(b.provider)
+      return compareResult
     })
 
     artistImages.value = images
-    console.log(`Found ${images.length} artist images`)
+    console.log(`Found ${images.length} artist images for "${props.artistName}"`)
   } catch (err) {
     console.error('Error fetching artist images:', err)
     error.value = 'Failed to load artist images. Please try again.'
@@ -159,10 +162,17 @@ const fetchArtistImages = async () => {
 
 // Watch for visibility changes to fetch images
 watch(() => props.isVisible, (newVisible) => {
-  if (newVisible && props.artistName) {
+  if (newVisible && props.artistName?.trim()) {
     fetchArtistImages()
   }
 }, { immediate: true })
+
+// Watch for artist name changes when modal is visible
+watch(() => props.artistName, (newArtistName) => {
+  if (props.isVisible && newArtistName?.trim()) {
+    fetchArtistImages()
+  }
+})
 
 // Handle keyboard events
 const handleKeydown = (event: KeyboardEvent) => {
@@ -193,7 +203,12 @@ const closeModal = () => {
 
 // Format file size for display
 const formatFileSize = (bytes: number): string => {
-  if (bytes < 1024) return `${bytes} B`
+  // Handle invalid input
+  if (typeof bytes !== 'number' || bytes < 0 || !isFinite(bytes)) {
+    return 'Unknown'
+  }
+
+  if (bytes < 1024) return `${Math.floor(bytes)} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
@@ -201,6 +216,9 @@ const formatFileSize = (bytes: number): string => {
 // Handle image load errors
 const onImageError = (event: Event) => {
   const img = event.target as HTMLImageElement
+  const url = img.src
+  failedImageUrls.value.add(url)
+  console.warn(`Failed to load image from: ${url}`)
   img.style.display = 'none'
 }
 </script>
