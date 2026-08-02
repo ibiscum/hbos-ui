@@ -64,28 +64,30 @@ export interface HeadphoneVolumeSetResponse {
 
 /**
  * Build volume API URL using audiocontrol base URL
+ * @param endpoint - API endpoint path (e.g., '/info', '/state', '/set')
+ * @returns Full API URL for the volume endpoint
  */
 const buildVolumeApiUrl = (endpoint: string): string => {
   const configStore = useAppConfigStore()
   const apiBaseUrl = configStore.getApiBaseUrl()
-  const url = `${apiBaseUrl}/volume${endpoint}`
-  console.log('Volume API URL:', url)
-  return url
+  return `${apiBaseUrl}/volume${endpoint}`
 }
 
 /**
  * Build headphone volume API URL using configurator base URL
+ * @param endpoint - API endpoint path (e.g., '', '/controls', '/store', '/restore')
+ * @returns Full API URL for the headphone volume endpoint
  */
 const buildHeadphoneVolumeApiUrl = (endpoint: string): string => {
   const configStore = useAppConfigStore()
   const configApiBaseUrl = configStore.getConfigApiBaseUrl()
-  const url = `${configApiBaseUrl}/volume/headphone${endpoint}`
-  console.log('Headphone Volume API URL:', url)
-  return url
+  return `${configApiBaseUrl}/volume/headphone${endpoint}`
 }
 
 /**
- * Get volume information including current state and capabilities
+ * Get volume information including current state and capabilities.
+ * Returns null on error to allow graceful degradation.
+ * @returns VolumeInfo object with available status and control details, or null on failure
  */
 export const getVolumeInfo = async (): Promise<VolumeInfo | null> => {
   try {
@@ -105,7 +107,9 @@ export const getVolumeInfo = async (): Promise<VolumeInfo | null> => {
 }
 
 /**
- * Get current volume state
+ * Get current volume state (percentage, decibels, raw value).
+ * Returns null on error. Handles 503 Service Unavailable gracefully.
+ * @returns Current volume state or null if unavailable
  */
 export const getVolumeState = async (): Promise<VolumeState | null> => {
   try {
@@ -129,12 +133,16 @@ export const getVolumeState = async (): Promise<VolumeState | null> => {
 }
 
 /**
- * Set volume level using percentage
+ * Set volume level using percentage (0-100).
+ * Validates input range and returns null on error.
+ * @param percentage - Volume level (0-100). Values outside range will return null.
+ * @returns VolumeResponse with new state or null on failure
  */
 export const setVolumeLevel = async (percentage: number): Promise<VolumeResponse | null> => {
   try {
     if (percentage < 0 || percentage > 100) {
-      throw new Error(`Volume percentage ${percentage} is out of range (0-100)`)
+      console.error('Volume validation failed:', `percentage ${percentage} out of range (0-100)`)
+      return null
     }
 
     const url = buildVolumeApiUrl('/set')
@@ -162,10 +170,18 @@ export const setVolumeLevel = async (percentage: number): Promise<VolumeResponse
 }
 
 /**
- * Increase volume by specified amount (default 5%)
+ * Increase volume by specified amount (default 5%).
+ * Validates that amount is positive. Negative amounts are rejected.
+ * @param amount - Volume increase in percentage points (0.1-100). Default 5. Negative values return null.
+ * @returns VolumeResponse with new state or null on failure or invalid input
  */
 export const increaseVolume = async (amount: number = 5.0): Promise<VolumeResponse | null> => {
   try {
+    if (amount <= 0 || amount > 100) {
+      console.error('Volume increase validation failed:', `amount ${amount} must be positive and ≤100`)
+      return null
+    }
+
     const url = buildVolumeApiUrl(`/increase?amount=${amount}`)
     const response = await apiFetch(url, {
       method: 'POST'
@@ -184,10 +200,18 @@ export const increaseVolume = async (amount: number = 5.0): Promise<VolumeRespon
 }
 
 /**
- * Decrease volume by specified amount (default 5%)
+ * Decrease volume by specified amount (default 5%).
+ * Validates that amount is positive. Negative amounts are rejected.
+ * @param amount - Volume decrease in percentage points (0.1-100). Default 5. Negative values return null.
+ * @returns VolumeResponse with new state or null on failure or invalid input
  */
 export const decreaseVolume = async (amount: number = 5.0): Promise<VolumeResponse | null> => {
   try {
+    if (amount <= 0 || amount > 100) {
+      console.error('Volume decrease validation failed:', `amount ${amount} must be positive and ≤100`)
+      return null
+    }
+
     const url = buildVolumeApiUrl(`/decrease?amount=${amount}`)
     const response = await apiFetch(url, {
       method: 'POST'
@@ -206,7 +230,9 @@ export const decreaseVolume = async (amount: number = 5.0): Promise<VolumeRespon
 }
 
 /**
- * Toggle mute (switches between 0% and 50% volume)
+ * Toggle mute state (switches between 0% and 50% volume).
+ * Returns null on error.
+ * @returns VolumeResponse with new mute state or null on failure
  */
 export const toggleMute = async (): Promise<VolumeResponse | null> => {
   try {
@@ -230,7 +256,9 @@ export const toggleMute = async (): Promise<VolumeResponse | null> => {
 // Headphone Volume Control APIs
 
 /**
- * Get available headphone volume controls on the current sound card
+ * Get available headphone volume controls on the current sound card.
+ * Returns error status object on failure (consistent with other headphone APIs).
+ * @returns HeadphoneControlsResponse with status 'success' or 'error'
  */
 export const getHeadphoneControls = async (): Promise<HeadphoneControlsResponse> => {
   try {
@@ -256,7 +284,9 @@ export const getHeadphoneControls = async (): Promise<HeadphoneControlsResponse>
 }
 
 /**
- * Get current headphone volume
+ * Get current headphone volume.
+ * Returns error status object on failure (consistent with other headphone APIs).
+ * @returns HeadphoneVolumeResponse with status 'success' or 'error' and optional volume data
  */
 export const getHeadphoneVolume = async (): Promise<HeadphoneVolumeResponse> => {
   try {
@@ -283,14 +313,17 @@ export const getHeadphoneVolume = async (): Promise<HeadphoneVolumeResponse> => 
 }
 
 /**
- * Set headphone volume
+ * Set headphone volume (0-100).
+ * Validates input range and returns error status on failure.
+ * @param volume - Headphone volume level (0-100). Out of range values return error status.
+ * @returns HeadphoneVolumeSetResponse with status 'success' or 'error'
  */
 export const setHeadphoneVolume = async (volume: number): Promise<HeadphoneVolumeSetResponse> => {
   try {
     if (volume < 0 || volume > 100) {
       return {
         status: 'error',
-        message: 'Volume must be between 0 and 100'
+        message: `Volume must be between 0 and 100, received ${volume}`
       }
     }
 
@@ -325,7 +358,9 @@ export const setHeadphoneVolume = async (volume: number): Promise<HeadphoneVolum
 }
 
 /**
- * Store current headphone volume setting
+ * Store current headphone volume setting to persistent storage.
+ * Returns error status object on failure.
+ * @returns HeadphoneVolumeSetResponse with status 'success' or 'error'
  */
 export const storeHeadphoneVolume = async (): Promise<HeadphoneVolumeSetResponse> => {
   try {
@@ -354,7 +389,9 @@ export const storeHeadphoneVolume = async (): Promise<HeadphoneVolumeSetResponse
 }
 
 /**
- * Restore previously stored headphone volume setting
+ * Restore previously stored headphone volume setting from persistent storage.
+ * Returns error status object on failure.
+ * @returns HeadphoneVolumeSetResponse with status 'success' or 'error'
  */
 export const restoreHeadphoneVolume = async (): Promise<HeadphoneVolumeSetResponse> => {
   try {

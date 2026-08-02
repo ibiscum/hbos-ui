@@ -51,7 +51,7 @@
                   <div class="server-details">
                     <h5>{{ server.hostname }}</h5>
                     <p>{{ server.ip }}</p>
-                    <p class="server-services">{{ server.services.join(', ') }}</p>
+                    <p class="server-services">{{ getServerServices(server) }}</p>
                   </div>
                 </div>
                 <div class="server-select">
@@ -301,6 +301,9 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 const toastStore = useToastStore()
 
+// AbortController for cancelling async operations
+let discoverServerController: AbortController | null = null
+
 // State
 const currentStep = ref(1)
 const servers = ref<SmbServer[]>([])
@@ -328,9 +331,35 @@ const mountError = ref('')
 
 const ipv4Regex = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/
 const ipv6Regex = /^((?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,7}:|(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,5}(?::[0-9A-Fa-f]{1,4}){1,2}|(?:[0-9A-Fa-f]{1,4}:){1,4}(?::[0-9A-Fa-f]{1,4}){1,3}|(?:[0-9A-Fa-f]{1,4}:){1,3}(?::[0-9A-Fa-f]{1,4}){1,4}|(?:[0-9A-Fa-f]{1,4}:){1,2}(?::[0-9A-Fa-f]{1,4}){1,5}|[0-9A-Fa-f]{1,4}:(?::[0-9A-Fa-f]{1,4}){1,6}|:(?::[0-9A-Fa-f]{1,4}){1,7}|::)$/
+const validSmbVersions = ['3.0', '2.1', '2.0', '1.0'] as const
 
 const isValidIpAddress = (value: string): boolean => {
   return ipv4Regex.test(value) || ipv6Regex.test(value)
+}
+
+const isValidSmbVersion = (version: string): boolean => {
+  return validSmbVersions.includes(version as typeof validSmbVersions[number])
+}
+
+const getSanitizedMountPoint = (shareName: string): string => {
+  // Sanitize: lowercase, remove non-alphanumeric except underscores
+  let sanitized = shareName.toLowerCase().replace(/[^a-z0-9]/g, '_')
+  // Collapse consecutive underscores for cleaner mount points
+  sanitized = sanitized.replace(/_+/g, '_')
+  // Remove leading/trailing underscores
+  sanitized = sanitized.replace(/^_+|_+$/g, '')
+  // Fallback to 'share' if result is empty
+  sanitized = sanitized || 'share'
+  // Limit length to prevent excessively long mount points
+  sanitized = sanitized.substring(0, 50)
+  return `/mnt/${sanitized}`
+}
+
+const getServerServices = (server: SmbServer): string => {
+  if (!server.services || server.services.length === 0) {
+    return 'Unknown service'
+  }
+  return server.services.join(', ')
 }
 
 // Computed properties
@@ -357,7 +386,7 @@ const canProceed = computed(() => {
     case 1:
       return selectedServer.value !== null
     case 2:
-      return authType.value === 'anonymous' || (username.value && password.value)
+      return authType.value === 'anonymous' || (!!username.value && !!password.value)
     case 3:
       return selectedShare.value !== null
     case 4:
@@ -368,11 +397,16 @@ const canProceed = computed(() => {
 })
 
 const canCreateMount = computed(() => {
-  return selectedServer.value && selectedShare.value && mountPoint.value.trim() !== ''
+  return selectedServer.value !== null && selectedShare.value !== null && mountPoint.value.trim() !== ''
 })
 
 // Methods
 const closeDialog = () => {
+  // Cancel any pending async operations
+  if (discoverServerController) {
+    discoverServerController.abort()
+    discoverServerController = null
+  }
   resetDialog()
   emit('close')
 }
@@ -413,14 +447,26 @@ const discoverServers = async () => {
   loadingServers.value = true
   serverError.value = ''
 
+  // Create new AbortController for this operation
+  discoverServerController = new AbortController()
+
   try {
     const response = await getSmbServers()
+    // Check if operation was aborted
+    if (discoverServerController.signal.aborted) {
+      return
+    }
     if (response.status === 'success') {
       servers.value = response.data.servers
     } else {
       serverError.value = response.message || 'Failed to discover SMB servers'
     }
   } catch (error) {
+    // Don't show error if operation was aborted
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      console.log('Server discovery cancelled')
+      return
+    }
     console.error('Error discovering SMB servers:', error)
     serverError.value = error instanceof Error ? error.message : 'Failed to discover SMB servers'
   } finally {
@@ -461,7 +507,7 @@ const addManualServer = () => {
   manualServer.value = ''
 }
 
-const testConnection = async () => {
+const testConnection = async (): Promise<boolean> => {
   if (!selectedServer.value) return false
 
   testingConnection.value = true
@@ -520,12 +566,18 @@ const selectShare = (share: SmbShare) => {
   selectedShare.value = share
   // Auto-generate mount point if not set
   if (!mountPoint.value) {
-    mountPoint.value = `/mnt/${share.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`
+    mountPoint.value = getSanitizedMountPoint(share.name)
   }
 }
 
 const createMount = async () => {
   if (!selectedServer.value || !selectedShare.value || !mountPoint.value.trim()) return
+
+  // Validate SMB version
+  if (!isValidSmbVersion(smbVersion.value)) {
+    mountError.value = 'Invalid SMB version selected'
+    return
+  }
 
   mounting.value = true
   mountError.value = ''
@@ -570,6 +622,8 @@ const goToNextStep = async () => {
 
     // Load shares for the next step
     await loadShares()
+    // Don't advance if shares failed to load
+    if (shareError.value) return
   }
 
   currentStep.value = Math.min(currentStep.value + 1, 4)
@@ -592,7 +646,7 @@ watch(() => props.isOpen, (isOpen) => {
   if (isOpen) {
     discoverServers()
   }
-})
+}, { immediate: true })
 </script>
 
 <style scoped lang="scss">

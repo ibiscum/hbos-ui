@@ -50,7 +50,7 @@ describe('formatFilterTypeName', () => {
   })
 
   it('returns raw type name for unmapped types', () => {
-    expect(formatFilterTypeName('highpass')).toBe('highpass')
-    expect(formatFilterTypeName('lowpass')).toBe('lowpass')
+    expect(formatFilterTypeName('highpass')).toBe('High\nPass')
+    expect(formatFilterTypeName('lowpass')).toBe('Low\nPass')
   })
 })

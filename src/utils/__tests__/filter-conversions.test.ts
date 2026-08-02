@@ -44,6 +44,7 @@ describe('convertUIFilterToStore', () => {
   })
 
   it('falls back to peak for unknown types', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = convertUIFilterToStore({ ...baseUIFilter, icon: 'unknown_type' as any })
     expect(result.type).toBe('peak')
   })
@@ -97,12 +98,14 @@ describe('convertStoreFilterToUI', () => {
 
   it('defaults gain to 0 when undefined', () => {
     const filter = { ...baseStoreFilter, gain: undefined }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = convertStoreFilterToUI(filter as any, 'filter_0')
     expect(result.gain).toBe(0)
   })
 
   it('defaults Q to 0.71 when undefined', () => {
     const filter = { ...baseStoreFilter, q: undefined }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = convertStoreFilterToUI(filter as any, 'filter_0')
     expect(result.Q).toBe(0.71)
   })

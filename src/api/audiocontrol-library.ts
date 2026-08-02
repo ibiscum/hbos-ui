@@ -12,11 +12,7 @@ export interface LibraryPlayerListResponse {
   players: LibraryPlayer[]
 }
 
-export interface LibraryStatsResponse {
-  player_name: string
-  player_id: string
-  has_library: boolean
-  is_loaded: boolean
+export interface LibraryStatsResponse extends LibraryPlayer {
   albums_count: number
   artists_count: number
   tracks_count: number
@@ -48,7 +44,8 @@ export const getLibraryStats = async (playerName: string): Promise<LibraryStatsR
   const response = await apiFetch(`${baseUrl}/library/${playerName}`)
 
   if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`)
+    const body = await response.json().catch(() => ({}))
+    throw new Error(body.message ?? `HTTP error! status: ${response.status}`)
   }
 
   return await response.json()
@@ -78,6 +75,10 @@ export const deleteAlbum = async (playerName: string, albumId: string): Promise<
 export const getAllLibraryStats = async (): Promise<LibraryStatsResponse[]> => {
   const list = await getLibraryPlayers()
   const loaded = list.players.filter(p => p.has_library && p.is_loaded)
+
+  if (loaded.length === 0) {
+    return []
+  }
 
   return Promise.all(loaded.map(p => getLibraryStats(p.player_name)))
 }

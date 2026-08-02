@@ -2,11 +2,17 @@ import { useAppConfigStore } from '@/stores/appconfig'
 import { apiFetch } from '@/api/http'
 
 // Types for SMB/CIFS API
+
+/**
+ * Represents a discovered SMB server on the network
+ * @note services array can be empty for manually added servers or servers with unknown services
+ */
 export interface SmbServer {
   ip: string
   name: string
   hostname: string
   is_file_server: boolean
+  /** Services array can be empty - use defensive rendering */
   services: string[]
   local_network: string
   interface: string
@@ -21,10 +27,16 @@ export interface SmbServersResponse {
   message?: string
 }
 
+/**
+ * Represents a share on an SMB server
+ * @note type can be empty string if API cannot determine share type
+ * @note comment may be empty string or undefined
+ */
 export interface SmbShare {
   name: string
   type: string
-  comment: string
+  /** Comment can be empty or undefined */
+  comment?: string
 }
 
 export interface SmbSharesResponse {
@@ -75,12 +87,14 @@ export interface SmbTestResponse {
 
 export interface SmbMountRequest {
   action?: 'add' | 'remove' // Optional since it's added by the API functions
-  server: string
-  share: string
-  mountpoint?: string
+  server: string            // Required: target server IP
+  share: string             // Required: share name
+  mountpoint?: string       // Optional mount point (API provides default if not set)
+  /** User/username - required if not using anonymous auth */
   user?: string
+  /** Password - required if not using anonymous auth */
   password?: string
-  version?: string
+  version?: string          // SMB version (3.0, 2.1, 2.0, 1.0)
   options?: string
   uid?: number
   gid?: number
@@ -223,14 +237,14 @@ const handleHttpError = async (response: Response, operation: string): Promise<n
 /**
  * Create safe mount options for SMB/CIFS mounting
  * This helps avoid capability issues by using appropriate mount options
- * This helps avoid capability issues by using appropriate mount options
  */
 export const createSafeMountOptions = (
   username?: string,
   uid?: number,
   gid?: number,
   fileMode?: string,
-  dirMode?: string
+  dirMode?: string,
+  smbVersion?: string
 ): string => {
   const options = []
 
@@ -261,7 +275,7 @@ export const createSafeMountOptions = (
   options.push('nobrl') // Disable byte range locking
   options.push('cache=loose') // Use loose caching
   options.push('iocharset=utf8') // UTF-8 character set
-  options.push('vers=3.0') // Use SMB 3.0 by default
+  options.push(`vers=${smbVersion || '3.0'}`) // Use specified SMB version or default to 3.0
 
   return options.join(',')
 }
@@ -449,7 +463,8 @@ export const mountSmbShareWithRetry = async (mountRequest: SmbMountRequest): Pro
     mountRequest.uid,
     mountRequest.gid,
     mountRequest.file_mode,
-    mountRequest.dir_mode
+    mountRequest.dir_mode,
+    mountRequest.version
   )
 
   const requestWithSafeOptions = {

@@ -288,21 +288,22 @@ export const usePlayerStore = defineStore('player', () => {
     console.log('initPlayer')
 
     isSendingCommand.value = true
+    try {
+      // await fetchPlayersAndUpdatePlayerDropdown() // for now we have only mpd player
 
-    // await fetchPlayersAndUpdatePlayerDropdown() // for now we have only mpd player
+      // Initialize volume control
+      await initializeVolumeControl()
 
-    // Initialize volume control
-    await initializeVolumeControl()
+      // Set up WebSocket connection first, before fetching current player
+      playerWebSocket.setupWebSocket()
 
-    // Set up WebSocket connection first, before fetching current player
-    playerWebSocket.setupWebSocket()
+      await fetchCurrentPlayer()
 
-    await fetchCurrentPlayer()
-
-    isSendingCommand.value = false
-
-    // Set up periodic updates using the configured polling interval
-    updateIntervalID.value = setInterval(fetchCurrentPlayer, PLAYER_CONFIG.pollingInterval)
+      // Set up periodic updates using the configured polling interval
+      updateIntervalID.value = setInterval(fetchCurrentPlayer, PLAYER_CONFIG.pollingInterval)
+    } finally {
+      isSendingCommand.value = false
+    }
   }
 
   const clearPollingInterval = () => {
@@ -336,6 +337,10 @@ export const usePlayerStore = defineStore('player', () => {
         method: 'POST',
       })
       console.log('sendCommand', response)
+      if (!response.ok) {
+        console.error(`Command failed: HTTP ${response.status} ${response.statusText}`)
+        return false
+      }
       // ! We could update UI and State when getting WebSocket message
       // ! but we dont get messages on 'loop_mode_changed' and 'shuffle_changed'
       // ! that's why we fetchCurrentPlayer()

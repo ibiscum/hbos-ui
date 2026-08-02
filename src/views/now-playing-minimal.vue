@@ -31,7 +31,9 @@
           class="now-playing__metadata-tooltip"
           :style="tooltipStyles"
         />
-      </div>      <div class="now-playing__info">
+      </div>
+
+      <div class="now-playing__info">
         <h2 v-if="song?.title">{{ song.title }}</h2>
         <p v-if="song?.artist">{{ song.artist }}</p>
       </div>
@@ -68,6 +70,17 @@ import { usePlayerStore } from '@/stores/player.ts'
 const { currentSong: song } = storeToRefs(usePlayerStore())
 
 const route = useRoute()
+const originalBodyOverflow = ref('')
+
+onMounted(() => {
+  originalBodyOverflow.value = document.body.style.overflow
+  document.body.style.overflow = 'hidden'
+})
+
+onUnmounted(() => {
+  document.body.style.overflow = originalBodyOverflow.value
+})
+
 if (route.query.dark !== undefined) {
   onMounted(() => document.documentElement.classList.add('dark'))
   onUnmounted(() => document.documentElement.classList.remove('dark'))

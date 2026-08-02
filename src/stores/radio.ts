@@ -174,8 +174,8 @@ export const useRadioStore = defineStore('radio', () => {
     }
     try {
       const response: Response = await fetch("https://all.api.radio-browser.info/json/servers")
-      const servers = (await response.json()) as unknown
-      if (servers && servers.length > 0) {
+      const servers = (await response.json()) as Array<{ name: string }>
+      if (servers && Array.isArray(servers) && servers.length > 0) {
         const randomServer = servers[Math.floor(Math.random() * servers.length)]
         radioBrowserBaseUrl.value = `https://${randomServer.name}`
 
@@ -245,6 +245,7 @@ export const useRadioStore = defineStore('radio', () => {
     } catch (error) {
       console.error('Radio Browser search error:', error)
       searchResults.value = []
+      loaded.value = false
     } finally {
       loading.value = false
     }
@@ -346,7 +347,10 @@ export const useRadioStore = defineStore('radio', () => {
       const configStore = useAppConfigStore()
 
       /* Get the configured radio player. The default is mpd. */
-      const radioPlayerName = configStore.radioPlayer()
+      const radioPlayerValue = configStore.radioPlayer
+      const radioPlayerName = typeof radioPlayerValue === 'function'
+        ? radioPlayerValue()
+        : (radioPlayerValue || 'mpd')
       const stationName = 'name' in station ? station.name : station.title
 
       console.log('Playing radio station:', stationName, 'on player:', radioPlayerName)

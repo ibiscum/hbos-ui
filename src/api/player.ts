@@ -7,6 +7,57 @@ import { useToastStore } from '@/stores/toast'
 export const rewrite_audiocontrol_api_url = rewriteAudiocontrolApiUrl
 
 /**
+ * Fallback logic for per-player command execution
+ * Used when bulk endpoint fails, to attempt commands on each player individually
+ * @param primaryCommand - The primary command to attempt on each player
+ * @param fallbackCommand - Optional fallback command if primary fails (used for pause->stop)
+ * @returns Promise<boolean> - true if at least one player succeeded
+ */
+const performPerPlayerCommandFallback = async (
+  primaryCommand: string,
+  fallbackCommand?: string
+): Promise<boolean> => {
+  try {
+    const configStore = useAppConfigStore()
+    const apiBaseUrl = configStore.getApiBaseUrl()
+
+    const listResp = await apiFetch(`${apiBaseUrl}/players`)
+    if (!listResp.ok) {
+      throw new Error(`Failed to list players: ${listResp.status} ${listResp.statusText}`)
+    }
+
+    const listJson = await listResp.json()
+    const players: Array<{ name: string }> = listJson?.players || []
+
+    let succeeded = 0
+    for (const p of players) {
+      const primaryUrl = `${apiBaseUrl}/player/${encodeURIComponent(p.name)}/command/${primaryCommand}`
+      try {
+        const r = await apiFetch(primaryUrl, { method: 'POST' })
+        if (r.ok) {
+          succeeded++
+          continue
+        }
+        // Try fallback command if primary failed and fallback provided
+        if (fallbackCommand) {
+          const fallbackUrl = `${apiBaseUrl}/player/${encodeURIComponent(p.name)}/command/${fallbackCommand}`
+          const s = await apiFetch(fallbackUrl, { method: 'POST' })
+          if (s.ok) succeeded++
+        }
+      } catch (e) {
+        console.warn(`Failed to send '${primaryCommand}' command to player '${p.name}':`, e)
+      }
+    }
+
+    console.log(`Per-player command '${primaryCommand}' succeeded for ${succeeded}/${players.length} players`)
+    return succeeded > 0
+  } catch (fallbackErr) {
+    console.error(`Fallback per-player command '${primaryCommand}' failed:`, fallbackErr)
+    return false
+  }
+}
+
+/**
  * Add a track to a player's queue using JSON payload
  * @param playerName - The name of the player to add the track to
  * @param trackUri - The URI/URL of the track to add
@@ -31,7 +82,7 @@ export const addTrackToPlayer = async (
     const configStore = useAppConfigStore()
     const apiBaseUrl = configStore.getApiBaseUrl()
 
-    const url = `${apiBaseUrl}/player/${playerName}/command/add_track`
+    const url = `${apiBaseUrl}/player/${encodeURIComponent(playerName)}/command/add_track`
     const payload: { uri: string; metadata?: typeof metadata } = {
       uri: trackUri
     }
@@ -57,6 +108,12 @@ export const addTrackToPlayer = async (
 
     const result = await response.json()
     console.log('Add track response:', result)
+
+    // Validate response indicates success
+    if (result?.error || result?.status === 'failed') {
+      throw new Error(`Failed to add track: ${result.error || result.status}`)
+    }
+
     return true
 
   } catch (error) {
@@ -82,7 +139,7 @@ export const sendPlayerCommand = async (playerName: string, command: string): Pr
       throw new Error('Use addTrackToPlayer() function for add_track commands instead of sendPlayerCommand()')
     }
 
-    const url = `${apiBaseUrl}/player/${playerName}/command/${command}`
+    const url = `${apiBaseUrl}/player/${encodeURIComponent(playerName)}/command/${encodeURIComponent(command)}`
     console.log('Sending player command:', { playerName, command, url })
 
     const response = await apiFetch(url, {
@@ -98,6 +155,12 @@ export const sendPlayerCommand = async (playerName: string, command: string): Pr
 
     const result = await response.json()
     console.log('Player command response:', result)
+
+    // Validate response indicates success
+    if (result?.error || result?.status === 'failed') {
+      throw new Error(`Failed to send command: ${result.error || result.status}`)
+    }
+
     return true
 
   } catch (error) {
@@ -134,43 +197,8 @@ export const pauseAllPlayers = async (): Promise<boolean> => {
 
   } catch (error) {
     console.error('Error pausing all players (will try fallback):', error)
-
-    // Fallback: enumerate players and send pause/stop to each
-    try {
-      const configStore = useAppConfigStore()
-      const apiBaseUrl = configStore.getApiBaseUrl()
-
-      const listResp = await apiFetch(`${apiBaseUrl}/players`)
-      if (!listResp.ok) {
-        throw new Error(`Failed to list players: ${listResp.status} ${listResp.statusText}`)
-      }
-      const listJson = await listResp.json()
-      const players: Array<{ name: string }> = listJson?.players || []
-
-      let succeeded = 0
-      for (const p of players) {
-        const pauseUrl = `${apiBaseUrl}/player/${encodeURIComponent(p.name)}/command/pause`
-        const stopUrl = `${apiBaseUrl}/player/${encodeURIComponent(p.name)}/command/stop`
-        try {
-          const r = await apiFetch(pauseUrl, { method: 'POST' })
-          if (r.ok) {
-            succeeded++
-            continue
-          }
-          // Try stop if pause not supported
-          const s = await apiFetch(stopUrl, { method: 'POST' })
-          if (s.ok) succeeded++
-        } catch (e) {
-          console.warn(`Failed to pause/stop player '${p.name}':`, e)
-        }
-      }
-
-      console.log(`Per-player pause/stop succeeded for ${succeeded}/${players.length} players`)
-      return succeeded > 0
-    } catch (fallbackErr) {
-      console.error('Fallback pause-all failed:', fallbackErr)
-      return false
-    }
+    // Fallback: try pause command on each player, fall back to stop if pause not supported
+    return performPerPlayerCommandFallback('pause', 'stop')
   }
 }
 
@@ -201,37 +229,7 @@ export const stopAllPlayers = async (): Promise<boolean> => {
 
   } catch (error) {
     console.error('Error stopping all players (will try fallback):', error)
-
-    // Fallback: enumerate players and send stop to each
-    try {
-      const configStore = useAppConfigStore()
-      const apiBaseUrl = configStore.getApiBaseUrl()
-
-      const listResp = await apiFetch(`${apiBaseUrl}/players`)
-      if (!listResp.ok) {
-        throw new Error(`Failed to list players: ${listResp.status} ${listResp.statusText}`)
-      }
-      const listJson = await listResp.json()
-      const players: Array<{ name: string }> = listJson?.players || []
-
-      let succeeded = 0
-      for (const p of players) {
-        const stopUrl = `${apiBaseUrl}/player/${encodeURIComponent(p.name)}/command/stop`
-        try {
-          const r = await apiFetch(stopUrl, { method: 'POST' })
-          if (r.ok) {
-            succeeded++
-          }
-        } catch (e) {
-          console.warn(`Failed to stop player '${p.name}':`, e)
-        }
-      }
-
-      console.log(`Per-player stop succeeded for ${succeeded}/${players.length} players`)
-      return succeeded > 0
-    } catch (fallbackErr) {
-      console.error('Fallback stop-all failed:', fallbackErr)
-      return false
-    }
+    // Fallback: try stop command on each player
+    return performPerPlayerCommandFallback('stop')
   }
 }

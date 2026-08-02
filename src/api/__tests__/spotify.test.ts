@@ -132,3 +132,227 @@ describe('spotify api auth handling', () => {
     expect((init.headers as Headers).has('X-CSRF-Token')).toBe(false)
   })
 })
+
+describe('spotify api regression tests', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.restoreAllMocks()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  describe('error responses', () => {
+    it('getSpotifyStatus throws on 500 error', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(500, { error: 'Server error' })))
+
+      await expect(getSpotifyStatus()).rejects.toThrow(/Failed to get Spotify status/)
+    })
+
+    it('createSpotifySession throws on 503 error', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(503, { error: 'Service unavailable' })))
+
+      await expect(createSpotifySession()).rejects.toThrow(/Failed to create Spotify session/)
+    })
+
+    it('getSpotifyLoginUrl throws on 400 error', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(400, { error: 'Bad request' })))
+
+      await expect(getSpotifyLoginUrl('invalid-session')).rejects.toThrow(/Failed to get Spotify login URL/)
+    })
+
+    it('pollSpotifyAuth throws on 404 error', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(404, { error: 'Not found' })))
+
+      await expect(pollSpotifyAuth('nonexistent-session')).rejects.toThrow(/Failed to poll Spotify auth/)
+    })
+
+    it('storeSpotifyTokens throws on 400 error', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(400, { error: 'Invalid token data' })))
+
+      await expect(
+        storeSpotifyTokens({ access_token: '', refresh_token: '', expires_in: 0 }),
+      ).rejects.toThrow(/Failed to store Spotify tokens/)
+    })
+
+    it('disconnectSpotify throws on 500 error', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(500, { error: 'Server error' })))
+
+      await expect(disconnectSpotify()).rejects.toThrow(/Failed to disconnect from Spotify/)
+    })
+  })
+
+  describe('invalid json responses', () => {
+    const createBadJsonResponse = (status: number) => ({
+      ok: status >= 200 && status < 300,
+      status,
+      statusText: '',
+      headers: new Headers(),
+      json: async () => {
+        throw new SyntaxError('Unexpected token < in JSON at position 0')
+      },
+    })
+
+    it('getSpotifyStatus throws on malformed JSON', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(createBadJsonResponse(200)))
+
+      await expect(getSpotifyStatus()).rejects.toThrow()
+    })
+
+    it('pollSpotifyAuth throws on malformed JSON', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(createBadJsonResponse(200)))
+
+      await expect(pollSpotifyAuth('sess-1')).rejects.toThrow()
+    })
+  })
+
+  describe('network errors', () => {
+    it('getSpotifyStatus throws on network error', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
+      )
+
+      await expect(getSpotifyStatus()).rejects.toThrow()
+    })
+
+    it('createSpotifySession throws on network error', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockRejectedValue(new TypeError('Network request failed')),
+      )
+
+      await expect(createSpotifySession()).rejects.toThrow()
+    })
+
+    it('storeSpotifyTokens throws on network error', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockRejectedValue(new Error('Connection timeout')),
+      )
+
+      await expect(
+        storeSpotifyTokens({ access_token: 'a', refresh_token: 'r', expires_in: 3600 }),
+      ).rejects.toThrow()
+    })
+  })
+
+  describe('edge cases with response data', () => {
+    it('getSpotifyStatus handles response with missing optional fields', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { authenticated: true }))
+      vi.stubGlobal('fetch', fetchMock)
+
+      const result = await getSpotifyStatus()
+
+      expect(result.authenticated).toBe(true)
+      expect(result.username).toBeUndefined()
+    })
+
+    it('pollSpotifyAuth handles pending status response', async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(jsonResponse(200, { status: 'pending' }))
+      vi.stubGlobal('fetch', fetchMock)
+
+      const result = await pollSpotifyAuth('sess-1')
+
+      expect(result.status).toBe('pending')
+      expect(result.token_data).toBeUndefined()
+    })
+
+    it('pollSpotifyAuth handles completed status with token data', async () => {
+      const tokenData = { access_token: 'a', refresh_token: 'r', expires_in: 3600 }
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(jsonResponse(200, { status: 'completed', token_data: tokenData }))
+      vi.stubGlobal('fetch', fetchMock)
+
+      const result = await pollSpotifyAuth('sess-1')
+
+      expect(result.status).toBe('completed')
+      expect(result.token_data).toEqual(tokenData)
+    })
+
+    it('pollSpotifyAuth handles error status with error message', async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(jsonResponse(200, { status: 'error', error: 'Auth failed' }))
+      vi.stubGlobal('fetch', fetchMock)
+
+      const result = await pollSpotifyAuth('sess-1')
+
+      expect(result.status).toBe('error')
+      expect(result.error).toBe('Auth failed')
+    })
+  })
+
+  describe('http status text edge cases', () => {
+    it('includes status text in error message for 503', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+        headers: new Headers(),
+        json: async () => ({}),
+      })
+      vi.stubGlobal('fetch', fetchMock)
+
+      await expect(createSpotifySession()).rejects.toThrow(/503 Service Unavailable/)
+    })
+
+    it('includes status code in error message for 400', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        headers: new Headers(),
+        json: async () => ({}),
+      })
+      vi.stubGlobal('fetch', fetchMock)
+
+      await expect(getSpotifyLoginUrl('session')).rejects.toThrow(/400 Bad Request/)
+    })
+  })
+
+  describe('behavior assertions', () => {
+    it('getSpotifyStatus returns parsed response object', async () => {
+      const expectedResponse = { authenticated: true, username: 'testuser', expires_at: 1234567890 }
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, expectedResponse))
+      vi.stubGlobal('fetch', fetchMock)
+
+      const result = await getSpotifyStatus()
+
+      expect(result).toEqual(expectedResponse)
+    })
+
+    it('createSpotifySession returns session id in response', async () => {
+      const expectedResponse = { session_id: 'sess-123', status: 'success' }
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, expectedResponse))
+      vi.stubGlobal('fetch', fetchMock)
+
+      const result = await createSpotifySession()
+
+      expect(result.session_id).toBe('sess-123')
+      expect(result.status).toBe('success')
+    })
+
+    it('disconnectSpotify calls logout endpoint', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { authenticated: false }))
+      vi.stubGlobal('fetch', fetchMock)
+
+      await disconnectSpotify()
+
+      expect(fetchMock.mock.calls[0][0]).toContain('/spotify/logout')
+    })
+
+    it('storeSpotifyTokens sends correct endpoint and method', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { status: 'success' }))
+      vi.stubGlobal('fetch', fetchMock)
+      const tokenData = { access_token: 'a', refresh_token: 'r', expires_in: 3600 }
+
+      await storeSpotifyTokens(tokenData)
+
+      const [url, init] = fetchMock.mock.calls[0]
+      expect(url).toContain('/spotify/tokens')
+      expect(init.method).toBe('POST')
+    })
+  })
+})

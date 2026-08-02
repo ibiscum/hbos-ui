@@ -16,33 +16,108 @@
       </div>
       <div class="info-card">
         <div class="toggle-row">
-          <h2>Dark mode</h2>
-          <ToggleSwitch v-model="isDark" />
-        </div>
-      </div>
-      <div v-if="settingsStore.isPi5OrHigher" class="info-card">
-        <div class="toggle-row">
-          <h2>VU meter</h2>
+          <div class="toggle-label">
+            <h2>Dark mode</h2>
+            <p class="toggle-description">System appearance preference</p>
+          </div>
           <ToggleSwitch
-            :modelValue="settingsStore.getVuMeterEnabled"
-            @update:modelValue="settingsStore.updateVuMeterEnabled"
+            v-model="isDark"
+            :disabled="isLoadingDarkMode"
+            :loading="isLoadingDarkMode"
+            aria-label="Toggle dark mode"
+            aria-describedby="dark-mode-description"
           />
         </div>
       </div>
+      <Transition name="slide-fade">
+        <div v-if="showVuMeterToggle" class="info-card">
+          <div class="toggle-row">
+            <div class="toggle-label">
+              <h2>VU meter</h2>
+              <p class="toggle-description">Audio level visualization (Pi 5+)</p>
+            </div>
+            <ToggleSwitch
+              :modelValue="vuMeterState"
+              :disabled="isLoadingVuMeter || !settingsStore.loaded"
+              :loading="isLoadingVuMeter"
+              @update:modelValue="handleVuMeterToggle"
+              aria-label="Toggle VU meter"
+              aria-describedby="vu-meter-description"
+            />
+          </div>
+        </div>
+      </Transition>
     </div>
   </PageContent>
 </template>
 
 <script setup lang="ts">
 import { useDark } from '@vueuse/core'
+import { ref, computed, onMounted } from 'vue'
 import BackRouter from '@/components/BackRouter.vue'
 import Icon from '@/components/Icon.vue'
 import PageContent from '@/components/PageContent.vue'
 import ToggleSwitch from '@/components/ToggleSwitch.vue'
 import { useSettingsStore } from '@/stores/settings'
+import { useToastStore } from '@/stores/toast'
 
 const isDark = useDark()
 const settingsStore = useSettingsStore()
+const toastStore = useToastStore()
+
+// Loading states
+const isLoadingDarkMode = ref(false)
+const isLoadingVuMeter = ref(false)
+
+// VU meter state with validation
+const vuMeterState = computed(() => {
+  // Validate that getVuMeterEnabled exists and is a boolean
+  if (settingsStore.getVuMeterEnabled === undefined || settingsStore.getVuMeterEnabled === null) {
+    return false
+  }
+  return Boolean(settingsStore.getVuMeterEnabled)
+})
+
+// Conditional rendering with guard
+const showVuMeterToggle = computed(() => {
+  // Guard against missing computed property
+  if (settingsStore.isPi5OrHigher === undefined || settingsStore.isPi5OrHigher === null) {
+    return false
+  }
+  return Boolean(settingsStore.isPi5OrHigher)
+})
+
+// Initialize dark mode with sync check
+onMounted(() => {
+  // Verify isDark is properly synced with system theme
+  if (typeof isDark.value === 'boolean') {
+    // Dark mode is properly initialized
+    console.debug('[display.vue] Dark mode initialized:', isDark.value)
+  } else {
+    console.warn('[display.vue] Dark mode initialization may have issues')
+  }
+})
+
+/**
+ * Handle VU meter toggle with error handling and user feedback
+ * @param value - The new toggle state
+ */
+const handleVuMeterToggle = async (value: boolean) => {
+  isLoadingVuMeter.value = true
+
+  try {
+    await settingsStore.updateVuMeterEnabled(value)
+    toastStore.showSuccessToast(`VU meter ${value ? 'enabled' : 'disabled'}`)
+  } catch (error) {
+    // Revert UI state on error
+    isLoadingVuMeter.value = false
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update VU meter'
+    console.error('[display.vue] VU meter toggle error:', error)
+    toastStore.showErrorToast(errorMessage)
+  } finally {
+    isLoadingVuMeter.value = false
+  }
+}
 </script>
 
 <style scoped lang="scss">
@@ -100,6 +175,64 @@ const settingsStore = useSettingsStore()
   display: flex;
   flex-direction: row;
   justify-content: space-between;
-  align-content: center;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+
+  .toggle-label {
+    flex: 1;
+    min-width: 150px;
+
+    h2 {
+      margin: 0 0 4px 0;
+      color: var(--color-head);
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .toggle-description {
+      margin: 0;
+      color: var(--color-body-secondary);
+      font-size: 0.875rem;
+      line-height: 1.4;
+    }
+  }
+}
+
+/* Smooth transition for conditional VU meter visibility */
+.slide-fade-enter-active,
+.slide-fade-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-fade-enter-from {
+  transform: translateX(-10px);
+  opacity: 0;
+}
+
+.slide-fade-leave-to {
+  transform: translateX(-10px);
+  opacity: 0;
+}
+
+/* Responsive design for small screens */
+@media (max-width: 640px) {
+  .toggle-row {
+    flex-direction: column;
+    align-items: stretch;
+
+    .toggle-label {
+      min-width: auto;
+      margin-bottom: 8px;
+    }
+  }
+
+  .display-content {
+    gap: 16px;
+
+    .info-card {
+      padding: 16px;
+    }
+  }
 }
 </style>

@@ -24,6 +24,7 @@ export const useVuMeterStore = defineStore('vu-meter', () => {
 
   let socket: WebSocket | null = null
   let reconnectTimer: number | undefined = undefined
+  let shouldReconnect = true
 
   function getWsUrl(): string {
     const hostname = window.location.hostname
@@ -34,6 +35,7 @@ export const useVuMeterStore = defineStore('vu-meter', () => {
 
   function connect() {
     if (socket) return
+    shouldReconnect = true
 
     if (reconnectTimer) {
       clearTimeout(reconnectTimer)
@@ -51,8 +53,10 @@ export const useVuMeterStore = defineStore('vu-meter', () => {
       socket.onclose = () => {
         connected.value = false
         socket = null
-        // Reconnect after 2 seconds
-        reconnectTimer = window.setTimeout(connect, 2000)
+        if (shouldReconnect) {
+          // Reconnect after 2 seconds
+          reconnectTimer = window.setTimeout(connect, 2000)
+        }
       }
 
       socket.onerror = () => {
@@ -60,7 +64,7 @@ export const useVuMeterStore = defineStore('vu-meter', () => {
       }
 
       socket.onmessage = (event: MessageEvent) => {
-        if (!(event.data instanceof ArrayBuffer) || event.data.byteLength < 6) return
+        if (!(event.data instanceof ArrayBuffer) || event.data.byteLength < 5) return
 
         const view = new DataView(event.data)
         leftRms.value = view.getUint8(0)
@@ -79,6 +83,7 @@ export const useVuMeterStore = defineStore('vu-meter', () => {
   }
 
   function disconnect() {
+    shouldReconnect = false
     if (reconnectTimer) {
       clearTimeout(reconnectTimer)
       reconnectTimer = undefined

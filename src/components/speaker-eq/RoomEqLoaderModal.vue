@@ -87,7 +87,7 @@ export interface RoomEQConfigItem {
   data: RoomEQConfig;
 }
 
-const props = defineProps<{
+defineProps<{
   open: boolean
   loading: boolean
   configs: RoomEQConfigItem[]

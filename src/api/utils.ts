@@ -1,17 +1,27 @@
 import { useAppConfigStore } from '@/stores/appconfig'
 
 /**
- * List of image URL prefixes that need to be proxied through the audiocontrol API
+ * List of URL prefixes that need to be rewritten to include /api/audiocontrol/.
+ * Used by both image URL rewriting and general API URL rewriting.
+ * Includes library, coverart, and lyrics endpoints.
  */
-const IMAGE_PROXY_PREFIXES = [
+const API_PROXY_PREFIXES = [
   '/api/library/',     // MPD/library images: /api/library/mpd/image/...
   '/api/coverart/',    // Cover art API: /api/coverart/...
+  '/api/lyrics/'       // Lyrics API: /api/lyrics/...
 ] as const
 
 /**
- * Rewrite image URLs to be accessible through the proxy or production API
- * This is specifically for images returned by the audiocontrol API
- * @param url - The image URL to rewrite
+ * Legacy constant for backward compatibility - use API_PROXY_PREFIXES instead.
+ * @deprecated Use API_PROXY_PREFIXES
+ */
+const IMAGE_PROXY_PREFIXES = API_PROXY_PREFIXES.slice(0, 2) // Only library and coverart
+
+/**
+ * Rewrite image URLs to be accessible through the proxy or production API.
+ * This is specifically for images returned by the audiocontrol API.
+ * Guards against double rewriting and validates device configuration.
+ * @param url - The image URL to rewrite (must be valid URL or empty string)
  * @returns The rewritten URL that can be accessed from the browser
  */
 export const rewriteImageUrl = (url: string): string => {
@@ -25,38 +35,48 @@ export const rewriteImageUrl = (url: string): string => {
   }
 
   const configStore = useAppConfigStore()
-  const { useProxy } = configStore.apiConfig()
+  const apiConfig = configStore.apiConfig
 
-  // If URL already starts with /api/audiocontrol/, it's already been rewritten
-  let correctedUrl = url
+  if (!apiConfig || typeof apiConfig.useProxy !== 'boolean') {
+    return url // Fallback if config unavailable
+  }
+  const { useProxy } = apiConfig
+
+  // Guard against double rewriting - if URL already rewritten, use it as-is
   if (url.startsWith('/api/audiocontrol/')) {
-    correctedUrl = url
-  } else {
-    // Check if URL matches any of the image proxy prefixes
-    const matchedPrefix = IMAGE_PROXY_PREFIXES.find(prefix => url.startsWith(prefix))
-    if (!matchedPrefix) {
-      // URL doesn't need proxying, return as-is
-      return url
-    }
+    return url
+  }
 
-    // Convert /api/library/ to /api/audiocontrol/library/ and similar
-    if (url.startsWith('/api/library/')) {
-      correctedUrl = url.replace('/api/library/', '/api/audiocontrol/library/')
-    } else if (url.startsWith('/api/coverart/')) {
-      correctedUrl = url.replace('/api/coverart/', '/api/audiocontrol/coverart/')
-    }
+  // Check if URL matches any of the supported prefixes
+  const matchedPrefix = IMAGE_PROXY_PREFIXES.find(prefix => url.startsWith(prefix))
+  if (!matchedPrefix) {
+    // URL doesn't need rewriting, return as-is
+    return url
+  }
+
+  // Rewrite URL to /api/audiocontrol/ prefix
+  let correctedUrl = url
+  if (url.startsWith('/api/library/')) {
+    correctedUrl = url.replace('/api/library/', '/api/audiocontrol/library/')
+  } else if (url.startsWith('/api/coverart/')) {
+    correctedUrl = url.replace('/api/coverart/', '/api/audiocontrol/coverart/')
   }
 
   if (useProxy) {
     // In development with proxy, return the corrected URL
     // The Vite proxy will handle routing this to the actual device
-    console.log('[IMG]', url, '->', correctedUrl)
     return correctedUrl
   }
 
   // In production (or when not using proxy), prepend the device base URL
-  const deviceIP = configStore.config.audiocontrol_api.deviceIP
-  const devicePort = configStore.config.audiocontrol_api.devicePort
+  const deviceIP = configStore.config?.audiocontrol_api?.deviceIP
+  const devicePort = configStore.config?.audiocontrol_api?.devicePort
+
+  // Validate device configuration exists
+  if (!deviceIP || typeof devicePort !== 'number') {
+    console.error('[IMG] Missing device configuration:', { deviceIP, devicePort })
+    return correctedUrl // Fallback to corrected path if device config unavailable
+  }
 
   // Build full URL with device IP/port
   // correctedUrl is like: /api/audiocontrol/library/mpd/image/...
@@ -64,16 +84,15 @@ export const rewriteImageUrl = (url: string): string => {
   const portSuffix = devicePort === 80 ? '' : `:${devicePort}`
   const rewrittenUrl = `http://${deviceIP}${portSuffix}${correctedUrl}`
 
-  console.log('[IMG]', url, '->', rewrittenUrl)
-
   return rewrittenUrl
 }
 
 /**
- * This function helps to deal with reverse proxies that rewrite the API url without the API
- * server knowing the full path.
- * @param url - The URL to rewrite
- * @returns The rewritten URL with full API prefix
+ * Rewrite audiocontrol API URLs with proper /api/audiocontrol prefix.
+ * Handles proxy mode (development) and production mode with API base URL.
+ * Guards against double rewriting to prevent path duplication.
+ * @param url - The API URL to rewrite (must be valid URL or empty string)
+ * @returns The rewritten URL with full /api/audiocontrol prefix
  */
 export const rewriteAudiocontrolApiUrl = (url: string): string => {
   if (!url) {
@@ -85,60 +104,62 @@ export const rewriteAudiocontrolApiUrl = (url: string): string => {
     return url
   }
 
+  // Guard against double rewriting - if already has /api/audiocontrol/, return as-is
+  if (url.startsWith('/api/audiocontrol/')) {
+    return url
+  }
+
   // Only process URLs that start with /api/
   if (!url.startsWith('/api/')) {
     return url
   }
 
   const configStore = useAppConfigStore()
-  const { useProxy } = configStore.apiConfig()
+  const apiConfig = configStore.apiConfig
 
-  // Fix URLs that start with /api/library/ to /api/audiocontrol/library/
-  // and /api/lyrics/ to /api/audiocontrol/lyrics/
-  // and /api/coverart/ to /api/audiocontrol/coverart/
-  // This is needed because the API server sometimes returns shortened paths
-  // but they should include /audiocontrol/ to match our API structure
+  if (!apiConfig || typeof apiConfig.useProxy !== 'boolean') {
+    return url // Fallback if config unavailable
+  }
+  const { useProxy } = apiConfig
+
+  // Rewrite URLs that need /audiocontrol/ inserted
+  // The API server sometimes returns shortened paths like /api/library/...
+  // but they should be /api/audiocontrol/library/... to match our API structure
   let correctedUrl = url
   if (url.startsWith('/api/library/')) {
     correctedUrl = url.replace('/api/library/', '/api/audiocontrol/library/')
-    console.log('Fixed library URL path:', { original: url, corrected: correctedUrl })
   } else if (url.startsWith('/api/lyrics/')) {
     correctedUrl = url.replace('/api/lyrics/', '/api/audiocontrol/lyrics/')
-    console.log('Fixed lyrics URL path:', { original: url, corrected: correctedUrl })
   } else if (url.startsWith('/api/coverart/')) {
     correctedUrl = url.replace('/api/coverart/', '/api/audiocontrol/coverart/')
-    console.log('Fixed coverart URL path:', { original: url, corrected: correctedUrl })
   }
 
   if (useProxy) {
     // In development with proxy, return the corrected URL
     // The Vite proxy will handle routing this to the actual device
-    console.log('API URL (proxy mode):', { original: url, final: correctedUrl })
     return correctedUrl
   }
 
   // In production (or when not using proxy), use the full API base URL
   const apiBaseUrl = configStore.getApiBaseUrl()
 
-  // For already encoded URLs, don't double-encode
-  // Just replace /api/ with the full API base URL
-  const rewrittenUrl = correctedUrl.replace('/api/', `${apiBaseUrl}/`)
+  if (!apiBaseUrl) {
+    console.error('API base URL not configured')
+    return correctedUrl // Fallback if API base URL unavailable
+  }
 
-  // Enhanced debug logging to understand what's happening
-  console.log('API URL rewriting:', {
-    original: url,
-    corrected: correctedUrl,
-    rewritten: rewrittenUrl,
-    apiBaseUrl,
-    useProxy,
-    config: configStore.apiConfig()
-  })
+  // Safely replace /api/ prefix with full API base URL
+  // Only replace if correctedUrl still starts with /api/
+  if (correctedUrl.startsWith('/api/')) {
+    return correctedUrl.replace('/api/', `${apiBaseUrl}/`)
+  }
 
-  return rewrittenUrl
+  return correctedUrl
 }
 
 /**
- * Legacy alias for backward compatibility
+ * Legacy alias for backward compatibility.
  * @deprecated Use rewriteAudiocontrolApiUrl instead
+ * @see rewriteAudiocontrolApiUrl
  */
 export const rewrite_audiocontrol_api_url = rewriteAudiocontrolApiUrl

@@ -1,5 +1,8 @@
 #!/usr/bin/make -f
 
+export DH_VERBOSE=1
+export DEB_BUILD_MAINT_OPTIONS=hardening=+all
+
 %:
 	dh $@
 
@@ -12,6 +15,8 @@ override_dh_auto_build:
 	# Copy built files to expected location for packaging
 	mkdir -p dist
 	cp -r debian/webui-dist/* dist/
+	# Verify build integrity
+	test -f dist/index.html || (echo "Build verification failed: index.html not present" && exit 1)
 
 override_dh_auto_install:
 	# Install the built web application to /usr/share/hifiberry/webui

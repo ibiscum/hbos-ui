@@ -75,11 +75,14 @@ export const usePlayerWebSocket = defineStore('player-web-socket', () => {
   function createPlayerWebSocket(options: createPlayerWebSocketOptions) {
     let socket: WebSocket | null = null
     let reconnectTimer: number | undefined = undefined
+    let shouldReconnect = true
 
     const wsUrl = `ws://${options.hostname}:${options.port}${options.apiPrefix || '/api'}/events`
 
     // Connect to WebSocket
     const connect = () => {
+      shouldReconnect = true
+
       if (socket) {
         return // Already connected or connecting
       }
@@ -110,10 +113,12 @@ export const usePlayerWebSocket = defineStore('player-web-socket', () => {
 
           // Schedule reconnect
           socket = null
-          if (reconnectTimer) {
-            clearTimeout(reconnectTimer)
+          if (shouldReconnect) {
+            if (reconnectTimer) {
+              clearTimeout(reconnectTimer)
+            }
+            reconnectTimer = setTimeout(connect, PLAYER_CONFIG.wsReconnectInterval)
           }
-          reconnectTimer = setTimeout(connect, PLAYER_CONFIG.wsReconnectInterval)
         }
 
         socket.onerror = (error) => {
@@ -147,16 +152,19 @@ export const usePlayerWebSocket = defineStore('player-web-socket', () => {
           options.onError(error as Event)
         }
         // Schedule reconnect after error
-        if (reconnectTimer) {
-          clearTimeout(reconnectTimer)
+        if (shouldReconnect) {
+          if (reconnectTimer) {
+            clearTimeout(reconnectTimer)
+          }
+          reconnectTimer = setTimeout(connect, PLAYER_CONFIG.wsReconnectInterval)
         }
-        reconnectTimer = setTimeout(connect, PLAYER_CONFIG.wsReconnectInterval)
       }
     }
 
     // Disconnect from WebSocket
     const disconnect = () => {
       console.log('ws disconnect')
+      shouldReconnect = false
 
       if (reconnectTimer) {
         clearTimeout(reconnectTimer)

@@ -1,7 +1,7 @@
 <template>
   <PageContent title="Sound">
     <div class="soundOverview">
-      <ContentBoxLink :to="{ name: 'general-sound' }"  height=150>
+      <ContentBoxLink :to="{ name: 'general-sound' }"  :height="150">
         <div class="soundCardHeader">
           <Icon icon="tabler/adjustments" class="soundCardHeaderIcon" />
           <h2>General sound settings</h2>
@@ -11,7 +11,7 @@
         </p>
       </ContentBoxLink>
 
-      <ContentBoxLink :to="{ name: 'speaker-equalizer' }"  height=150>
+      <ContentBoxLink :to="{ name: 'speaker-equalizer' }"  :height="150">
         <div class="soundCardHeader">
           <Icon icon="tabler/speaker" class="soundCardHeaderIcon" />
           <h2>Speaker Equalizer</h2>
@@ -21,7 +21,7 @@
         </p>
       </ContentBoxLink>
 
-      <ContentBoxLink :to="{ name: 'crossover-design' }"  height=150>
+      <ContentBoxLink :to="{ name: 'crossover-design' }"  :height="150">
         <div class="soundCardHeader">
           <Icon icon="tabler/crossover" class="soundCardHeaderIcon" />
           <h2>Crossover Design</h2>
@@ -29,7 +29,7 @@
         <p class="soundCardDescription">Configure frequency separation and phase alignment for multi-way speaker systems</p>
       </ContentBoxLink>
 
-      <ContentBoxLink :to="{ name: 'room-acoustics' }" height=150>
+      <ContentBoxLink :to="{ name: 'room-acoustics' }" :height="150">
         <div class="soundCardHeader">
           <Icon icon="tabler/armchair" class="soundCardHeaderIcon" />
           <h2>Room Acoustics Correction</h2>

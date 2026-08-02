@@ -16,6 +16,7 @@ import { FilterBackend, type Filter, type FilterBanks, type BackendCapabilities 
 
 export class HttpFilterBackend extends FilterBackend {
   public readonly name = 'HTTP API Filter Backend'
+  public readonly shortDescription = 'Remote HTTP backend for filter operations'
   public readonly description = `
     <p><strong>HTTP API Filter Backend</strong></p>
 
@@ -46,6 +47,10 @@ export class HttpFilterBackend extends FilterBackend {
     this.apiBaseUrl = apiBaseUrl
   }
 
+  private encodeBankName(bankName: string): string {
+    return encodeURIComponent(bankName)
+  }
+
   private async apiCall(endpoint: string, method: string = 'GET', data?: unknown): Promise<unknown> {
     const url = `${this.apiBaseUrl}${endpoint}`
     const options: RequestInit = {
@@ -69,13 +74,21 @@ export class HttpFilterBackend extends FilterBackend {
   }
 
   async getBackendCapabilities(): Promise<BackendCapabilities> {
-    const result = await this.apiCall('/capabilities') as BackendCapabilities
-    console.log(`[${this.name}] Retrieved backend capabilities:`, result)
-    return result
+    const result = await this.apiCall('/capabilities') as Partial<BackendCapabilities>
+    const capabilities: BackendCapabilities = {
+      availableFilterBanks: result.availableFilterBanks ?? [],
+      backendName: result.backendName ?? this.name,
+      backendDescription: result.backendDescription ?? this.description,
+      backendShortDescription: result.backendShortDescription ?? this.name,
+      sampleRate: result.sampleRate,
+    }
+    console.log(`[${this.name}] Retrieved backend capabilities:`, capabilities)
+    return capabilities
   }
 
   async addFilter(bankName: string, position: number, filter: Omit<Filter, 'id'>): Promise<string> {
-    const result = await this.apiCall(`/filter-banks/${bankName}/filters`, 'POST', {
+    const encodedBankName = this.encodeBankName(bankName)
+    const result = await this.apiCall(`/filter-banks/${encodedBankName}/filters`, 'POST', {
       position,
       filter
     }) as { id: string }
@@ -86,7 +99,8 @@ export class HttpFilterBackend extends FilterBackend {
 
   async removeFilter(bankName: string, position: number): Promise<boolean> {
     try {
-      await this.apiCall(`/filter-banks/${bankName}/filters/${position}`, 'DELETE')
+      const encodedBankName = this.encodeBankName(bankName)
+      await this.apiCall(`/filter-banks/${encodedBankName}/filters/${position}`, 'DELETE')
       console.log(`[HTTP Filter Backend] Removed filter from ${bankName} at position ${position}`)
       return true
     } catch (error) {
@@ -97,7 +111,8 @@ export class HttpFilterBackend extends FilterBackend {
 
   async updateFilter(bankName: string, position: number, updates: Partial<Omit<Filter, 'id'>>): Promise<boolean> {
     try {
-      await this.apiCall(`/filter-banks/${bankName}/filters/${position}`, 'PATCH', updates)
+      const encodedBankName = this.encodeBankName(bankName)
+      await this.apiCall(`/filter-banks/${encodedBankName}/filters/${position}`, 'PATCH', updates)
       console.log(`[HTTP Filter Backend] Updated filter in ${bankName} at position ${position}:`, updates)
       return true
     } catch (error) {
@@ -107,18 +122,21 @@ export class HttpFilterBackend extends FilterBackend {
   }
 
   async clearFiltersFromBank(bankName: string): Promise<void> {
-    await this.apiCall(`/filter-banks/${bankName}/filters`, 'DELETE')
+    const encodedBankName = this.encodeBankName(bankName)
+    await this.apiCall(`/filter-banks/${encodedBankName}/filters`, 'DELETE')
     console.log(`[HTTP Filter Backend] Cleared all filters from ${bankName}`)
   }
 
   async createFilterBank(bankName: string): Promise<void> {
-    await this.apiCall(`/filter-banks/${bankName}`, 'POST')
+    const encodedBankName = this.encodeBankName(bankName)
+    await this.apiCall(`/filter-banks/${encodedBankName}`, 'POST')
     console.log(`[HTTP Filter Backend] Created filter bank: ${bankName}`)
   }
 
   async removeFilterBank(bankName: string): Promise<boolean> {
     try {
-      await this.apiCall(`/filter-banks/${bankName}`, 'DELETE')
+      const encodedBankName = this.encodeBankName(bankName)
+      await this.apiCall(`/filter-banks/${encodedBankName}`, 'DELETE')
       console.log(`[HTTP Filter Backend] Removed filter bank: ${bankName}`)
       return true
     } catch (error) {

@@ -1,3 +1,18 @@
+hifiberry-webui (0.20.6) trixie; urgency=medium
+
+  * Debian/Trixie compliance updates:
+    - Update Standards-Version to 4.7.0 (Trixie standard)
+    - Add explicit Node.js and npm build dependencies
+    - Add hardening flags (DEB_BUILD_MAINT_OPTIONS=hardening=+all)
+    - Add Rules-Requires-Root: no for modern practices
+    - Improve build verification in rules file
+    - Update Dockerfile to use Node.js 20 LTS (Trixie available)
+    - Update copyright year range to 2024-2026
+    - Add build process comment in copyright file
+    - Improve .lintian-overrides documentation
+
+ -- HiFiBerry <support@hifiberry.com>  Fri, 02 Aug 2026 10:00:00 +0000
+
 hifiberry-webui (0.20.5) stable; urgency=medium
 
   * Web Services: route the Spotify and Last.fm APIs through apiFetch. Both

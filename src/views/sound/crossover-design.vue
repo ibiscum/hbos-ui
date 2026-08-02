@@ -214,7 +214,6 @@ const {
   currentChannelFilterInfo,
   isCurrentPairLinked,
   getPairPartner,
-  getPairKey,
   togglePairLink,
   initialize,
   loadBackendCapabilities,

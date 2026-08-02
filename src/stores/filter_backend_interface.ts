@@ -64,6 +64,11 @@ export abstract class FilterBackend {
   abstract readonly name: string
 
   /**
+   * Short description of this backend implementation
+   */
+  abstract readonly shortDescription: string
+
+  /**
    * Extended description of this backend implementation
    */
   abstract readonly description: string

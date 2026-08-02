@@ -79,7 +79,7 @@ const onDeleteAlbum = async () => {
     toastStore.showSuccessToast('Album deleted')
     await albumStore.getAlbums()
     router.push({ name: 'albums' })
-  } catch (err) {
+  } catch {
     toastStore.showErrorToast('Failed to delete album')
   }
 }

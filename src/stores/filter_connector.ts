@@ -75,7 +75,7 @@ export const useFilterStore = defineStore('filter', () => {
       if (response.data?.value && response.data.value in availableBackends) {
         return response.data.value as keyof typeof availableBackends
       }
-    } catch (error) {
+    } catch {
       // Key doesn't exist or request failed — no preference stored
     }
     return null
@@ -123,9 +123,16 @@ export const useFilterStore = defineStore('filter', () => {
   const switchBackend = async (backendType: keyof typeof availableBackends): Promise<void> => {
     if (backendType === currentBackendType.value) return
 
+    const previousBackendType = currentBackendType.value
     currentBackendType.value = backendType
-    await saveBackendType(backendType) // Persist the selection
-    await syncFromBackend()
+
+    try {
+      await syncFromBackend()
+      await saveBackendType(backendType) // Persist only after successful switch
+    } catch (error) {
+      currentBackendType.value = previousBackendType
+      throw error
+    }
   }
 
   // Computed

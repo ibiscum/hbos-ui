@@ -5,29 +5,46 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount } from 'vue'
-import { usePlayerWebSocket } from '@/stores/player-web-socket'
+
 import { usePlayerStore } from '@/stores/player'
 import { useAudioControls } from '@/stores/audio-controls'
+import { usePlayerWebSocket } from '@/stores/player-web-socket'
+
 import SecurityPrompt from '@/components/SecurityPrompt.vue'
 
 const playerStore = usePlayerStore()
 const audioControls = useAudioControls()
 const playerWebSocket = usePlayerWebSocket()
 
-playerStore.initPlayer()
+try {
+  playerStore.initPlayer()
+} catch (error) {
+  console.error('Failed to initialize player:', error)
+}
 
 onBeforeUnmount(() => {
-  if (audioControls.progressIntervalID) {
-    audioControls.stopAutoProgress()
-  }
+  try {
+    // Clear progress interval for audio control updates
+    if (audioControls?.progressIntervalID) {
+      audioControls.stopAutoProgress()
+    }
 
-  if (playerStore.updateIntervalID) {
-    playerStore.clearPollingInterval()
-  }
+    // Clear polling interval for player state updates
+    if (playerStore?.updateIntervalID) {
+      playerStore.clearPollingInterval()
+    }
 
-  if (playerWebSocket.wsController) {
-    playerWebSocket.wsController.disconnect()
-    playerWebSocket.wsController = null
+    // Disconnect WebSocket and clear reference
+    if (playerWebSocket?.wsController) {
+      try {
+        playerWebSocket.wsController.disconnect()
+      } catch (disconnectError) {
+        console.error('Error disconnecting WebSocket:', disconnectError)
+      }
+      playerWebSocket.wsController = null
+    }
+  } catch (cleanupError) {
+    console.error('Error during cleanup:', cleanupError)
   }
 })
 </script>

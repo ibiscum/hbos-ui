@@ -31,11 +31,11 @@
           <div class="control-group" v-for="ctrl in standardControls" :key="ctrl.label">
             <label>{{ ctrl.label }}</label>
             <div class="control-buttons">
-              <button @click="$emit(ctrl.decEvent, filter)" class="control-btn">
+              <button @click="$emit(ctrl.decEvent as any, filter)" class="control-btn">
                 <Icon icon="minus-small" />
               </button>
               <span class="control-value">{{ ctrl.format(filter) }}</span>
-              <button @click="$emit(ctrl.incEvent, filter)" class="control-btn">
+              <button @click="$emit(ctrl.incEvent as any, filter)" class="control-btn">
                 <Icon icon="plus-small" />
               </button>
             </div>

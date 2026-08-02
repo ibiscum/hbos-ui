@@ -58,7 +58,13 @@ const capability = ref("KeyboardOnly")
 onMounted(async () => {
   try {
     const response = await apiFetch(`${apiBaseUrl}/bluetooth/settings`)
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
     const data = await response.json()
+
+    // Validate response structure
+    if (!data || !data.data || typeof data.data.capability !== 'string' || typeof data.data.discoverable !== 'boolean') {
+      throw new Error('Invalid response structure from bluetooth settings API')
+    }
 
     capability.value = data.data.capability
     discoverable.value = data.data.discoverable
@@ -84,25 +90,24 @@ onUnmounted(() => {
 
 /**
   * Updates a setting in the hbos-bluetooth-service via the config-server.
+  * Always returns boolean: true on success, false on failure.
   *
   * @param {string} key - The key of the setting.
   * @param {boolean | number | string} newValue - The new value that should be written into the config-server.
-  * @throws Will throw an error if the http response status code is not `response.ok`.
-  * @throws Will throw an error if it could not update the setting inside the config-server.
+  * @returns {Promise<boolean>} True if update succeeded, false if failed
   */
-async function updateSetting(key: string, newValue: boolean | number | string) {
-  const valueString = typeof newValue === "boolean" ? String(newValue).toLowerCase() : newValue
+async function updateSetting(key: string, newValue: boolean | number | string): Promise<boolean> {
+  const valueString = typeof newValue === 'boolean' ? String(newValue).toLowerCase() : newValue
   const url = `${apiBaseUrl}/bluetooth/settings?${key}=${valueString}`
 
   try {
-    const response = await apiFetch(url, { method: "POST" })
+    const response = await apiFetch(url, { method: 'POST' })
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
-    const data = await response.json()
-    console.log("Update successful:", data)
-    return data
+    await response.json()
+    return true
   } catch (error) {
-    console.error("Failed to update setting:", error)
-    throw error
+    console.error('Failed to update setting:', error)
+    return false
   }
 }
 
@@ -117,7 +122,7 @@ function startCountdown() {
   isCountdownActive.value = true
   discoverableCountdown.value = 60
   updateSetting('discoverable_timeout', 60)
-  modalShouldRequest.value = true;
+  modalShouldRequest.value = true
 
   if (countdownInterval.value) {
     clearInterval(countdownInterval.value)
@@ -126,37 +131,40 @@ function startCountdown() {
   countdownInterval.value = window.setInterval(() => {
     if (discoverableCountdown.value > 0) {
       discoverableCountdown.value--
-      if (modalShouldRequest.value == true) {
-        showModalIfTrue();
+      // Poll modal state every second only while countdown is active
+      if (modalShouldRequest.value === true && isCountdownActive.value) {
+        showModalIfTrue()
       }
     } else {
+      // Countdown reached zero - stop discovery and clean up
+      stopCountdown()
       discoverable.value = false
-      isCountdownActive.value = false
       updateSetting('discoverable', false)
-      if (countdownInterval.value) {
-        clearInterval(countdownInterval.value)
-      }
       modalOpen.value = false
     }
   }, 1000)
 }
 
 /**
-  * Request the backend modal API. Show the modal if it returns `"true"`.
+  * Request the backend modal API. Show the modal if it returns true/"true".
+  * On error, continue polling but don't show error toast (avoid spam).
   */
 async function showModalIfTrue() {
   try {
-    const response = await apiFetch(`${apiBaseUrl}/bluetooth/modal`);
-    const data = await response.json();
+    const response = await apiFetch(`${apiBaseUrl}/bluetooth/modal`)
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+    const data = await response.json()
 
-    console.log(data.modal);
-    if (data.modal === "true") {
-      modalOpen.value = true;
-      modalShouldRequest.value = false;
+    // Handle both boolean and string "true" responses from backend
+    const shouldShowModal = data.modal === true || data.modal === 'true'
+    if (shouldShowModal) {
+      modalOpen.value = true
+      modalShouldRequest.value = false
     }
   } catch (error) {
-    console.error("Failed to fetch bluetooth modal:", error);
-    toastStore.showErrorToast('Failed to fetch bluetooth modal.')
+    console.error('Failed to fetch bluetooth modal:', error)
+    // Don't show error toast to avoid spam during countdown polling
+    // Continue polling to retry next second
   }
 }
 
@@ -172,59 +180,72 @@ function stopCountdown() {
 
 /**
   * Toggles the discoverable mode (pairing mode).
-  * If the pairing mode is set to false, it will
-  * also stop the countdown using the
-  * `stopCountdown()` function.
+  * Updates backend first, then UI state only on success.
+  * If the pairing mode is set to false, also stops the countdown.
   */
 async function toggleDiscoverable() {
   const newState = !discoverable.value
 
   try {
-    await updateSetting('discoverable', newState)
-    discoverable.value = newState
+    const success = await updateSetting('discoverable', newState)
+    if (!success) {
+      toastStore.showErrorToast('Failed to toggle discoverable state.')
+      return
+    }
 
+    discoverable.value = newState
     if (newState) startCountdown()
     else stopCountdown()
   } catch (error) {
-    console.error("Failed to toggle discoverable state:", error)
+    console.error('Failed to toggle discoverable state:', error)
     toastStore.showErrorToast('Failed to toggle discoverable state.')
   }
 }
 
 /**
-  * Update the capability (pairing with password)
-  * in the backend. It can either be `"NoInputNoOutput"`
-  * or `"KeyboardOnly"`.
-  * `"KeyboardOnly"` is with the passkey and
-  * `"NoInputNoOutput"` without the passkey.
+  * Update the capability (pairing with password) in the backend.
+  * It can either be `"NoInputNoOutput"` or `"KeyboardOnly"`.
+  * `"KeyboardOnly"` enables passkey pairing.
+  * `"NoInputNoOutput"` disables passkey pairing.
+  * Updates backend first, then UI state only on success.
   *
   * Please look at the [hbos-bluetooth-service](https://github.com/arcathrax/hbos-bluetooth-service)
   * for all the available options.
   */
 async function togglePairingWithPassword() {
   try {
-    if (capability.value === "NoInputNoOutput") {
-      await updateSetting("capability", "KeyboardOnly")
-      capability.value = "KeyboardOnly"
-    } else {
-      await updateSetting("capability", "NoInputNoOutput")
-      capability.value = "NoInputNoOutput"
+    // Validate current state before toggling
+    const validCapabilities = ['NoInputNoOutput', 'KeyboardOnly']
+    if (!validCapabilities.includes(capability.value)) {
+      console.error(`Invalid capability value: ${capability.value}`)
+      toastStore.showErrorToast('Invalid pairing capability setting.')
+      return
     }
+
+    const newCapability = capability.value === 'NoInputNoOutput' ? 'KeyboardOnly' : 'NoInputNoOutput'
+    const success = await updateSetting('capability', newCapability)
+    if (!success) {
+      toastStore.showErrorToast('Failed to toggle pairing with password.')
+      return
+    }
+
+    capability.value = newCapability
   } catch (error) {
-    console.error("Failed to toggle pairing with password:", error)
+    console.error('Failed to toggle pairing with password:', error)
     toastStore.showErrorToast('Failed to toggle pairing with password.')
   }
 }
 
 /**
-  * Resets the countdown. This is called
-  * when the user presses on the visible countdown,
-  * so it will go back to 60.
-  *
-  * This will simply update the ui and send the
-  * setting to the backend.
+  * Resets the countdown. This is called when the user clicks the countdown.
+  * Only works while countdown is active. Resets to 60 seconds.
+  * This will update the UI and send the setting to the backend.
   */
 function resetCountdown() {
+  // Guard: only allow reset if countdown is active and discoverable is enabled
+  if (!isCountdownActive.value || !discoverable.value) {
+    return
+  }
   discoverableCountdown.value = 60
   updateSetting('discoverable_timeout', 60)
 }

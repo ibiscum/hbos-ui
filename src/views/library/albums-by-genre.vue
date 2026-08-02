@@ -13,10 +13,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 
 import PageContent from '@/components/PageContent.vue'
 import PosterGrid from '@/components/PosterGrid.vue'
+
 import type { PosterItem } from '@/types/library'
 
 import { useLibraryFetch } from '@/composables/useLibraryFetch.ts'
@@ -29,7 +30,15 @@ const libraryFetch = useLibraryFetch()
 const toastStore = useToastStore()
 const albumStore = useAlbumStore()
 
-const category = computed(() => route.params.category as string)
+const YEAR_SUBSTRING_LENGTH = 4
+
+const category = computed<string>(() => {
+  const cat = route.params.category as string
+  if (!cat) {
+    console.warn('Genre parameter missing from route')
+  }
+  return cat
+})
 
 interface Album {
   id: string
@@ -39,31 +48,51 @@ interface Album {
 }
 
 const albums = ref<Album[]>([])
-const loading = ref(false)
-const loaded = ref(false)
+const loading = ref<boolean>(false)
+const loaded = ref<boolean>(false)
 
 const albumItems = computed<PosterItem[]>(() =>
-  albums.value.map((album) => ({
-    $id: album.id,
-    $title: album.name,
-    $subtitle: album.artists[0] ?? '',
-    $note: album.release_date ? album.release_date.substring(0, 4) : '',
-    $cover_src: albumStore.getAlbumCoverById(album.id),
-  }))
+  albums.value.map((album) => {
+    if (!album?.id || !album?.name) {
+      console.warn('Invalid album data:', album)
+      return {
+        $id: album?.id ?? '',
+        $title: album?.name ?? '',
+        $subtitle: '',
+        $note: '',
+        $cover_src: '',
+      }
+    }
+    return {
+      $id: album.id,
+      $title: album.name,
+      $subtitle: album.artists?.[0] ?? '',
+      $note: album.release_date ? album.release_date.substring(0, YEAR_SUBSTRING_LENGTH) : '',
+      $cover_src: albumStore.getAlbumCoverById(album.id),
+    }
+  })
 )
 
-const loadAlbums = async () => {
+const loadAlbums = async (): Promise<void> => {
   loading.value = true
   loaded.value = false
   albums.value = []
 
-  const encodedCategory = encodeURIComponent(category.value)
+  if (!category.value) {
+    toastStore.showErrorToast('Genre not specified')
+    loading.value = false
+    loaded.value = true
+    return
+  }
+
+  const encodedGenre = encodeURIComponent(category.value)
   const { error, data } = await libraryFetch<{ albums: Album[] }>(
-    `/library/:activeLibrary/albums/by-category/${encodedCategory}`,
+    `/library/:activeLibrary/albums/by-genre/${encodedGenre}`,
   ).json()
 
   if (error.value) {
-    toastStore.showErrorToast(`Failed to load albums: ${error.value}`)
+    const errorMessage = typeof error.value === 'string' ? error.value : 'Unknown error'
+    toastStore.showErrorToast(`Failed to load albums: ${errorMessage}`)
   } else if (data.value?.albums) {
     albums.value = data.value.albums
   }
@@ -72,5 +101,12 @@ const loadAlbums = async () => {
   loaded.value = true
 }
 
-onMounted(loadAlbums)
+onMounted(async () => {
+  try {
+    await loadAlbums()
+  } catch {
+    console.error('Error loading albums by genre')
+    toastStore.showErrorToast('An error occurred while loading albums')
+  }
+})
 </script>
