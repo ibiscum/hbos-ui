@@ -237,14 +237,14 @@ const handleHttpError = async (response: Response, operation: string): Promise<n
 /**
  * Create safe mount options for SMB/CIFS mounting
  * This helps avoid capability issues by using appropriate mount options
- * This helps avoid capability issues by using appropriate mount options
  */
 export const createSafeMountOptions = (
   username?: string,
   uid?: number,
   gid?: number,
   fileMode?: string,
-  dirMode?: string
+  dirMode?: string,
+  smbVersion?: string
 ): string => {
   const options = []
 
@@ -275,7 +275,7 @@ export const createSafeMountOptions = (
   options.push('nobrl') // Disable byte range locking
   options.push('cache=loose') // Use loose caching
   options.push('iocharset=utf8') // UTF-8 character set
-  options.push('vers=3.0') // Use SMB 3.0 by default
+  options.push(`vers=${smbVersion || '3.0'}`) // Use specified SMB version or default to 3.0
 
   return options.join(',')
 }
@@ -463,7 +463,8 @@ export const mountSmbShareWithRetry = async (mountRequest: SmbMountRequest): Pro
     mountRequest.uid,
     mountRequest.gid,
     mountRequest.file_mode,
-    mountRequest.dir_mode
+    mountRequest.dir_mode,
+    mountRequest.version
   )
 
   const requestWithSafeOptions = {

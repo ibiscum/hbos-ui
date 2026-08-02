@@ -37,20 +37,20 @@ vi.mock('@/components/ToggleSwitch.vue', () => ({
 }))
 
 vi.mock('@/stores/settings', () => ({
-  useSettingsStore: () => ({
+  useSettingsStore: vi.fn(() => ({
     loaded: true,
     isPi5OrHigher: true,
     getVuMeterEnabled: true,
     updateVuMeterEnabled: vi.fn().mockResolvedValue(undefined)
-  })
+  }))
 }))
 
 vi.mock('@/stores/toast', () => ({
-  useToastStore: () => ({
+  useToastStore: vi.fn(() => ({
     showSuccessToast: vi.fn(),
     showErrorToast: vi.fn(),
     showInfoToast: vi.fn()
-  })
+  }))
 }))
 
 vi.mock('@vueuse/core', () => ({
