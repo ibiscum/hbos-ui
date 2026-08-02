@@ -27,7 +27,8 @@ import ContentBox from "@/components/ContentBox.vue"
 </script>
 
 <style scoped lang="scss">
-@import '@/assets/scss/service-item';
+
+// @import '@/assets/scss/service-item';
 
 .service-item {
   @include service-item-base;

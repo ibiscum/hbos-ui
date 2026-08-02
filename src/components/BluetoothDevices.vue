@@ -44,7 +44,28 @@ interface BluetoothDevice {
 const devices = ref<BluetoothDevice[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
+const retryCount = ref(0)
+const MAX_RETRIES = 3
 
+/**
+  * Type guard to validate BluetoothDevice response structure
+  */
+function isValidDevice(device: unknown): device is BluetoothDevice {
+  if (typeof device !== 'object' || device === null) return false
+  const obj = device as Record<string, unknown>
+  return (
+    typeof obj.address === 'string' &&
+    typeof obj.name === 'string' &&
+    typeof obj.connected === 'boolean' &&
+    typeof obj.trusted === 'boolean'
+  )
+}
+
+/**
+  * Fetches and validates bluetooth paired devices from the backend.
+  * Validates response structure and individual device objects.
+  * Retries up to MAX_RETRIES times on failure.
+  */
 const fetchDevices = async () => {
   loading.value = true
   error.value = null
@@ -53,12 +74,36 @@ const fetchDevices = async () => {
     const response = await apiFetch(`${apiBaseUrl}/bluetooth/paired-devices`)
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
     const result = await response.json()
-    console.log(result);
-    const data: BluetoothDevice[] = result.data
-    devices.value = data
+
+    // Validate response structure
+    if (!result || !Array.isArray(result.data)) {
+      throw new Error('Invalid response structure: expected data array')
+    }
+
+    // Validate each device object
+    const validatedDevices = result.data.filter((device: unknown) => {
+      if (!isValidDevice(device)) {
+        console.warn('Invalid device structure:', device)
+        return false
+      }
+      return true
+    })
+
+    devices.value = validatedDevices
+    retryCount.value = 0 // Reset retry counter on success
   } catch (err) {
-    console.error(err)
+    console.error('Failed to fetch devices:', err)
     error.value = 'Failed to load Bluetooth devices.'
+
+    // Attempt retry for transient errors
+    if (retryCount.value < MAX_RETRIES) {
+      retryCount.value++
+      console.log(`Retrying device fetch (${retryCount.value}/${MAX_RETRIES})...`)
+      // Retry after 1 second
+      setTimeout(() => {
+        fetchDevices()
+      }, 1000)
+    }
   } finally {
     loading.value = false
   }

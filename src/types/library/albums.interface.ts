@@ -5,7 +5,7 @@ import type { PosterItem } from '@/types/library'
 export interface Album extends PosterItem {
   id: string
   name: string
-  release_date: string
+  release_date?: string
   tracks_count: number
   cover_art: string
   artists: string[]
@@ -21,6 +21,7 @@ export interface AlbumByArtistResponse {
   artists: Artist[]
   count: number
   player_name: string
+  albums: Album[]
 }
 export interface AlbumsResponse {
   player_name: string

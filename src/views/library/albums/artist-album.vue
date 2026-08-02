@@ -172,9 +172,7 @@
 <script setup lang="ts">
 import { onMounted, computed, watch, ref } from 'vue'
 import { storeToRefs } from 'pinia'
-
-import { useRouter } from 'vue-router'
-const router = useRouter()
+import { useRouter, useRoute } from 'vue-router'
 
 import BackRouter from '@/components/BackRouter.vue'
 import PosterGrid from '@/components/PosterGrid.vue'
@@ -184,42 +182,44 @@ import ArtistImageSelector from '@/components/ArtistImageSelector.vue'
 import { updateArtistImage } from '@/api/coverart'
 import { rewriteImageUrl } from '@/api/utils'
 
-import { useRoute } from 'vue-router'
+import { useAlbumStore } from '@/stores/album.ts'
+import { useArtistStore } from '@/stores/artist.ts'
+import { useToastStore } from '@/stores/toast'
+
+import { useLibraryFetch } from '@/composables/useLibraryFetch.ts'
+import { useMusicBrainz } from '@/composables/useMusicBrainz'
+
+const router = useRouter()
 const route = useRoute()
 
 const id = computed(() => route.params.artistId as string)
 
-import { useAlbumStore } from '@/stores/album.ts'
 const albumsStore = useAlbumStore()
 const { loading, loaded, sortedAlbumsByReleaseDate } = storeToRefs(albumsStore)
 const { getAlbumByArtistId } = albumsStore
 
-import { useLibraryFetch } from '@/composables/useLibraryFetch.ts'
 const libraryFetch = useLibraryFetch()
 
-import { useArtistStore } from '@/stores/artist.ts'
 const artistStore = useArtistStore()
 const { getArtistByIdFromStore, getArtists } = artistStore
 
-import { useToastStore } from '@/stores/toast'
 const toastStore = useToastStore()
 const { allArtists, artistByName: fullArtistData } = storeToRefs(artistStore)
 
-import { useMusicBrainz } from '@/composables/useMusicBrainz'
 const {
   artistData: mbArtistData,
   loading: mbLoading,
   error: mbError,
   fetchArtist: fetchMbArtist,
   formattedLifeSpan,
-  formattedLocation
+  formattedLocation,
 } = useMusicBrainz()
 
 // Get basic artist from store
-const artistByName = computed(() => getArtistByIdFromStore(id.value))
+const artistByName = computed<ReturnType<typeof getArtistByIdFromStore>>(() => getArtistByIdFromStore(id.value))
 
 // Process artist image URL through rewrite function
-const artistImageUrl = computed(() => {
+const artistImageUrl = computed<string | null>(() => {
   if (artistImageError.value) {
     return null // Don't show image if there was an error loading it
   }
@@ -231,6 +231,7 @@ const artistImageUrl = computed(() => {
 
 // Track artist image loading errors
 const artistImageError = ref(false)
+const isUpdatingImage = ref(false)
 
 // Handle artist image loading errors
 const onArtistImageError = () => {
@@ -275,7 +276,7 @@ const openImageSelector = () => {
   showImageSelector.value = true
 }
 
-const onArtistImageSelected = async (imageUrl: string) => {
+const onArtistImageSelected = async (imageUrl: string): Promise<void> => {
   console.log('Selected artist image:', imageUrl)
 
   const artistName = artistByName.value?.name
@@ -285,6 +286,7 @@ const onArtistImageSelected = async (imageUrl: string) => {
     return
   }
 
+  isUpdatingImage.value = true
   try {
     toastStore.showInfoToast('Updating artist image...')
     const result = await updateArtistImage(artistName, imageUrl)
@@ -298,14 +300,16 @@ const onArtistImageSelected = async (imageUrl: string) => {
       console.error('Failed to update artist image:', result.message)
       toastStore.showErrorToast(`Failed to update artist image: ${result.message}`)
     }
-  } catch (error) {
-    console.error('Error updating artist image:', error)
+  } catch {
+    console.error('Error updating artist image')
     toastStore.showErrorToast('An error occurred while updating the artist image')
+  } finally {
+    isUpdatingImage.value = false
   }
 }
 
 // Computed property for displayed biography text
-const displayedBiography = computed(() => {
+const displayedBiography = computed<string>(() => {
   const biography = fullArtistData.value?.metadata?.biography
   if (!biography) return ''
 
@@ -321,7 +325,7 @@ const displayedBiography = computed(() => {
 })
 
 // Computed property for unique genres (removes duplicates)
-const uniqueGenres = computed(() => {
+const uniqueGenres = computed<string[]>(() => {
   const genres = fullArtistData.value?.metadata?.genres
   if (!genres || !Array.isArray(genres)) return []
 
@@ -344,7 +348,7 @@ const uniqueGenres = computed(() => {
 })
 
 // Function to get full artist metadata
-const getArtistMetadata = async (artistId: string) => {
+const getArtistMetadata = async (artistId: string): Promise<void> => {
   const { error, data } = await libraryFetch(`/library/:activeLibrary/artist/by-id/${artistId}`).json()
 
   if (!error.value && data.value?.artist) {
@@ -353,22 +357,26 @@ const getArtistMetadata = async (artistId: string) => {
 }
 
 onMounted(async () => {
-  // Ensure artists are loaded before trying to find by ID
-  if (allArtists.value.length === 0) {
-    await getArtists()
-  }
-  getAlbumByArtistId(id.value as string)
-  // Get full artist metadata for MBID and other details
-  await getArtistMetadata(id.value)
+  try {
+    // Ensure artists are loaded before trying to find by ID
+    if (allArtists.value.length === 0) {
+      await getArtists()
+    }
+    getAlbumByArtistId(id.value as string)
+    // Get full artist metadata for MBID and other details
+    await getArtistMetadata(id.value)
 
-  // Fetch MusicBrainz data if MBID is available
-  const mbid = fullArtistData.value?.metadata?.mbid?.[0]
-  if (mbid) {
-    await fetchMbArtist(mbid)
-  }
+    // Fetch MusicBrainz data if MBID is available
+    const mbid = fullArtistData.value?.metadata?.mbid?.[0]
+    if (mbid) {
+      await fetchMbArtist(mbid)
+    }
 
-  // Check biography length
-  checkBiographyLength()
+    // Check biography length
+    checkBiographyLength()
+  } catch {
+    console.error('Error loading artist data')
+  }
 })
 
 // Watch for MBID changes (in case it's loaded after component mounts)

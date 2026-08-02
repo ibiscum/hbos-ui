@@ -31,7 +31,9 @@
           class="now-playing__metadata-tooltip"
           :style="tooltipStyles"
         />
-      </div>      <div class="now-playing__info">
+      </div>
+
+      <div class="now-playing__info">
         <h2 v-if="song?.title">{{ song.title }}</h2>
         <p v-if="song?.artist">{{ song.artist }}</p>
       </div>

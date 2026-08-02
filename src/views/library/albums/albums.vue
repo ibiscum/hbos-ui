@@ -100,6 +100,9 @@ const { getAlbums, clearSearch, setSortBy, toggleSortOrder, shuffleAlbums, loadG
 const search = ref<string>('')
 const genreOpen = ref(false)
 const genreDropdownRef = ref<HTMLElement | null>(null)
+const isPlayingNow = ref(false)
+const isAddingToQueue = ref(false)
+const isDeletingAlbum = ref(false)
 
 const playerStore = usePlayerStore()
 const toastStore = useToastStore()
@@ -107,25 +110,29 @@ const libraryStore = useLibraryStore()
 const { supportsDelete, activeLibrary } = storeToRefs(libraryStore)
 const libraryFetch = useLibraryFetch()
 
+// Type alias for track from API
+type TrackFromLibrary = { id?: string; uri?: string }
+
 const contextMenu = reactive({ visible: false, x: 0, y: 0, albumId: '' })
 
-const onAlbumContextMenu = (album: { id: string }, event: MouseEvent) => {
+const onAlbumContextMenu = (album: { id: string }, event: MouseEvent): void => {
   contextMenu.albumId = album.id
   contextMenu.x = event.clientX
   contextMenu.y = event.clientY
   contextMenu.visible = true
 }
 
-const closeContextMenu = () => { contextMenu.visible = false }
+const closeContextMenu = (): void => { contextMenu.visible = false }
 
-const fetchAlbumTracks = async (albumId: string) => {
+const fetchAlbumTracks = async (albumId: string): Promise<TrackFromLibrary[]> => {
   const { data } = await libraryFetch(`/library/:activeLibrary/album/by-id/${albumId}`).json()
-  return (data.value?.album?.tracks as Array<{ id?: string; uri?: string }>) || []
+  return (data.value?.album?.tracks as TrackFromLibrary[]) || []
 }
 
-const playNow = async () => {
+const playNow = async (): Promise<void> => {
   const albumId = contextMenu.albumId
   closeContextMenu()
+  isPlayingNow.value = true
   try {
     const tracks = await fetchAlbumTracks(albumId)
     if (!tracks.length) return
@@ -135,38 +142,52 @@ const playNow = async () => {
       await playerStore.addTrackToQueue(track as Parameters<typeof playerStore.addTrackToQueue>[0])
     }
     await playerStore.sendLibraryCommand('play')
-  } catch (err) {
+  } catch {
     toastStore.showErrorToast('Failed to play album')
+  } finally {
+    isPlayingNow.value = false
   }
 }
 
-const addToQueue = async () => {
+const addToQueue = async (): Promise<void> => {
   const albumId = contextMenu.albumId
   closeContextMenu()
+  isAddingToQueue.value = true
   try {
     const tracks = await fetchAlbumTracks(albumId)
     for (const track of tracks) {
       await playerStore.addTrackToQueue(track as Parameters<typeof playerStore.addTrackToQueue>[0])
     }
-  } catch (err) {
+  } catch {
     toastStore.showErrorToast('Failed to add album to queue')
+  } finally {
+    isAddingToQueue.value = false
   }
 }
 
-const deleteAlbum = async () => {
+const deleteAlbum = async (): Promise<void> => {
   const albumId = contextMenu.albumId
   closeContextMenu()
   if (!confirm('Delete this album from the filesystem? This cannot be undone.')) return
+
+  if (!activeLibrary.value) {
+    toastStore.showErrorToast('No library selected')
+    return
+  }
+
+  isDeletingAlbum.value = true
   try {
-    await apiDeleteAlbum(activeLibrary.value!, albumId)
+    await apiDeleteAlbum(activeLibrary.value, albumId)
     toastStore.showSuccessToast('Album deleted')
     await getAlbums()
-  } catch (err) {
+  } catch {
     toastStore.showErrorToast('Failed to delete album')
+  } finally {
+    isDeletingAlbum.value = false
   }
 }
 
-const handleSortByChange = (newSortBy: 'release_date' | 'artist' | 'random') => {
+const handleSortByChange = (newSortBy: 'release_date' | 'artist' | 'random'): void => {
   if (newSortBy === 'random') {
     shuffleAlbums()
   } else {
@@ -174,18 +195,18 @@ const handleSortByChange = (newSortBy: 'release_date' | 'artist' | 'random') => 
   }
 }
 
-const handleToggleOrder = () => {
+const handleToggleOrder = (): void => {
   if (sortBy.value === 'release_date') {
     toggleSortOrder()
   }
 }
 
-const onSearch = (searchValue: string) => {
+const onSearch = (searchValue: string): void => {
   search.value = searchValue
   albumStore.setSearchQuery(searchValue)
 }
 
-const toggleGenre = (genre: string) => {
+const toggleGenre = (genre: string): void => {
   const current = [...selectedGenres.value]
   const idx = current.indexOf(genre)
   if (idx >= 0) {
@@ -196,13 +217,13 @@ const toggleGenre = (genre: string) => {
   setGenreFilter(current)
 }
 
-const onClickOutside = (event: MouseEvent) => {
+const onClickOutside = (event: MouseEvent): void => {
   if (genreDropdownRef.value && !genreDropdownRef.value.contains(event.target as Node)) {
     genreOpen.value = false
   }
 }
 
-const onDocumentClick = (event: MouseEvent) => {
+const onDocumentClick = (event: MouseEvent): void => {
   onClickOutside(event)
   if (contextMenu.visible) closeContextMenu()
 }

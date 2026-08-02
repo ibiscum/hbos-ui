@@ -11,8 +11,9 @@ import type {
 import { useLibraryFetch } from '@/composables/useLibraryFetch.ts'
 import { useToastStore } from '@/stores/toast'
 import { useLibraryStore } from '@/stores/library.ts'
-
 import { useAppConfigStore } from '@/stores/appconfig'
+
+const YEAR_SUBSTRING_LENGTH = 4
 
 export const useAlbumStore = defineStore('album', () => {
   const configStore = useAppConfigStore()
@@ -112,26 +113,32 @@ export const useAlbumStore = defineStore('album', () => {
     albums.value = filtered
   }
 
-  const loadGenres = async () => {
-    const { data } = await libraryFetch<{ categories: string[] }>(
+  const loadGenres = async (): Promise<void> => {
+    const { error, data } = await libraryFetch<{ categories: string[] }>(
       '/library/:activeLibrary/categories',
     ).json()
-    if (data.value?.categories) {
+    if (error.value) {
+      const errorMessage = typeof error.value === 'string' ? error.value : 'Unknown error'
+      toastStore.showErrorToast(`Failed to load genres: ${errorMessage}`)
+    } else if (data.value?.categories) {
       genres.value = data.value.categories
     }
   }
 
-  const setGenreFilter = async (newGenres: string[]) => {
+  const setGenreFilter = async (newGenres: string[]): Promise<void> => {
     selectedGenres.value = newGenres
     if (newGenres.length === 0) {
       genreAlbumIds.value = new Set()
     } else {
       const ids = new Set<string>()
       for (const genre of newGenres) {
-        const { data } = await libraryFetch<{ albums: Array<{ id: string }> }>(
+        const { error, data } = await libraryFetch<{ albums: Array<{ id: string }> }>(
           `/library/:activeLibrary/albums/by-category/${encodeURIComponent(genre)}`,
         ).json()
-        if (data.value?.albums) {
+        if (error.value) {
+          const errorMessage = typeof error.value === 'string' ? error.value : 'Unknown error'
+          console.error(`Failed to load albums for genre ${genre}: ${errorMessage}`)
+        } else if (data.value?.albums) {
           for (const a of data.value.albums) ids.add(a.id)
         }
       }
@@ -141,7 +148,7 @@ export const useAlbumStore = defineStore('album', () => {
   }
 
   // Action
-  const getAlbums = async () => {
+  const getAlbums = async (): Promise<void> => {
     loading.value = true
     loaded.value = false
 
@@ -150,7 +157,8 @@ export const useAlbumStore = defineStore('album', () => {
     ).json()
 
     if (error.value) {
-      toastStore.showErrorToast(`Get Albums Error: ${error.value}`)
+      const errorMessage = typeof error.value === 'string' ? error.value : 'Unknown error'
+      toastStore.showErrorToast(`Failed to load albums: ${errorMessage}`)
     }
 
     if (data.value?.albums && data.value.albums.length) {
@@ -159,8 +167,8 @@ export const useAlbumStore = defineStore('album', () => {
           ...album,
           $id: album.id,
           $title: album.name,
-          $subtitle: `${album.artists[0]}`,
-          $note: `${album.release_date ? album.release_date.substring(0, 4) : 'Unknown year'}`,
+          $subtitle: `${album.artists?.[0] || 'Various Artists'}`,
+          $note: `${album.release_date ? album.release_date.substring(0, YEAR_SUBSTRING_LENGTH) : 'Unknown year'}`,
           $cover_src: getAlbumCoverById(album.id),
         }
       })
@@ -170,7 +178,6 @@ export const useAlbumStore = defineStore('album', () => {
       albums.value = mappedAlbums
     } else {
       // No albums found - refresh library status to check if library is still updating
-      const libraryStore = useLibraryStore()
       await libraryStore.refreshLibraryStatus()
     }
 
@@ -178,7 +185,7 @@ export const useAlbumStore = defineStore('album', () => {
     loaded.value = isFinished.value
   }
 
-  const getAlbumByAlbumId = async (id: string) => {
+  const getAlbumByAlbumId = async (id: string): Promise<void> => {
     album.value = null
     loading.value = true
 
@@ -187,7 +194,8 @@ export const useAlbumStore = defineStore('album', () => {
     ).json()
 
     if (error.value) {
-      toastStore.showErrorToast(error.value)
+      const errorMessage = typeof error.value === 'string' ? error.value : 'Unknown error'
+      toastStore.showErrorToast(`Failed to load album: ${errorMessage}`)
     }
 
     if (data.value?.album) {
@@ -197,7 +205,7 @@ export const useAlbumStore = defineStore('album', () => {
     loading.value = false
   }
 
-  const getAlbumByArtistId = async (id: string) => {
+  const getAlbumByArtistId = async (id: string): Promise<void> => {
     loading.value = true
     albums.value = []
 
@@ -206,18 +214,18 @@ export const useAlbumStore = defineStore('album', () => {
     ).json()
 
     if (error.value) {
-      toastStore.showErrorToast(error.value)
+      const errorMessage = typeof error.value === 'string' ? error.value : 'Unknown error'
+      toastStore.showErrorToast(`Failed to load albums: ${errorMessage}`)
     }
 
     if (data.value?.albums && data.value.albums.length > 0) {
-      // albums.value = data.value.albums
       albums.value = data.value.albums.map((album: Album) => {
         return {
           ...album,
           $id: album.id,
           $title: album.name,
-          $subtitle: `${album.artists[0]}`,
-          $note: `${album.release_date ? album.release_date.substring(0, 4) : 'Unknown year'}`,
+          $subtitle: `${album.artists?.[0] || 'Various Artists'}`,
+          $note: `${album.release_date ? album.release_date.substring(0, YEAR_SUBSTRING_LENGTH) : 'Unknown year'}`,
           $cover_src: getAlbumCoverById(album.id),
         }
       })

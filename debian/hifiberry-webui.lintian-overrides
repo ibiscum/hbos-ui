@@ -1,1 +1,5 @@
-# These are built JavaScript and CSS files from Vue.js compilation, not missing source
+# These are built JavaScript and CSS files from Vue.js/Vite compilation, not missing source
+# The source files are present in the upstream repository but are compiled to JavaScript
+# during the build process. This is expected behavior for web application packages.
+hifiberry-webui: missing-pre-built-source-file
+hifiberry-webui: missing-source-file

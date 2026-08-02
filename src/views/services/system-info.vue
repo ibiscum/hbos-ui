@@ -774,7 +774,6 @@ import {
   getSystemInfo,
   updateHostname,
   getSoundCards,
-  setSoundCardDtoverlay,
   rebootSystem,
   getCacheStats,
   getBackgroundJobs,
@@ -795,7 +794,6 @@ import { useFavouritesInfo } from '@/composables/useFavouritesInfo'
 import { getCoverArtMethods, type CoverArtMethodsResponse } from '@/api/coverart'
 // TODO: Update to use new PipeWire API
 // import { listPipewireDevices, getPipewireMonoStereo, getPipewireBalance, type PipewireDevices } from '@/api/pipewire'
-import { getVersion as getPipewireVersion } from '@/api/pipewire'
 import { useAppConfigStore } from '@/stores/appconfig'
 import { useSettingsStore } from '@/stores/settings'
 import { getAllLibraryStats, type LibraryStatsResponse } from '@/api/audiocontrol-library'
@@ -817,7 +815,6 @@ const dspProgramError = ref('')
 
 // Soundcard editing state
 const isEditingSoundCard = ref(false)
-const savingSoundCard = ref(false)
 const availableSoundCards = ref<SoundCard[]>([])
 const selectedSoundCard = ref('')
 const showSoundCardWarning = ref(false)
@@ -898,9 +895,7 @@ const fetchLibraryStats = async () => {
 const pipewireLoading = ref(true)
 const pipewireError = ref('')
 // const pipewireDevices = ref<PipewireDevices | null>(null)
-const pipewireDevices = ref<any>(null)
-const pipewireMonoStereo = ref<string | null>(null)
-const pipewireBalance = ref<number | null>(null)
+// Commented out unused variables - to be removed in next PipeWire API update
 
 // Background services state
 interface BackgroundService {
@@ -962,6 +957,7 @@ const transformSoundCardName = (name: string): string => {
 //
 // Prefer the newer pinSource field; fall back to the legacy
 // fixedInConfigTxt boolean for older configurators that don't expose it.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const getSoundCardPinLabel = (soundcard: any): string => {
   const pinSource: string | undefined = soundcard?.pinSource
   if (pinSource === 'configdb') return 'ConfigDB'
@@ -1104,10 +1100,10 @@ const saveHostname = async () => {
 }
 
 // Soundcard editing methods
-const startEditingSoundCard = async () => {
-  // Show warning first before loading sound cards
-  showSoundCardWarning.value = true
-}
+// const startEditingSoundCard = async () => {
+//   // Show warning first before loading sound cards
+//   showSoundCardWarning.value = true
+// }
 
 const cancelSoundCardWarning = () => {
   showSoundCardWarning.value = false
@@ -1139,45 +1135,45 @@ const loadSoundCards = async () => {
   }
 }
 
-const cancelEditingSoundCard = () => {
-  isEditingSoundCard.value = false
-  selectedSoundCard.value = ''
-  showSoundCardWarning.value = false
-  resumeAutoUpdate() // Resume auto-update when canceling edit
-}
+// const cancelEditingSoundCard = () => {
+//   isEditingSoundCard.value = false
+//   selectedSoundCard.value = ''
+//   showSoundCardWarning.value = false
+//   resumeAutoUpdate() // Resume auto-update when canceling edit
+// }
 
-const saveSoundCard = async () => {
-  if (!selectedSoundCard.value) return
+// const saveSoundCard = async () => {
+//   if (!selectedSoundCard.value) return
 
-  savingSoundCard.value = true
-  try {
-    const response = await setSoundCardDtoverlay({
-      dtoverlay: selectedSoundCard.value,
-      remove_existing: true
-    })
+//   savingSoundCard.value = true
+//   try {
+//     const response = await setSoundCardDtoverlay({
+//       dtoverlay: selectedSoundCard.value,
+//       remove_existing: true
+//     })
 
-    if (response.status === 'success') {
-      if (response.data?.reboot_required) {
-        // Show reboot required modal
-        showRebootDialog.value = true
-      }
+//     if (response.status === 'success') {
+// //       if (response.data?.reboot_required) {
+//         // Show reboot required modal
+//         showRebootDialog.value = true
+//       }
 
-      // Refresh system info
-      await fetchSystemInfo()
-      isEditingSoundCard.value = false
-      selectedSoundCard.value = ''
-      resumeAutoUpdate() // Resume auto-update after successful save
-    } else {
-      throw new Error(response.message || 'Failed to update sound card')
-    }
-  } catch (err) {
-    console.error('Error updating sound card:', err)
-    error.value = err instanceof Error ? err.message : 'Failed to update sound card'
-    // Don't resume auto-update on error, keep editing mode active
-  } finally {
-    savingSoundCard.value = false
-  }
-}
+//       // Refresh system info
+//       await fetchSystemInfo()
+//       isEditingSoundCard.value = false
+//       selectedSoundCard.value = ''
+//       resumeAutoUpdate() // Resume auto-update after successful save
+//     } else {
+//       throw new Error(response.message || 'Failed to update sound card')
+//     }
+//   } catch (err) {
+//     console.error('Error updating sound card:', err)
+//     error.value = err instanceof Error ? err.message : 'Failed to update sound card'
+//     // Don't resume auto-update on error, keep editing mode active
+//   } finally {
+//     savingSoundCard.value = false
+//   }
+// }
 
 // Reboot system method
 const rebootSystemHandler = async () => {

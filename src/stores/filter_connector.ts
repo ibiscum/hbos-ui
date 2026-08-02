@@ -75,7 +75,7 @@ export const useFilterStore = defineStore('filter', () => {
       if (response.data?.value && response.data.value in availableBackends) {
         return response.data.value as keyof typeof availableBackends
       }
-    } catch (error) {
+    } catch {
       // Key doesn't exist or request failed — no preference stored
     }
     return null

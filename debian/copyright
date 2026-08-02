@@ -2,13 +2,16 @@ Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: hifiberry-webui
 Upstream-Contact: HiFiBerry <support@hifiberry.com>
 Source: https://github.com/hifiberry/hbos-ui
+Comment: This package contains a pre-built Vue.js application.
+         The build process compiles TypeScript and Vue components
+         to static JavaScript, CSS, and HTML files.
 
 Files: *
-Copyright: 2024-2025 HiFiBerry <support@hifiberry.com>
+Copyright: 2024-2026 HiFiBerry <support@hifiberry.com>
 License: MIT
 
 Files: debian/*
-Copyright: 2024-2025 HiFiBerry <support@hifiberry.com>
+Copyright: 2024-2026 HiFiBerry <support@hifiberry.com>
 License: MIT
 
 License: MIT

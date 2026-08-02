@@ -174,8 +174,8 @@ export const useRadioStore = defineStore('radio', () => {
     }
     try {
       const response: Response = await fetch("https://all.api.radio-browser.info/json/servers")
-      const servers = (await response.json()) as unknown
-      if (servers && servers.length > 0) {
+      const servers = (await response.json()) as Array<{ name: string }>
+      if (servers && Array.isArray(servers) && servers.length > 0) {
         const randomServer = servers[Math.floor(Math.random() * servers.length)]
         radioBrowserBaseUrl.value = `https://${randomServer.name}`
 

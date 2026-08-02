@@ -3,12 +3,16 @@ Section: misc
 Priority: optional
 Maintainer: HiFiBerry <support@hifiberry.com>
 Build-Depends: debhelper-compat (= 13)
-Standards-Version: 4.5.1
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
 Homepage: https://github.com/hifiberry/hbos-ui
 
 Package: hifiberry-webui
 Architecture: all
-Depends: ${misc:Depends}, nginx, python3, hifiberry-auth
+Depends: ${misc:Depends},
+         nginx,
+         python3,
+         hifiberry-auth
 Description: HiFiBerry OS Web User Interface
  Modern web-based user interface for HiFiBerry OS.
  Provides a Vue.js-based frontend for configuring and
