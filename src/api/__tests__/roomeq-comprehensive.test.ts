@@ -9,7 +9,7 @@ vi.mock('@/stores/appconfig')
 
 describe('RoomEQ API - Comprehensive Unit & Regression Tests', () => {
   const mockBaseUrl = 'http://localhost:8888/roomeq'
-  
+
   let mockConfigStore: any
   let mockApiFetch: any
 
@@ -18,12 +18,12 @@ describe('RoomEQ API - Comprehensive Unit & Regression Tests', () => {
     mockConfigStore = {
       getRoomEQApiBaseUrl: vi.fn(() => mockBaseUrl)
     }
-    
+
     mockApiFetch = vi.fn()
-    
+
     vi.mocked(useAppConfigStore).mockReturnValue(mockConfigStore)
     vi.mocked(httpApi.apiFetch).mockImplementation(mockApiFetch)
-    
+
     // Clear console mocks
     vi.clearAllMocks()
   })
@@ -456,7 +456,7 @@ describe('RoomEQ API - Comprehensive Unit & Regression Tests', () => {
           })
         )
 
-        await roomeq.startRoomEQRecording({ 
+        await roomeq.startRoomEQRecording({
           duration: 5,
           sampleRate: 48000,
           device: 'hw:0'

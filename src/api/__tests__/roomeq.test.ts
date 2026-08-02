@@ -708,7 +708,7 @@ describe('roomeq.ts - Regression Tests', () => {
 
       it('should handle FFT difference with various source types', () => {
         const sourceTypes: Array<'recording_id' | 'filename' | 'filepath'> = ['recording_id', 'filename', 'filepath']
-        
+
         sourceTypes.forEach(type1 => {
           sourceTypes.forEach(type2 => {
             // Verify all combinations are theoretically valid
