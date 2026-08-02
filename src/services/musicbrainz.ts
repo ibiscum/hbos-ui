@@ -78,6 +78,16 @@ class MusicBrainzService {
   private readonly baseUrl = 'https://musicbrainz.org/ws/2'
   private readonly userAgent = 'HBos-UI/1.0.0 ( https://github.com/hifiberry/hbos-ui )'
 
+  private getYear(dateValue?: string): number | null {
+    if (!dateValue) return null
+    const year = new Date(dateValue).getFullYear()
+    return Number.isNaN(year) ? null : year
+  }
+
+  private normalizeLocationName(name: string): string {
+    return name.trim().toLocaleLowerCase()
+  }
+
   private async fetchWithUserAgent(url: string): Promise<Response> {
     return fetch(url, {
       headers: {
@@ -93,8 +103,15 @@ class MusicBrainzService {
    * @returns Artist information
    */
   async getArtist(mbid: string): Promise<MusicBrainzResponse | null> {
+    const normalizedMbid = mbid.trim()
+    if (!normalizedMbid) return null
+
     try {
-      const url = `${this.baseUrl}/artist/${mbid}?fmt=json&inc=aliases+tags+area-rels+genres`
+      const query = new URLSearchParams({
+        fmt: 'json',
+        inc: 'aliases+tags+area-rels'
+      })
+      const url = `${this.baseUrl}/artist/${encodeURIComponent(normalizedMbid)}?${query.toString()}`
       const response = await this.fetchWithUserAgent(url)
 
       if (!response.ok) {
@@ -103,6 +120,10 @@ class MusicBrainzService {
       }
 
       const data: MusicBrainzArtist = await response.json()
+      const filteredAliases = data.aliases?.filter(alias => alias.primary || alias.locale === 'en')
+      const sortedTags = data.tags
+        ? [...data.tags].sort((a, b) => b.count - a.count).slice(0, 10)
+        : undefined
 
       // Transform the response to a more usable format
       return {
@@ -116,8 +137,8 @@ class MusicBrainzService {
         'life-span': data['life-span'],
         area: data.area ? { name: data.area.name } : undefined,
         'begin-area': data['begin-area'] ? { name: data['begin-area'].name } : undefined,
-        aliases: data.aliases?.filter(alias => alias.primary || alias.locale === 'en'),
-        tags: data.tags?.sort((a, b) => b.count - a.count).slice(0, 10) // Top 10 tags by count
+        aliases: filteredAliases,
+        tags: sortedTags,
       }
     } catch (error) {
       console.error('Error fetching artist from MusicBrainz:', error)
@@ -133,13 +154,15 @@ class MusicBrainzService {
   formatLifeSpan(lifeSpan?: { begin?: string; end?: string; ended?: boolean }): string | null {
     if (!lifeSpan) return null
 
-    const begin = lifeSpan.begin ? new Date(lifeSpan.begin).getFullYear() : '?'
-    const end = lifeSpan.ended && lifeSpan.end ? new Date(lifeSpan.end).getFullYear() : (lifeSpan.ended ? '?' : '')
+    const beginYear = this.getYear(lifeSpan.begin)
+    const endYear = this.getYear(lifeSpan.end)
 
     if (lifeSpan.ended) {
+      const begin = beginYear ?? '?'
+      const end = endYear ?? '?'
       return `${begin} - ${end}`
-    } else if (lifeSpan.begin) {
-      return `${begin} - present`
+    } else if (beginYear !== null) {
+      return `${beginYear} - present`
     }
 
     return null
@@ -152,7 +175,8 @@ class MusicBrainzService {
    */
   getPrimaryGenre(tags?: Array<{ count: number; name: string }>): string | null {
     if (!tags || tags.length === 0) return null
-    return tags[0].name
+    const firstNonEmpty = tags.find(tag => tag.name.trim().length > 0)
+    return firstNonEmpty ? firstNonEmpty.name : null
   }
 
   /**
@@ -162,8 +186,15 @@ class MusicBrainzService {
    * @returns Formatted location string
    */
   getFormattedLocation(area?: { name: string }, beginArea?: { name: string }): string | null {
-    if (area && beginArea && area.name !== beginArea.name) {
-      return `${beginArea.name} / ${area.name}`
+    const areaName = area?.name.trim()
+    const beginAreaName = beginArea?.name.trim()
+
+    if (areaName && beginAreaName && this.normalizeLocationName(areaName) !== this.normalizeLocationName(beginAreaName)) {
+      return `${beginAreaName} / ${areaName}`
+    } else if (areaName) {
+      return areaName
+    } else if (beginAreaName) {
+      return beginAreaName
     } else if (area) {
       return area.name
     } else if (beginArea) {
