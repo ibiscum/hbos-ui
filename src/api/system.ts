@@ -275,13 +275,12 @@ export const setSoundCardDtoverlay = async (request: SetDtoverlayRequest): Promi
     body: JSON.stringify(request),
   })
 
-  const data = await response.json()
-
   if (!response.ok) {
+    const data = await response.json()
     throw new Error(data.message || `HTTP error! status: ${response.status}`)
   }
 
-  return data
+  return await response.json()
 }
 
 /**
@@ -298,13 +297,12 @@ export const detectSoundCard = async (): Promise<SoundCardDetectionResponse> => 
     },
   })
 
-  const data = await response.json()
-
   if (!response.ok) {
+    const data = await response.json()
     throw new Error(data.message || `HTTP error! status: ${response.status}`)
   }
 
-  return data
+  return await response.json()
 }
 
 /**
@@ -324,13 +322,12 @@ export const detectSoundCardLive = async (): Promise<SoundCardDetectionResponse>
     },
   })
 
-  const data = await response.json()
-
   if (!response.ok) {
+    const data = await response.json()
     throw new Error(data.message || `HTTP error! status: ${response.status}`)
   }
 
-  return data
+  return await response.json()
 }
 
 /**
@@ -350,13 +347,12 @@ export const setSoundCardDetection = async (enabled: boolean): Promise<{ status:
     },
   })
 
-  const data = await response.json()
-
   if (!response.ok) {
+    const data = await response.json()
     throw new Error(data.message || `HTTP error! status: ${response.status}`)
   }
 
-  return data
+  return await response.json()
 }
 
 /**
@@ -381,13 +377,12 @@ export const getSoundCardDetectionStatus = async (): Promise<{
     },
   })
 
-  const data = await response.json()
-
   if (!response.ok) {
+    const data = await response.json()
     throw new Error(data.message || `HTTP error! status: ${response.status}`)
   }
 
-  return data
+  return await response.json()
 }
 
 /**
@@ -405,13 +400,12 @@ export const disableSoundCardDetection = async (card_name: string): Promise<SetD
     body: JSON.stringify({ card_name }),
   })
 
-  const data = await response.json()
-
   if (!response.ok) {
+    const data = await response.json()
     throw new Error(data.message || `HTTP error! status: ${response.status}`)
   }
 
-  return data
+  return await response.json()
 }
 
 /**
@@ -421,6 +415,13 @@ export const rebootSystem = async (request?: RebootRequest): Promise<RebootRespo
   const appConfigStore = useAppConfigStore()
   const baseUrl = appConfigStore.getConfigApiBaseUrl()
 
+  // Validate delay parameter if provided
+  if (request?.delay !== undefined) {
+    if (!Number.isFinite(request.delay) || request.delay < 0) {
+      throw new Error('Reboot delay must be a non-negative number')
+    }
+  }
+
   const response = await apiFetch(`${baseUrl}/system/reboot`, {
     method: 'POST',
     headers: {
@@ -429,13 +430,12 @@ export const rebootSystem = async (request?: RebootRequest): Promise<RebootRespo
     body: JSON.stringify(request || {}),
   })
 
-  const data = await response.json()
-
   if (!response.ok) {
+    const data = await response.json()
     throw new Error(data.message || `HTTP error! status: ${response.status}`)
   }
 
-  return data
+  return await response.json()
 }
 
 /**
@@ -445,6 +445,11 @@ export const executeScript = async (request: ScriptExecutionRequest): Promise<Sc
   const appConfigStore = useAppConfigStore()
   const baseUrl = appConfigStore.getConfigApiBaseUrl()
 
+  // Validate script name is not empty
+  if (!request.script || request.script.trim().length === 0) {
+    throw new Error('Script name cannot be empty')
+  }
+
   const response = await apiFetch(`${baseUrl}/scripts/${request.script}/execute`, {
     method: 'POST',
     headers: {
@@ -452,13 +457,12 @@ export const executeScript = async (request: ScriptExecutionRequest): Promise<Sc
     },
   })
 
-  const data = await response.json()
-
   if (!response.ok) {
+    const data = await response.json()
     throw new Error(data.message || `HTTP error! status: ${response.status}`)
   }
 
-  return data
+  return await response.json()
 }
 
 /**
@@ -466,7 +470,7 @@ export const executeScript = async (request: ScriptExecutionRequest): Promise<Sc
  */
 export const getCacheStats = async (): Promise<CacheStatsResponse> => {
   const appConfigStore = useAppConfigStore()
-  const baseUrl = appConfigStore.getApiBaseUrl()
+  const baseUrl = appConfigStore.getConfigApiBaseUrl()
 
   const response = await apiFetch(`${baseUrl}/cache/stats`, {
     method: 'GET',
@@ -487,7 +491,7 @@ export const getCacheStats = async (): Promise<CacheStatsResponse> => {
  */
 export const getBackgroundJobs = async (): Promise<BackgroundJobsResponse> => {
   const appConfigStore = useAppConfigStore()
-  const baseUrl = appConfigStore.getApiBaseUrl()
+  const baseUrl = appConfigStore.getConfigApiBaseUrl()
 
   const response = await apiFetch(`${baseUrl}/background/jobs`, {
     method: 'GET',

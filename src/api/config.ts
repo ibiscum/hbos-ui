@@ -134,7 +134,7 @@ export const getConfigValue = async (
   const baseUrl = configStore.getConfigApiBaseUrl()
   const params = new URLSearchParams()
 
-  if (defaultValue) params.append('default', defaultValue)
+  if (defaultValue !== undefined) params.append('default', defaultValue)
 
   // Decrypted (secure) reads go to a dedicated /secure path, which the auth
   // gateway classifies risky (requires a session). The plain /key/<key> path
@@ -524,6 +524,10 @@ export const getNetworkConfiguration = async (): Promise<ConfigApiResponse<Netwo
  * @param busNumber - I2C bus number to scan (default: 1, range: 0-10)
  */
 export const scanI2CDevices = async (busNumber?: number): Promise<ConfigApiResponse<I2CDeviceInfo>> => {
+  if (busNumber !== undefined && (!Number.isInteger(busNumber) || busNumber < 0 || busNumber > 10)) {
+    throw new Error('I2C bus number must be an integer between 0 and 10')
+  }
+
   const configStore = useAppConfigStore()
   const baseUrl = configStore.getConfigApiBaseUrl()
   const params = busNumber !== undefined ? `?bus=${busNumber}` : ''
@@ -595,7 +599,8 @@ export const saveExternalPlayerSettings = async (
 ): Promise<void> => {
   const configStore = useAppConfigStore()
   const baseUrl = configStore.getConfigApiBaseUrl()
-  const response = await apiFetch(`${baseUrl}/players/${systemdService}/settings`, {
+  const encodedService = encodeURIComponent(systemdService)
+  const response = await apiFetch(`${baseUrl}/players/${encodedService}/settings`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(values),

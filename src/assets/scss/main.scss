@@ -7,7 +7,7 @@
 @use "title";
 @use "scroll";
 @use "status-badge";
-@use 'vue3-toastify/dist/index.css';
+@import 'vue3-toastify/dist/index.css';
 
 body {
   font-weight: $font-weight-base;

@@ -669,4 +669,35 @@ describe('volume.ts - API Consistency & Regression Tests', () => {
       )
     })
   })
+
+  describe('Inconsistency #11: Non-finite Numeric Input Validation', () => {
+    it('setVolumeLevel rejects NaN and Infinity without making API calls', async () => {
+      const resultNaN = await volumeApi.setVolumeLevel(Number.NaN)
+      const resultInfinity = await volumeApi.setVolumeLevel(Number.POSITIVE_INFINITY)
+
+      expect(resultNaN).toBeNull()
+      expect(resultInfinity).toBeNull()
+      expect(mockApiFetch).not.toHaveBeenCalled()
+    })
+
+    it('increaseVolume/decreaseVolume reject NaN and Infinity', async () => {
+      const incNaN = await volumeApi.increaseVolume(Number.NaN)
+      const decInf = await volumeApi.decreaseVolume(Number.POSITIVE_INFINITY)
+
+      expect(incNaN).toBeNull()
+      expect(decInf).toBeNull()
+      expect(mockApiFetch).not.toHaveBeenCalled()
+    })
+
+    it('setHeadphoneVolume rejects NaN and Infinity with error status', async () => {
+      const resultNaN = await volumeApi.setHeadphoneVolume(Number.NaN)
+      const resultInfinity = await volumeApi.setHeadphoneVolume(Number.POSITIVE_INFINITY)
+
+      expect(resultNaN.status).toBe('error')
+      expect(resultNaN.message).toContain('between 0 and 100')
+      expect(resultInfinity.status).toBe('error')
+      expect(resultInfinity.message).toContain('between 0 and 100')
+      expect(mockApiFetch).not.toHaveBeenCalled()
+    })
+  })
 })

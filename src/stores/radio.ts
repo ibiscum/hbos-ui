@@ -347,10 +347,7 @@ export const useRadioStore = defineStore('radio', () => {
       const configStore = useAppConfigStore()
 
       /* Get the configured radio player. The default is mpd. */
-      const radioPlayerValue = configStore.radioPlayer
-      const radioPlayerName = typeof radioPlayerValue === 'function'
-        ? radioPlayerValue()
-        : (radioPlayerValue || 'mpd')
+      const radioPlayerName = configStore.radioPlayer || 'mpd'
       const stationName = 'name' in station ? station.name : station.title
 
       console.log('Playing radio station:', stationName, 'on player:', radioPlayerName)

@@ -72,9 +72,16 @@ export const rewriteImageUrl = (url: string): string => {
   const deviceIP = configStore.config?.audiocontrol_api?.deviceIP
   const devicePort = configStore.config?.audiocontrol_api?.devicePort
 
-  // Validate device configuration exists
-  if (!deviceIP || typeof devicePort !== 'number') {
-    console.error('[IMG] Missing device configuration:', { deviceIP, devicePort })
+  // Validate device configuration exists and port is in valid range
+  // Port must be an integer between 1 and 65535
+  if (
+    !deviceIP ||
+    typeof devicePort !== 'number' ||
+    !Number.isInteger(devicePort) ||
+    devicePort < 1 ||
+    devicePort > 65535
+  ) {
+    console.error('[IMG] Missing or invalid device configuration:', { deviceIP, devicePort })
     return correctedUrl // Fallback to corrected path if device config unavailable
   }
 
@@ -151,7 +158,9 @@ export const rewriteAudiocontrolApiUrl = (url: string): string => {
   // Safely replace /api/ prefix with full API base URL
   // Only replace if correctedUrl still starts with /api/
   if (correctedUrl.startsWith('/api/')) {
-    return correctedUrl.replace('/api/', `${apiBaseUrl}/`)
+    const rewrittenUrl = correctedUrl.replace('/api/', `${apiBaseUrl}/`)
+    // Normalize double slashes that could occur if apiBaseUrl has trailing slash
+    return rewrittenUrl.replace(/([^:]\/)\/+/g, '$1')
   }
 
   return correctedUrl

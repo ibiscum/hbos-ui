@@ -140,7 +140,7 @@ export const getVolumeState = async (): Promise<VolumeState | null> => {
  */
 export const setVolumeLevel = async (percentage: number): Promise<VolumeResponse | null> => {
   try {
-    if (percentage < 0 || percentage > 100) {
+    if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
       console.error('Volume validation failed:', `percentage ${percentage} out of range (0-100)`)
       return null
     }
@@ -177,7 +177,7 @@ export const setVolumeLevel = async (percentage: number): Promise<VolumeResponse
  */
 export const increaseVolume = async (amount: number = 5.0): Promise<VolumeResponse | null> => {
   try {
-    if (amount <= 0 || amount > 100) {
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 100) {
       console.error('Volume increase validation failed:', `amount ${amount} must be positive and ≤100`)
       return null
     }
@@ -207,7 +207,7 @@ export const increaseVolume = async (amount: number = 5.0): Promise<VolumeRespon
  */
 export const decreaseVolume = async (amount: number = 5.0): Promise<VolumeResponse | null> => {
   try {
-    if (amount <= 0 || amount > 100) {
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 100) {
       console.error('Volume decrease validation failed:', `amount ${amount} must be positive and ≤100`)
       return null
     }
@@ -320,7 +320,7 @@ export const getHeadphoneVolume = async (): Promise<HeadphoneVolumeResponse> => 
  */
 export const setHeadphoneVolume = async (volume: number): Promise<HeadphoneVolumeSetResponse> => {
   try {
-    if (volume < 0 || volume > 100) {
+    if (!Number.isFinite(volume) || volume < 0 || volume > 100) {
       return {
         status: 'error',
         message: `Volume must be between 0 and 100, received ${volume}`

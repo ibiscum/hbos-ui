@@ -107,7 +107,7 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
-@import '@/assets/scss/service-item';
+@use '@/assets/scss/service-item' as *;
 
 .service-item {
   @include service-item-base;

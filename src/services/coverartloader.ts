@@ -48,11 +48,16 @@ export class CoverArtLoader {
    * @returns URL-safe base64 encoded string
    */
   private encodeBase64UrlSafe(text: string): string {
-    // Convert to base64 and make URL-safe
-    return btoa(unescape(encodeURIComponent(text)))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '')
+    try {
+      // Convert to base64 and make URL-safe
+      return btoa(unescape(encodeURIComponent(text)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '')
+    } catch (error) {
+      console.warn('Failed to encode text for API request:', error)
+      return ''
+    }
   }
 
   /**
@@ -155,7 +160,10 @@ export class CoverArtLoader {
    */
   private filterSquareImages(images: CoverArtImage[]): CoverArtImage[] {
     return images.filter(image => {
-      if (!image.width || !image.height) return true // Keep images without dimensions
+      // Skip images with zero dimensions (would cause Infinity aspect ratio)
+      if (image.width === 0 || image.height === 0) return false
+      // Keep images without dimensions (only width or only height)
+      if (!image.width || !image.height) return true
       const aspectRatio = image.width / image.height
       return aspectRatio >= 0.8 && aspectRatio <= 1.2
     })
@@ -305,14 +313,14 @@ export class CoverArtLoader {
     }
 
     // Last resort: check for coverart_url or logo_url in the metadata field
-    if (song.metadata && typeof song.metadata === 'object') {
+    if (song.metadata && typeof song.metadata === 'object' && song.metadata !== null) {
       const metadata = song.metadata as Record<string, unknown>
 
       // Check for coverart_url first, then logo_url
       const metadataCoverUrl = metadata.coverart_url || metadata.logo_url
       const sourceType = metadata.coverart_url ? 'coverart_url' : 'logo_url'
 
-      if (metadataCoverUrl && typeof metadataCoverUrl === 'string') {
+      if (metadataCoverUrl && typeof metadataCoverUrl === 'string' && metadataCoverUrl.trim()) {
         console.log('🎯 Using metadata.' + sourceType + ' as last resort:', metadataCoverUrl)
         return {
           success: true,

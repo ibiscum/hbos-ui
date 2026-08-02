@@ -47,7 +47,7 @@ describe('system.ts - Code Review & Regression Tests', () => {
       expect(mockGetConfigApiBaseUrl).toHaveBeenCalled()
     })
 
-    it('getCacheStats uses getApiBaseUrl() (INCONSISTENT)', async () => {
+    it('FIXED: getCacheStats now uses getConfigApiBaseUrl()', async () => {
       const mockFetch = vi.mocked(apiFetch)
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -56,10 +56,10 @@ describe('system.ts - Code Review & Regression Tests', () => {
 
       await systemApi.getCacheStats()
 
-      expect(mockGetApiBaseUrl).toHaveBeenCalled()
+      expect(mockGetConfigApiBaseUrl).toHaveBeenCalled()
     })
 
-    it('getBackgroundJobs uses getApiBaseUrl() but should use getConfigApiBaseUrl()', async () => {
+    it('FIXED: getBackgroundJobs now uses getConfigApiBaseUrl()', async () => {
       const mockFetch = vi.mocked(apiFetch)
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -68,8 +68,8 @@ describe('system.ts - Code Review & Regression Tests', () => {
 
       await systemApi.getBackgroundJobs()
 
-      // INCONSISTENCY: Uses different base URL than soundcard functions
-      expect(mockGetApiBaseUrl).toHaveBeenCalled()
+      // FIXED: Now uses consistent base URL with other system functions
+      expect(mockGetConfigApiBaseUrl).toHaveBeenCalled()
     })
 
     it('all soundcard functions consistently use getConfigApiBaseUrl()', async () => {
@@ -194,20 +194,14 @@ describe('system.ts - Code Review & Regression Tests', () => {
       expect(mockFetch).toHaveBeenCalled()
     })
 
-    it('executeScript does not validate script parameter', async () => {
+    it('FIXED: executeScript now validates script parameter', async () => {
       const mockFetch = vi.mocked(apiFetch)
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ status: 'success' })
-      } as AnyType)
 
-      // Empty script should be validated
-      await systemApi.executeScript({ script: '' })
+      // Empty script should be rejected
+      await expect(systemApi.executeScript({ script: '' }))
+        .rejects.toThrow('Script name cannot be empty')
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/scripts//execute'),
-        expect.anything()
-      )
+      expect(mockFetch).not.toHaveBeenCalled()
     })
 
     it('disableSoundCardDetection does not validate card_name', async () => {
@@ -608,6 +602,248 @@ describe('system.ts - Code Review & Regression Tests', () => {
           headers: { 'Content-Type': 'application/json' }
         })
       )
+    })
+  })
+
+  describe('Regression #1: Numeric Parameter Validation', () => {
+    it('FIXED: rebootSystem now rejects negative delay', async () => {
+      // Negative delay should be rejected
+      await expect(systemApi.rebootSystem({ delay: -10 }))
+        .rejects.toThrow('Reboot delay must be a non-negative number')
+    })
+
+    it('FIXED: rebootSystem now rejects Infinity', async () => {
+      // Infinity should be rejected
+      await expect(systemApi.rebootSystem({ delay: Infinity }))
+        .rejects.toThrow('Reboot delay must be a non-negative number')
+    })
+
+    it('FIXED: rebootSystem now rejects NaN', async () => {
+      // NaN should be rejected
+      await expect(systemApi.rebootSystem({ delay: NaN }))
+        .rejects.toThrow('Reboot delay must be a non-negative number')
+    })
+
+    it('FIXED: rebootSystem now allows float delays (Number.isFinite accepts floats)', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ status: 'success' })
+      } as AnyType)
+
+      // Float delays are allowed (are finite numbers)
+      await systemApi.rebootSystem({ delay: 10.5 })
+
+      expect(mockFetch).toHaveBeenCalled()
+    })
+  })
+
+  describe('Regression #2: String Parameter Validation', () => {
+    it('FIXED: executeScript now rejects empty script name', async () => {
+      // Empty script should be rejected
+      await expect(systemApi.executeScript({ script: '' }))
+        .rejects.toThrow('Script name cannot be empty')
+    })
+
+    it('REGRESSION: executeScript accepts path traversal attempts', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ status: 'success' })
+      } as AnyType)
+
+      // Path traversal patterns should be blocked
+      await systemApi.executeScript({ script: '../../../etc/passwd' })
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('../../../etc/passwd'),
+        expect.anything()
+      )
+    })
+
+    it('REGRESSION: executeScript accepts scripts with special characters', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ status: 'success' })
+      } as AnyType)
+
+      // Special characters might need escaping
+      await systemApi.executeScript({ script: 'script; rm -rf /' })
+
+      expect(mockFetch).toHaveBeenCalled()
+    })
+
+    it('REGRESSION: setSoundCardDtoverlay accepts empty string', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ status: 'success' })
+      } as AnyType)
+
+      // Empty dtoverlay should be rejected
+      await systemApi.setSoundCardDtoverlay({ dtoverlay: '' })
+
+      expect(mockFetch).toHaveBeenCalled()
+    })
+
+    it('REGRESSION: disableSoundCardDetection accepts empty card name', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ status: 'success' })
+      } as AnyType)
+
+      // Empty card name should be rejected
+      await systemApi.disableSoundCardDetection('')
+
+      expect(mockFetch).toHaveBeenCalled()
+    })
+
+    it('REGRESSION: updateHostname accepts empty request', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ status: 'success' })
+      } as AnyType)
+
+      // Empty request should require at least one field
+      await systemApi.updateHostname({})
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          body: JSON.stringify({})
+        })
+      )
+    })
+  })
+
+  describe('Regression #3: Array Parameter Validation', () => {
+    it('REGRESSION: checkFileExistence accepts empty array', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+
+      const result = await systemApi.checkFileExistence([])
+
+      // Empty array should either throw or return empty, currently returns empty silently
+      expect(result).toEqual([])
+      expect(mockFetch).not.toHaveBeenCalled()
+    })
+
+    it('REGRESSION: checkFileExistence accepts empty path strings', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: { exists: false } })
+      } as AnyType)
+
+      const result = await systemApi.checkFileExistence([''])
+
+      // Empty path should be rejected
+      expect(result[0].path).toBe('')
+      expect(result[0].filename).toBe('')
+    })
+
+    it('REGRESSION: checkFileExistence fails on first error (no partial results)', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ data: { exists: true } })
+        } as AnyType)
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 500
+        } as AnyType)
+
+      await expect(
+        systemApi.checkFileExistence(['/path/1', '/path/2', '/path/3'])
+      ).rejects.toThrow()
+
+      // Only made 2 requests before failing
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+      // No partial results returned
+    })
+  })
+
+  describe('Regression #4: Base URL Method Consistency', () => {
+    it('FIXED: getCacheStats should use getConfigApiBaseUrl not getApiBaseUrl', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true })
+      } as AnyType)
+
+      mockGetConfigApiBaseUrl.mockClear()
+      mockGetApiBaseUrl.mockClear()
+
+      await systemApi.getCacheStats()
+
+      // NOW FIXED: uses getConfigApiBaseUrl
+      expect(mockGetConfigApiBaseUrl).toHaveBeenCalled()
+      expect(mockGetApiBaseUrl).not.toHaveBeenCalled()
+    })
+
+    it('FIXED: getBackgroundJobs should use getConfigApiBaseUrl not getApiBaseUrl', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true })
+      } as AnyType)
+
+      mockGetConfigApiBaseUrl.mockClear()
+      mockGetApiBaseUrl.mockClear()
+
+      await systemApi.getBackgroundJobs()
+
+      // NOW FIXED: uses getConfigApiBaseUrl
+      expect(mockGetConfigApiBaseUrl).toHaveBeenCalled()
+      expect(mockGetApiBaseUrl).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('Regression #5: Error Handling Order Consistency', () => {
+    it('FIXED: setSoundCardDtoverlay now checks ok BEFORE parsing JSON', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ message: 'Invalid' })
+      } as AnyType)
+
+      await expect(systemApi.setSoundCardDtoverlay({ dtoverlay: 'bad' }))
+        .rejects.toThrow('Invalid')
+    })
+
+    it('FIXED: detectSoundCard now checks ok BEFORE parsing JSON on error', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({ message: 'Detection failed' })
+      } as AnyType)
+
+      await expect(systemApi.detectSoundCard())
+        .rejects.toThrow('Detection failed')
+    })
+
+    it('CORRECT: getSystemInfo checks ok before parsing JSON (no json call on error)', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      const jsonSpy = vi.fn()
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: jsonSpy
+      } as AnyType)
+
+      await expect(systemApi.getSystemInfo())
+        .rejects.toThrow('HTTP error! status: 500')
+
+      // JSON NOT parsed when ok is false
+      expect(jsonSpy).not.toHaveBeenCalled()
     })
   })
 })

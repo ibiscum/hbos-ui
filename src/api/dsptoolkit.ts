@@ -482,8 +482,30 @@ export async function clearCache(): Promise<{ status: string }> {
 export async function getDSPProfile(): Promise<string> {
   const appConfigStore = useAppConfigStore()
   const baseUrl = appConfigStore.getDSPToolkitApiBaseUrl()
-  const response = await apiFetch(`${baseUrl}/dspprofile`)
-  return response.text()
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
+
+  try {
+    const response = await apiFetch(`${baseUrl}/dspprofile`, {
+      signal: controller.signal,
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      throw new Error(`Failed to get DSP profile: ${response.status} ${response.statusText}`)
+    }
+
+    return response.text()
+  } catch (error) {
+    clearTimeout(timeoutId)
+
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timeout')
+    }
+
+    throw error
+  }
 }
 
 export async function updateDSPProfile(request: DSPProfileUpdateRequest): Promise<DSPProfileUpdateResponse> {
@@ -555,7 +577,7 @@ export async function deleteStoredFilters(params: {
   }
 
   const query = queryParams.toString()
-  const endpoint = `/filters?${query}`
+  const endpoint = query ? `/filters?${query}` : '/filters'
 
   return apiRequest<FilterStoreDeleteResponse>(endpoint, {
     method: 'DELETE'
