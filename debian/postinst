@@ -62,8 +62,9 @@ case "$1" in
             # Test and reload nginx
             if nginx -t 2>/dev/null; then
                 echo "nginx configuration test passed"
-                if systemctl is-active --quiet nginx; then
-                    systemctl reload nginx && echo "nginx reloaded successfully"
+                # Use invoke-rc.d to reload nginx (Debian standard way)
+                if invoke-rc.d nginx status >/dev/null 2>&1; then
+                    invoke-rc.d nginx reload && echo "nginx reloaded successfully" || true
                 fi
             else
                 echo "Warning: nginx configuration test failed"

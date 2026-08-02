@@ -48,6 +48,12 @@ CLAUDE.md
 
 # Debian build artifacts
 debian/webui-dist/
+debian/.debhelper/
+debian/debhelper-build-stamp
+debian/files
+debian/*.debhelper.log
+debian/*.substvars
+debian/hifiberry-webui/
 *.deb
 *.build
 *.changes

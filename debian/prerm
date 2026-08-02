@@ -11,9 +11,9 @@ case "$1" in
             echo "Disabling HiFiBerry Web UI nginx site"
             rm -f /etc/nginx/sites-enabled/hifiberry-webui
             
-            # Reload nginx if running
-            if systemctl is-active --quiet nginx; then
-                systemctl reload nginx 2>/dev/null || true
+            # Reload nginx if running (use invoke-rc.d for Debian standard)
+            if invoke-rc.d nginx status >/dev/null 2>&1; then
+                invoke-rc.d nginx reload 2>/dev/null || true
             fi
         fi
         ;;
