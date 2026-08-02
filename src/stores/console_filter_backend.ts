@@ -36,6 +36,7 @@ export class ConsoleFilterBackend extends FilterBackend {
 
   private filterBanks: FilterBanks = {}
   private nextFilterId = 0
+  private readonly DEFAULT_MAX_FILTERS = 16
 
   // Configuration for predefined filter banks
   private readonly PREDEFINED_BANKS = {
@@ -78,7 +79,7 @@ export class ConsoleFilterBackend extends FilterBackend {
   }
 
   private getMaxFiltersForBank(bankName: string): number {
-    return this.PREDEFINED_BANKS[bankName as keyof typeof this.PREDEFINED_BANKS]?.maxFilters || 0
+    return this.PREDEFINED_BANKS[bankName as keyof typeof this.PREDEFINED_BANKS]?.maxFilters || this.DEFAULT_MAX_FILTERS
   }
 
   private canAddFilterToBank(bankName: string): boolean {
@@ -98,6 +99,19 @@ export class ConsoleFilterBackend extends FilterBackend {
         currentFilterCount: bank?.filters.length || 0,
         filterBankType: config.type,
         bankAddress: bankName
+      })
+    }
+
+    // Surface dynamically created banks so callers can validate capacity.
+    for (const [bankName, bank] of Object.entries(this.filterBanks)) {
+      if (bankName in this.PREDEFINED_BANKS) continue
+
+      availableFilterBanks.push({
+        name: bankName,
+        maxFilters: this.DEFAULT_MAX_FILTERS,
+        currentFilterCount: bank.filters.length,
+        filterBankType: 'custom',
+        bankAddress: bankName,
       })
     }
 

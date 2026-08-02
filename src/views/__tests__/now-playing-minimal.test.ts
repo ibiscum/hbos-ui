@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
+import { ref } from 'vue'
 
 // Mock components
 vi.mock('@/components/CoverArt.vue', () => ({
@@ -41,11 +42,11 @@ vi.mock('@/components/VolumeControl.vue', () => ({
 
 vi.mock('@/stores/player', () => ({
   usePlayerStore: () => ({
-    currentSong: {
+    currentSong: ref({
       title: 'Test Song',
       artist: 'Test Artist',
       duration: 240
-    }
+    })
   })
 }))
 
@@ -108,7 +109,6 @@ describe('NowPlayingMinimal - Locking Behavior & Regression Tests', () => {
     })
 
     it('should restore body scroll on unmount', async () => {
-      const originalOverflow = document.body.style.overflow
       document.body.style.overflow = 'auto'
 
       const wrapper = mount(NowPlayingMinimal, {
@@ -130,7 +130,7 @@ describe('NowPlayingMinimal - Locking Behavior & Regression Tests', () => {
       await flushPromises()
 
       // Should restore original overflow state
-      expect(document.body.style.overflow).toBe(originalOverflow || '')
+      expect(document.body.style.overflow).toBe('auto')
     })
 
     it('should prevent scrolling while component is mounted', async () => {
@@ -718,7 +718,8 @@ function getEventListenerCount(): number {
   const events = ['mouseenter', 'mouseleave', 'mousemove', 'scroll', 'keydown']
   let count = 0
   events.forEach((eventType) => {
-    const listeners = getEventListeners ? (getEventListeners(document)?.[eventType] || []) : []
+    const getListeners = (globalThis as { getEventListeners?: (target: EventTarget) => Record<string, unknown[]> }).getEventListeners
+    const listeners = getListeners ? (getListeners(document)?.[eventType] || []) : []
     count += Array.isArray(listeners) ? listeners.length : 0
   })
   return count

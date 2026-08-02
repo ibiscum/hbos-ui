@@ -10,6 +10,12 @@ import { formatTime } from '@/helpers/formatTime'
 
 import type { LoopMode } from '@/types/player'
 
+const PLAYBACK_SKIP_COMMANDS = ['next', 'previous'] as const
+
+function isPlaybackSkipCommand(value: string): value is (typeof PLAYBACK_SKIP_COMMANDS)[number] {
+  return PLAYBACK_SKIP_COMMANDS.includes(value as (typeof PLAYBACK_SKIP_COMMANDS)[number])
+}
+
 function isLoopMode(value: string): value is Exclude<LoopMode, undefined> {
   return ['no', 'none', 'song', 'track', 'playlist'].includes(value)
 }
@@ -93,7 +99,9 @@ export const useAudioControls = defineStore('audio-controls', () => {
   }
 
   const playNextOrPrev = (nextOrPrev: string) => {
-    console.log('playNextOrPrev', nextOrPrev)
+    if (!isPlaybackSkipCommand(nextOrPrev)) {
+      return
+    }
 
     // Playback commands go to active player
     sendCommand(nextOrPrev)
@@ -152,7 +160,8 @@ export const useAudioControls = defineStore('audio-controls', () => {
         return
       }
 
-      const seekToPosition = (currentData.value.song.duration * position) / 100
+      const normalizedPosition = Math.max(0, Math.min(100, position))
+      const seekToPosition = (currentData.value.song.duration * normalizedPosition) / 100
 
       console.log('seekToPosition', seekToPosition)
 

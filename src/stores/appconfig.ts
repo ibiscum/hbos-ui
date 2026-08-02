@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 
 export interface AppConfig {
@@ -27,6 +27,64 @@ export interface AppConfig {
     apiPrefix: string
     useProxy: boolean
   }
+}
+
+// Utility function to validate config values
+const validateApiConfig = (config: unknown): boolean => {
+  if (!config || typeof config !== 'object') return false
+
+  const candidate = config as Record<string, unknown>
+  if (typeof candidate.deviceIP !== 'string' || !candidate.deviceIP.trim()) return false
+  if (
+    typeof candidate.devicePort !== 'number' ||
+    candidate.devicePort < 1 ||
+    candidate.devicePort > 65535
+  ) {
+    return false
+  }
+  if (typeof candidate.apiPrefix !== 'string') return false
+  if (typeof candidate.useProxy !== 'boolean') return false
+  return true
+}
+
+// Helper function to build API URL with consistent logic (DRY principle)
+const buildApiUrl = (
+  protocol: 'http' | 'ws',
+  deviceIP: string,
+  devicePort: number,
+  apiPrefix: string,
+  useProxy: boolean,
+): string => {
+  if (!deviceIP || !apiPrefix) {
+    console.warn(`Invalid API config: deviceIP=${deviceIP}, apiPrefix=${apiPrefix}`)
+    return ''
+  }
+
+  if (useProxy) {
+    // Use current host and port for proxy in development
+    if (typeof window !== 'undefined' && window.location) {
+      const currentUrl = window.location.origin
+      // Convert http/https to ws/wss if needed
+      if (protocol === 'ws') {
+        // Replace http:// with ws:// and https:// with wss://
+        const wsUrl = currentUrl.replace(/^https?:\/\//, `${protocol}://`)
+        return `${wsUrl}${apiPrefix}`
+      }
+      return `${currentUrl}${apiPrefix}`
+    }
+    // Fallback if window not available
+    return apiPrefix
+  }
+
+  // Direct connection to device
+  // Don't include default ports (80 for http/ws, 443 for https/wss)
+  let portSuffix = ''
+  if (protocol === 'http' && devicePort !== 80) {
+    portSuffix = `:${devicePort}`
+  } else if (protocol === 'ws' && devicePort !== 80) {
+    portSuffix = `:${devicePort}`
+  }
+  return `${protocol}://${deviceIP}${portSuffix}${apiPrefix}`
 }
 
 export const useAppConfigStore = defineStore('appconfig', () => {
@@ -59,16 +117,20 @@ export const useAppConfigStore = defineStore('appconfig', () => {
     }
   })
   const loading = ref(false)
+  const error = ref<string | null>(null)
 
   // Actions
   const getConfig = async (): Promise<AppConfig> => {
     loading.value = true
+    error.value = null
     try {
       // In a real implementation, this would fetch from API
       // For now, return the default config
       return config.value
-    } catch (error) {
-      console.error('Failed to get configuration:', error)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to get configuration'
+      console.error(errorMessage)
+      error.value = errorMessage
       return config.value
     } finally {
       loading.value = false
@@ -77,12 +139,29 @@ export const useAppConfigStore = defineStore('appconfig', () => {
 
   const updateConfig = async (newConfig: Partial<AppConfig>): Promise<boolean> => {
     loading.value = true
+    error.value = null
     try {
+      // Validate that new config contains valid API configs if provided
+      if (newConfig.audiocontrol_api && !validateApiConfig(newConfig.audiocontrol_api)) {
+        throw new Error('Invalid audiocontrol_api configuration')
+      }
+      if (newConfig.config_api && !validateApiConfig(newConfig.config_api)) {
+        throw new Error('Invalid config_api configuration')
+      }
+      if (newConfig.dsptoolkit_api && !validateApiConfig(newConfig.dsptoolkit_api)) {
+        throw new Error('Invalid dsptoolkit_api configuration')
+      }
+      if (newConfig.roomeq_api && !validateApiConfig(newConfig.roomeq_api)) {
+        throw new Error('Invalid roomeq_api configuration')
+      }
+
       // In a real implementation, this would save to API
       config.value = { ...config.value, ...newConfig }
       return true
-    } catch (error) {
-      console.error('Failed to update configuration:', error)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update configuration'
+      console.error(errorMessage)
+      error.value = errorMessage
       return false
     } finally {
       loading.value = false
@@ -90,95 +169,88 @@ export const useAppConfigStore = defineStore('appconfig', () => {
   }
 
   const setRadioPlayer = async (playerName: string): Promise<boolean> => {
+    if (!playerName || typeof playerName !== 'string') {
+      error.value = 'Invalid radio player name'
+      return false
+    }
     return updateConfig({ radioPlayer: playerName })
   }
 
-  const setApiConfig = async (apiConfig: Partial<AppConfig['audiocontrol_api']>): Promise<boolean> => {
-    return updateConfig({ audiocontrol_api: { ...config.value.audiocontrol_api, ...apiConfig } })
-  }
+  const setApiConfig = async (
+    apiTypeOrConfig: 'audiocontrol' | 'config' | 'dsptoolkit' | 'roomeq' | Partial<AppConfig['audiocontrol_api']>,
+    apiConfigOverload?: Partial<AppConfig['audiocontrol_api']>,
+  ): Promise<boolean> => {
+    // Handle backward compatibility: setApiConfig(config) vs setApiConfig(apiType, config)
+    let apiType: 'audiocontrol' | 'config' | 'dsptoolkit' | 'roomeq' = 'audiocontrol'
+    let apiConfig: Partial<AppConfig['audiocontrol_api']>
 
-  // API URL getters
-  const getApiBaseUrl = (): string => {
-    const { deviceIP, devicePort, apiPrefix, useProxy } = config.value.audiocontrol_api
-
-    let apiUrl: string
-    if (useProxy) {
-      // Use current host and port for proxy in development
-      const currentUrl = window.location.origin
-      apiUrl = `${currentUrl}${apiPrefix}`
+    if (typeof apiTypeOrConfig === 'string') {
+      // New signature: setApiConfig(apiType, config)
+      apiType = apiTypeOrConfig
+      apiConfig = apiConfigOverload || {}
     } else {
-      // Don't include port 80 in the URL as it's the default HTTP port
-      const portSuffix = devicePort === 80 ? '' : `:${devicePort}`
-      apiUrl = `http://${deviceIP}${portSuffix}${apiPrefix}`
+      // Old signature: setApiConfig(config)
+      apiConfig = apiTypeOrConfig
     }
 
-    return apiUrl
+    const apiKey = `${apiType}_api` as keyof AppConfig
+    const configKey = apiKey as keyof AppConfig
+    const currentConfig = config.value[configKey]
+
+    if (typeof currentConfig !== 'object' || currentConfig === null) {
+      error.value = `Invalid API type: ${apiType}`
+      return false
+    }
+
+    return updateConfig({
+      [apiKey]: { ...currentConfig, ...apiConfig },
+    } as Partial<AppConfig>)
   }
 
-  const getWsBaseUrl = (): string => {
+  // API URL getters using unified builder function
+  const getApiBaseUrl = (): string => {
+    const { deviceIP, devicePort, apiPrefix, useProxy } = config.value.audiocontrol_api
+    return buildApiUrl('http', deviceIP, devicePort, apiPrefix, useProxy)
+  }
+
+  const getWsBaseUrl = (forceProxy = false): string => {
     const { deviceIP, devicePort, apiPrefix } = config.value.audiocontrol_api
-    // WebSocket always connects directly to API server (no proxy)
-    // Don't include port 80 for WebSocket as it's the default HTTP port, but the WebSocket will use port 80
-    const portSuffix = devicePort === 80 ? '' : `:${devicePort}`
-    const wsUrl = `ws://${deviceIP}${portSuffix}${apiPrefix}`
-    return wsUrl
+    // WebSocket connections are always direct (unless explicitly forced through proxy)
+    // WebSocket doesn't have CORS restrictions like HTTP does
+    const useProxy = forceProxy
+    return buildApiUrl('ws', deviceIP, devicePort, apiPrefix, useProxy)
   }
 
   const getConfigApiBaseUrl = (): string => {
     const { deviceIP, devicePort, apiPrefix, useProxy } = config.value.config_api
-
-    let configApiUrl: string
-    if (useProxy) {
-      // Use current host and port for proxy in development
-      const currentUrl = window.location.origin
-      configApiUrl = `${currentUrl}${apiPrefix}`
-    } else {
-      // Don't include port 80 in the URL as it's the default HTTP port
-      const portSuffix = devicePort === 80 ? '' : `:${devicePort}`
-      configApiUrl = `http://${deviceIP}${portSuffix}${apiPrefix}`
-    }
-
-    return configApiUrl
+    return buildApiUrl('http', deviceIP, devicePort, apiPrefix, useProxy)
   }
 
   const getDSPToolkitApiBaseUrl = (): string => {
     const { deviceIP, devicePort, apiPrefix, useProxy } = config.value.dsptoolkit_api
-
-    let dspToolkitApiUrl: string
-    if (useProxy) {
-      // Use current host and port for proxy in development
-      const currentUrl = window.location.origin
-      dspToolkitApiUrl = `${currentUrl}${apiPrefix}`
-    } else {
-      // Don't include port 80 in the URL as it's the default HTTP port
-      const portSuffix = devicePort === 80 ? '' : `:${devicePort}`
-      dspToolkitApiUrl = `http://${deviceIP}${portSuffix}${apiPrefix}`
-    }
-
-    return dspToolkitApiUrl
+    return buildApiUrl('http', deviceIP, devicePort, apiPrefix, useProxy)
   }
 
   const getRoomEQApiBaseUrl = (): string => {
     const { deviceIP, devicePort, apiPrefix, useProxy } = config.value.roomeq_api
-
-    let roomEQApiUrl: string
-    if (useProxy) {
-      // Use current host and port for proxy in development
-      const currentUrl = window.location.origin
-      roomEQApiUrl = `${currentUrl}${apiPrefix}`
-    } else {
-      // Don't include port 80 in the URL as it's the default HTTP port
-      const portSuffix = devicePort === 80 ? '' : `:${devicePort}`
-      roomEQApiUrl = `http://${deviceIP}${portSuffix}${apiPrefix}`
-    }
-
-    return roomEQApiUrl
+    return buildApiUrl('http', deviceIP, devicePort, apiPrefix, useProxy)
   }
+
+  // Computed getters for consistent API (unifies function vs method patterns)
+  const radioPlayer = computed(() => config.value.radioPlayer)
+  const apiConfig = computed(() => config.value.audiocontrol_api)
+  const configApiConfig = computed(() => config.value.config_api)
 
   return {
     // State
     config,
     loading,
+    error,
+
+    // Computed getters (consistent pattern)
+    radioPlayer,
+    apiConfig,
+    configApiConfig,
 
     // Actions
     getConfig,
@@ -192,10 +264,5 @@ export const useAppConfigStore = defineStore('appconfig', () => {
     getConfigApiBaseUrl,
     getDSPToolkitApiBaseUrl,
     getRoomEQApiBaseUrl,
-
-    // Getters
-    radioPlayer: () => config.value.radioPlayer,
-    apiConfig: () => config.value.audiocontrol_api,
-    configApiConfig: () => config.value.config_api
   }
 })

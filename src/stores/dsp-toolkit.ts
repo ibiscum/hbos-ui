@@ -34,6 +34,7 @@ export const useDSPToolkitStore = defineStore('dsp-toolkit', () => {
   // State
   const status = ref<DSPToolkitStatus | null>(null)
   const isChecking = ref(false)
+  let checkingOperations = 0
   const lastChecked = ref<Date | null>(null)
   const cacheTimeout = ref(5 * 60 * 1000) // 5 minutes cache timeout
 
@@ -58,6 +59,7 @@ export const useDSPToolkitStore = defineStore('dsp-toolkit', () => {
       return status.value
     }
 
+    checkingOperations += 1
     isChecking.value = true
 
     try {
@@ -71,7 +73,8 @@ export const useDSPToolkitStore = defineStore('dsp-toolkit', () => {
       lastChecked.value = new Date()
       return 'backend_error'
     } finally {
-      isChecking.value = false
+      checkingOperations = Math.max(0, checkingOperations - 1)
+      isChecking.value = checkingOperations > 0
     }
   }
 

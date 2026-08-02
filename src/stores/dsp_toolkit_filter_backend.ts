@@ -703,26 +703,43 @@ export class DSPToolkitFilterBackend extends FilterBackend {
   async importFilterConfig(config: FilterBanks): Promise<void> {
     await this.initialize()
 
+    // Start from current bank topology and clear filters so omitted banks do not keep stale entries.
+    const nextBanks: ExtendedFilterBanks = {}
+    for (const [bankName, bank] of Object.entries(this.filterBanks)) {
+      nextBanks[bankName] = {
+        ...bank,
+        filters: [],
+      }
+    }
+
     // Validate the imported configuration
     for (const [bankName, bank] of Object.entries(config)) {
       // Use existing bank's maxFilters or default to 8
-      const existingBank = this.filterBanks[bankName]
+      const existingBank = nextBanks[bankName]
       const maxFilters = existingBank?.maxFilters || 8
       if (bank.filters.length > maxFilters) {
         throw new Error(`Import failed: Bank '${bankName}' has ${bank.filters.length} filters, but maximum is ${maxFilters}`)
       }
     }
 
-    // Import the configuration, preserving maxFilters from existing banks
+    // Import provided configuration, preserving bank metadata/capacity when known.
     for (const [bankName, bank] of Object.entries(config)) {
-      const existingBank = this.filterBanks[bankName]
-      this.filterBanks[bankName] = {
+      const existingBank = nextBanks[bankName]
+      nextBanks[bankName] = {
         name: bank.name,
         filters: JSON.parse(JSON.stringify(bank.filters)),
         maxFilters: existingBank?.maxFilters || 8,
-        baseAddress: existingBank?.baseAddress // Preserve baseAddress if it exists
+        baseAddress: existingBank?.baseAddress,
+        metadataKey: existingBank?.metadataKey,
+        filterBankType: existingBank?.filterBankType,
+        delayAddress: existingBank?.delayAddress,
+        levelAddress: existingBank?.levelAddress,
+        invertAddress: existingBank?.invertAddress,
+        channelSelectAddress: existingBank?.channelSelectAddress,
       }
     }
+
+    this.filterBanks = nextBanks
 
     console.log('DSP Toolkit: Imported filter configuration', {
       bankCount: Object.keys(config).length,

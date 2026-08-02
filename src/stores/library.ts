@@ -32,42 +32,43 @@ export const useLibraryStore = defineStore('library', () => {
   const getAvailableLibrary = async () => {
     loading.value = true
 
-    const apiBase = configStore.getApiBaseUrl()
-    const { error, data } = await useFetch<LibraryPlayerResponse>(`${apiBase}/library`).json()
+    try {
+      const apiBase = configStore.getApiBaseUrl()
+      const { error, data } = await useFetch<LibraryPlayerResponse>(`${apiBase}/library`).json()
 
-    if (error.value) {
-      toastStore.showErrorToast("Could not fetch library.")
+      if (error.value) {
+        toastStore.showErrorToast('Could not fetch library.')
+        return Promise.reject(error.value)
+      }
+
+      const players = data.value?.players ?? []
+
+      // Find any player with library that's loaded
+      let availableLibrary = players.find((p: LibraryPlayer) =>
+        p.has_library && p.is_loaded
+      )
+
+      // Last resort: any player with library
+      if (!availableLibrary) {
+        availableLibrary = players.find((p: LibraryPlayer) => p.has_library)
+      }
+
+      if (availableLibrary) {
+        activeLibrary.value = availableLibrary.player_name
+        isLibraryLoaded.value = availableLibrary.is_loaded
+        supportsDelete.value = availableLibrary.supports_delete ?? false
+      } else {
+        activeLibrary.value = null
+        isLibraryLoaded.value = false
+        supportsDelete.value = false
+      }
+
+      return Promise.resolve(activeLibrary.value)
+    } catch (error) {
+      throw error
+    } finally {
       loading.value = false
-      return Promise.reject(error.value)
     }
-
-    const players = data.value?.players ?? []
-    console.log('Library players available:', players)
-
-    // Find any player with library that's loaded
-    let availableLibrary = players.find((p: LibraryPlayer) =>
-      p.has_library && p.is_loaded
-    )
-
-    // Last resort: any player with library
-    if (!availableLibrary) {
-      availableLibrary = players.find((p: LibraryPlayer) => p.has_library)
-    }
-
-    if (availableLibrary) {
-      console.log('Selected library player:', availableLibrary.player_name)
-      activeLibrary.value = availableLibrary.player_name
-      isLibraryLoaded.value = availableLibrary.is_loaded
-      supportsDelete.value = availableLibrary.supports_delete ?? false
-    } else {
-      console.warn('No suitable library player found')
-      activeLibrary.value = null
-      isLibraryLoaded.value = false
-      supportsDelete.value = false
-    }
-
-    loading.value = false
-    return Promise.resolve(activeLibrary.value)
   }
 
   // Method to refresh library status (useful for checking if library update has completed)
@@ -76,15 +77,18 @@ export const useLibraryStore = defineStore('library', () => {
       return
     }
 
-    const apiBase = configStore.getApiBaseUrl()
-    const { error, data } = await useFetch<LibraryPlayerResponse>(`${apiBase}/library`).json()
+    try {
+      const apiBase = configStore.getApiBaseUrl()
+      const { error, data } = await useFetch<LibraryPlayerResponse>(`${apiBase}/library`).json()
 
-    if (!error.value && data.value?.players) {
-      const currentPlayer = data.value.players.find((p: LibraryPlayer) => p.player_name === activeLibrary.value)
-      if (currentPlayer) {
-        isLibraryLoaded.value = currentPlayer.is_loaded
-        console.log(`Library ${activeLibrary.value} loaded status: ${isLibraryLoaded.value}`)
+      if (!error.value && data.value?.players) {
+        const currentPlayer = data.value.players.find((p: LibraryPlayer) => p.player_name === activeLibrary.value)
+        if (currentPlayer) {
+          isLibraryLoaded.value = currentPlayer.is_loaded
+        }
       }
+    } catch {
+      // keep existing state if refresh fails
     }
   }
 
@@ -101,6 +105,9 @@ export const useLibraryStore = defineStore('library', () => {
   }
 
   const getAlbumCover = (id: string) => {
+    if (!activeLibrary.value) {
+      return ''
+    }
     const apiBase = configStore.getApiBaseUrl()
     return `${apiBase}/library/${activeLibrary.value}/image/album:${id}`
   }

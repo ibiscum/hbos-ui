@@ -8,6 +8,10 @@ export const usePlayerChangesStore = defineStore('player-changes', () => {
    * @param {string} newPlayerName - The name of the new current player
    */
   const player_changed = (oldPlayerName: string | null, newPlayerName: string | null) => {
+    if (oldPlayerName === newPlayerName) {
+      return
+    }
+
     console.log('Player changed:', { from: oldPlayerName, to: newPlayerName })
 
     // TODO: Implement player change handling logic

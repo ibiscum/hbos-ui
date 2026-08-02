@@ -21,6 +21,18 @@ export const useAuthStore = defineStore('auth', () => {
   const status = ref<AuthStatus | null>(null)
   const csrf = ref<string | null>(null)
   const loading = ref(false)
+  let loadingOperations = 0
+
+  const withLoading = async <T>(operation: () => Promise<T>): Promise<T> => {
+    loadingOperations += 1
+    loading.value = true
+    try {
+      return await operation()
+    } finally {
+      loadingOperations = Math.max(0, loadingOperations - 1)
+      loading.value = loadingOperations > 0
+    }
+  }
 
   // Prompt state — a single shared in-flight prompt. Concurrent callers of
   // promptForAuth() while one is already open get the SAME promise back,
@@ -32,39 +44,44 @@ export const useAuthStore = defineStore('auth', () => {
   let promptResolve: ((value: boolean) => void) | null = null
 
   const refreshStatus = async (): Promise<AuthStatus> => {
-    loading.value = true
-    try {
+    return withLoading(async () => {
       const result = await getAuthStatus()
       status.value = result
       return result
-    } finally {
-      loading.value = false
-    }
+    })
   }
 
   const login = async (password: string, remember = false) => {
-    const result = await apiLogin(password, remember)
-    csrf.value = result.csrf
-    await refreshStatus()
-    return result
+    return withLoading(async () => {
+      const result = await apiLogin(password, remember)
+      csrf.value = result.csrf
+      await refreshStatus()
+      return result
+    })
   }
 
   const setPassword = async (password: string, current?: string, remember = false) => {
-    const result = await apiSetPassword(password, current, remember)
-    csrf.value = result.csrf
-    await refreshStatus()
-    return result
+    return withLoading(async () => {
+      const result = await apiSetPassword(password, current, remember)
+      csrf.value = result.csrf
+      await refreshStatus()
+      return result
+    })
   }
 
   const logout = async () => {
-    await apiLogout(csrf.value ?? undefined)
-    csrf.value = null
-    await refreshStatus()
+    return withLoading(async () => {
+      await apiLogout(csrf.value ?? undefined)
+      csrf.value = null
+      await refreshStatus()
+    })
   }
 
   const setPolicy = async (protection: ProtectionLevel) => {
-    await apiSetPolicy(protection, csrf.value ?? undefined)
-    await refreshStatus()
+    return withLoading(async () => {
+      await apiSetPolicy(protection, csrf.value ?? undefined)
+      await refreshStatus()
+    })
   }
 
   /** Silently rehydrate the CSRF token from a still-valid session cookie.

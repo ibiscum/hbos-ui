@@ -70,6 +70,17 @@ import { usePlayerStore } from '@/stores/player.ts'
 const { currentSong: song } = storeToRefs(usePlayerStore())
 
 const route = useRoute()
+const originalBodyOverflow = ref('')
+
+onMounted(() => {
+  originalBodyOverflow.value = document.body.style.overflow
+  document.body.style.overflow = 'hidden'
+})
+
+onUnmounted(() => {
+  document.body.style.overflow = originalBodyOverflow.value
+})
+
 if (route.query.dark !== undefined) {
   onMounted(() => document.documentElement.classList.add('dark'))
   onUnmounted(() => document.documentElement.classList.remove('dark'))

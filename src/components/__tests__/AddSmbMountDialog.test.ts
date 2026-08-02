@@ -557,6 +557,7 @@ describe('AddSmbMountDialog', () => {
 
       const nextButton = wrapper.find('.btn-primary')
       await nextButton.trigger('click')
+      await nextButton.trigger('click')
       await flushPromises()
 
       expect(testSmbServerMock).toHaveBeenCalledWith(mockSmbServer.ip, undefined, undefined)
@@ -598,6 +599,7 @@ describe('AddSmbMountDialog', () => {
       await serverItem.trigger('click')
 
       const nextButton = wrapper.find('.btn-primary')
+      await nextButton.trigger('click')
       await nextButton.trigger('click')
       await flushPromises()
 
@@ -869,6 +871,10 @@ describe('AddSmbMountDialog', () => {
       if (serverItem.exists()) {
         await serverItem.trigger('click')
 
+        const nextButton = wrapper.find('.btn-primary')
+        await nextButton.trigger('click')
+        await flushPromises()
+
         wrapper.vm.authType = 'credentials'
         wrapper.vm.username = ''
         wrapper.vm.password = 'pass'
@@ -903,6 +909,7 @@ describe('AddSmbMountDialog', () => {
 
         const nextButton = wrapper.find('.btn-primary')
         await nextButton.trigger('click')
+        await nextButton.trigger('click')
         await flushPromises()
 
         expect(wrapper.vm.shares[0].name).toBe('Public')
@@ -933,6 +940,7 @@ describe('AddSmbMountDialog', () => {
         await serverItem.trigger('click')
 
         const nextButton = wrapper.find('.btn-primary')
+        await nextButton.trigger('click')
         await nextButton.trigger('click')
         await flushPromises()
 

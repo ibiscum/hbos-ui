@@ -344,6 +344,8 @@ const isValidSmbVersion = (version: string): boolean => {
 const getSanitizedMountPoint = (shareName: string): string => {
   // Sanitize: lowercase, remove non-alphanumeric except underscores
   let sanitized = shareName.toLowerCase().replace(/[^a-z0-9]/g, '_')
+  // Collapse consecutive underscores for cleaner mount points
+  sanitized = sanitized.replace(/_+/g, '_')
   // Remove leading/trailing underscores
   sanitized = sanitized.replace(/^_+|_+$/g, '')
   // Fallback to 'share' if result is empty
@@ -384,7 +386,7 @@ const canProceed = computed(() => {
     case 1:
       return selectedServer.value !== null
     case 2:
-      return authType.value === 'anonymous' || (username.value && password.value)
+      return authType.value === 'anonymous' || (!!username.value && !!password.value)
     case 3:
       return selectedShare.value !== null
     case 4:
@@ -395,7 +397,7 @@ const canProceed = computed(() => {
 })
 
 const canCreateMount = computed(() => {
-  return selectedServer.value && selectedShare.value && mountPoint.value.trim() !== ''
+  return selectedServer.value !== null && selectedShare.value !== null && mountPoint.value.trim() !== ''
 })
 
 // Methods
@@ -644,7 +646,7 @@ watch(() => props.isOpen, (isOpen) => {
   if (isOpen) {
     discoverServers()
   }
-})
+}, { immediate: true })
 </script>
 
 <style scoped lang="scss">

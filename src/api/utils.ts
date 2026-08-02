@@ -35,7 +35,7 @@ export const rewriteImageUrl = (url: string): string => {
   }
 
   const configStore = useAppConfigStore()
-  const apiConfig = configStore.apiConfig()
+  const apiConfig = configStore.apiConfig
 
   if (!apiConfig || typeof apiConfig.useProxy !== 'boolean') {
     return url // Fallback if config unavailable
@@ -115,7 +115,7 @@ export const rewriteAudiocontrolApiUrl = (url: string): string => {
   }
 
   const configStore = useAppConfigStore()
-  const apiConfig = configStore.apiConfig()
+  const apiConfig = configStore.apiConfig
 
   if (!apiConfig || typeof apiConfig.useProxy !== 'boolean') {
     return url // Fallback if config unavailable

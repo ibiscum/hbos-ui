@@ -152,86 +152,110 @@ export const useAlbumStore = defineStore('album', () => {
     loading.value = true
     loaded.value = false
 
-    const { error, data, isFinished } = await libraryFetch<AlbumsResponse>(
-      '/library/:activeLibrary/albums',
-    ).json()
+    try {
+      const { error, data } = await libraryFetch<AlbumsResponse>(
+        '/library/:activeLibrary/albums',
+      ).json()
 
-    if (error.value) {
-      const errorMessage = typeof error.value === 'string' ? error.value : 'Unknown error'
+      if (error.value) {
+        const errorMessage = typeof error.value === 'string' ? error.value : 'Unknown error'
+        toastStore.showErrorToast(`Failed to load albums: ${errorMessage}`)
+        return
+      }
+
+      if (data.value?.albums && data.value.albums.length) {
+        // Filter out albums missing critical fields (id, name) and add null defaults
+        const mappedAlbums = data.value.albums
+          .filter((album: Album) => album.id && album.name)
+          .map((album: Album) => {
+            return {
+              ...album,
+              $id: album.id || 'unknown',
+              $title: album.name || 'Unknown Album',
+              $subtitle: `${album.artists?.[0] || 'Various Artists'}`,
+              $note: `${album.release_date ? album.release_date.substring(0, YEAR_SUBSTRING_LENGTH) : 'Unknown year'}`,
+              $cover_src: getAlbumCoverById(album.id),
+            }
+          })
+
+        // Store all albums and set the filtered albums
+        allAlbums.value = mappedAlbums
+        albums.value = mappedAlbums
+        loaded.value = true
+      } else {
+        // No albums found - refresh library status to check if library is still updating
+        await libraryStore.refreshLibraryStatus()
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       toastStore.showErrorToast(`Failed to load albums: ${errorMessage}`)
+    } finally {
+      loading.value = false
     }
-
-    if (data.value?.albums && data.value.albums.length) {
-      const mappedAlbums = data.value.albums.map((album: Album) => {
-        return {
-          ...album,
-          $id: album.id,
-          $title: album.name,
-          $subtitle: `${album.artists?.[0] || 'Various Artists'}`,
-          $note: `${album.release_date ? album.release_date.substring(0, YEAR_SUBSTRING_LENGTH) : 'Unknown year'}`,
-          $cover_src: getAlbumCoverById(album.id),
-        }
-      })
-
-      // Store all albums and set the filtered albums
-      allAlbums.value = mappedAlbums
-      albums.value = mappedAlbums
-    } else {
-      // No albums found - refresh library status to check if library is still updating
-      await libraryStore.refreshLibraryStatus()
-    }
-
-    loading.value = false
-    loaded.value = isFinished.value
   }
 
   const getAlbumByAlbumId = async (id: string): Promise<void> => {
     album.value = null
     loading.value = true
 
-    const { error, data } = await libraryFetch<AlbumResponse>(
-      `/library/:activeLibrary/album/by-id/${id}`,
-    ).json()
+    try {
+      const { error, data } = await libraryFetch<AlbumResponse>(
+        `/library/:activeLibrary/album/by-id/${id}`,
+      ).json()
 
-    if (error.value) {
-      const errorMessage = typeof error.value === 'string' ? error.value : 'Unknown error'
+      if (error.value) {
+        const errorMessage = typeof error.value === 'string' ? error.value : 'Unknown error'
+        toastStore.showErrorToast(`Failed to load album: ${errorMessage}`)
+        return
+      }
+
+      if (data.value?.album) {
+        album.value = data.value.album
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       toastStore.showErrorToast(`Failed to load album: ${errorMessage}`)
+    } finally {
+      loading.value = false
     }
-
-    if (data.value?.album) {
-      album.value = data.value.album
-    }
-
-    loading.value = false
   }
 
   const getAlbumByArtistId = async (id: string): Promise<void> => {
     loading.value = true
     albums.value = []
 
-    const { error, data } = await libraryFetch<AlbumByArtistResponse>(
-      `/library/:activeLibrary/albums/by-artist-id/${id}`,
-    ).json()
+    try {
+      const { error, data } = await libraryFetch<AlbumByArtistResponse>(
+        `/library/:activeLibrary/albums/by-artist-id/${id}`,
+      ).json()
 
-    if (error.value) {
-      const errorMessage = typeof error.value === 'string' ? error.value : 'Unknown error'
+      if (error.value) {
+        const errorMessage = typeof error.value === 'string' ? error.value : 'Unknown error'
+        toastStore.showErrorToast(`Failed to load albums: ${errorMessage}`)
+        return
+      }
+
+      if (data.value?.albums && data.value.albums.length > 0) {
+        // Filter out albums missing critical fields and add null defaults
+        albums.value = data.value.albums
+          .filter((album: Album) => album.id && album.name)
+          .map((album: Album) => {
+            return {
+              ...album,
+              $id: album.id || 'unknown',
+              $title: album.name || 'Unknown Album',
+              $subtitle: `${album.artists?.[0] || 'Various Artists'}`,
+              $note: `${album.release_date ? album.release_date.substring(0, YEAR_SUBSTRING_LENGTH) : 'Unknown year'}`,
+              $cover_src: getAlbumCoverById(album.id),
+            }
+          })
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       toastStore.showErrorToast(`Failed to load albums: ${errorMessage}`)
+    } finally {
+      loading.value = false
     }
-
-    if (data.value?.albums && data.value.albums.length > 0) {
-      albums.value = data.value.albums.map((album: Album) => {
-        return {
-          ...album,
-          $id: album.id,
-          $title: album.name,
-          $subtitle: `${album.artists?.[0] || 'Various Artists'}`,
-          $note: `${album.release_date ? album.release_date.substring(0, YEAR_SUBSTRING_LENGTH) : 'Unknown year'}`,
-          $cover_src: getAlbumCoverById(album.id),
-        }
-      })
-    }
-
-    loading.value = false
   }
 
   const getAlbumCoverById = (id: string) => {
@@ -291,6 +315,8 @@ export const useAlbumStore = defineStore('album', () => {
     sortOrder,
     genres,
     selectedGenres,
+    randomKeys,
+    genreAlbumIds,
 
     // Getter
     sortedAlbums,

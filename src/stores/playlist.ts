@@ -28,21 +28,22 @@ export const usePlaylistStore = defineStore('playlist', () => {
         .json()
 
       if (error.value) {
-        console.error('Error fetching queue:', error.value)
         toastStore.showErrorToast(`Queue fetch error: ${error.value}`)
         queue.value = []
-      } else if (data.value?.queue) {
-        queue.value = data.value.queue
+      } else if (Array.isArray(data.value?.queue)) {
+        queue.value = [...data.value.queue]
+      } else if (data.value?.queue !== undefined) {
+        toastStore.showErrorToast('Queue fetch error: Invalid queue response')
+        queue.value = []
       } else {
         queue.value = []
       }
-    } catch (error) {
-      console.error('Error fetching queue:', error)
+    } catch {
       toastStore.showErrorToast('Failed to fetch playlist')
       queue.value = []
+    } finally {
+      loading.value = false
     }
-
-    loading.value = false
   }
 
   return {

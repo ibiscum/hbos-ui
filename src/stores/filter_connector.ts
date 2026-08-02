@@ -123,9 +123,16 @@ export const useFilterStore = defineStore('filter', () => {
   const switchBackend = async (backendType: keyof typeof availableBackends): Promise<void> => {
     if (backendType === currentBackendType.value) return
 
+    const previousBackendType = currentBackendType.value
     currentBackendType.value = backendType
-    await saveBackendType(backendType) // Persist the selection
-    await syncFromBackend()
+
+    try {
+      await syncFromBackend()
+      await saveBackendType(backendType) // Persist only after successful switch
+    } catch (error) {
+      currentBackendType.value = previousBackendType
+      throw error
+    }
   }
 
   // Computed
