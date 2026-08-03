@@ -48,7 +48,15 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { ConsoleFilterBackend } from './console-filter-backend'
 import { DSPToolkitFilterBackend } from './dsp-toolkit-filter-backend'
-import type { Filter, FilterBank, FilterBanks, FilterBackend, BackendCapabilities } from './filter-backend-interface'
+import type {
+  Filter,
+  FilterBank,
+  FilterBanks,
+  FilterBackend,
+  BackendCapabilities,
+  NewFilter,
+  FilterUpdate,
+} from './filter-backend-interface'
 import { getConfigValue, setConfigValue } from '@/api/config'
 import { useDSPToolkitStore } from './dsp-toolkit'
 
@@ -155,7 +163,9 @@ export const useFilterStore = defineStore('filter', () => {
     const bankInfo = capabilities.availableFilterBanks.find(bank => bank.name === bankName)
 
     if (!bankInfo) {
-      return false // Bank doesn't exist in capabilities
+      // Some backends support creating dynamic banks on first add.
+      // Defer the final decision to addFilter/backend behavior.
+      return true
     }
 
     return bankInfo.currentFilterCount < bankInfo.maxFilters
@@ -194,16 +204,13 @@ export const useFilterStore = defineStore('filter', () => {
    * If position is greater than current length, filter is added at the end
    * Throws an error if the bank has reached its maximum capacity
    */
-  const addFilter = async (bankName: string, position: number, filter: Omit<Filter, 'id'>): Promise<string> => {
-    // Check if the bank can accept more filters
-    const canAdd = await canAddFilterToBank(bankName)
-    if (!canAdd) {
-      const capabilities = await getBackendCapabilities()
-      const bankInfo = capabilities.availableFilterBanks.find(bank => bank.name === bankName)
-      const maxFilters = bankInfo?.maxFilters || 0
-      const currentCount = bankInfo?.currentFilterCount || 0
-
-      throw new Error(`Cannot add filter: Bank "${bankName}" has reached its maximum capacity of ${maxFilters} filters (currently has ${currentCount})`)
+  const addFilter = async (bankName: string, position: number, filter: NewFilter): Promise<string> => {
+    // Pre-check capacity only for banks explicitly surfaced by backend capabilities.
+    // Unknown banks may still be valid for backends that create banks dynamically.
+    const capabilities = await getBackendCapabilities()
+    const bankInfo = capabilities.availableFilterBanks.find(bank => bank.name === bankName)
+    if (bankInfo && bankInfo.currentFilterCount >= bankInfo.maxFilters) {
+      throw new Error(`Cannot add filter: Bank "${bankName}" has reached its maximum capacity of ${bankInfo.maxFilters} filters (currently has ${bankInfo.currentFilterCount})`)
     }
 
     const filterId = await getCurrentBackend().addFilter(bankName, position, filter)
@@ -226,7 +233,7 @@ export const useFilterStore = defineStore('filter', () => {
   /**
    * Update a filter at a specific position in a bank
    */
-  const updateFilter = async (bankName: string, position: number, updates: Partial<Omit<Filter, 'id'>>): Promise<boolean> => {
+  const updateFilter = async (bankName: string, position: number, updates: FilterUpdate): Promise<boolean> => {
     const result = await getCurrentBackend().updateFilter(bankName, position, updates)
     if (result) {
       await syncFromBackend()
@@ -388,7 +395,7 @@ export const useFilterStore = defineStore('filter', () => {
    * Bulk update filters across multiple banks
    * Useful for applying the same filter change to multiple channels
    */
-  const bulkUpdateFilter = async (bankNames: string[], position: number, updates: Partial<Omit<Filter, 'id'>>): Promise<boolean[]> => {
+  const bulkUpdateFilter = async (bankNames: string[], position: number, updates: FilterUpdate): Promise<boolean[]> => {
     const results = []
     for (const bankName of bankNames) {
       results.push(await updateFilter(bankName, position, updates))

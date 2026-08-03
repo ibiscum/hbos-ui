@@ -78,7 +78,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useFilterStore, type BackendCapabilities } from '@/stores/filter_connector';
+import { useFilterStore, type BackendCapabilities } from '@/stores/filter-connector';
 import { useDSPToolkitStore } from '@/stores/dsp-toolkit';
 import { getFilterBankDisplayName } from '@/helpers/dspFilterBankTranslations';
 import Icon from '@/components/Icon.vue';

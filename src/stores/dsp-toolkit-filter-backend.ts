@@ -69,7 +69,7 @@ function qToShelfSlope(Q: number, dBgain: number): number {
 }
 
 export class DSPToolkitFilterBackend extends FilterBackend {
-  readonly name = 'HiFiBery DSP'
+  readonly name = 'HiFiBerry DSP'
   readonly shortDescription = 'Support for HiFiBerry DSP hardware'
   readonly description = `
     <div class="backend-info">
@@ -548,24 +548,21 @@ export class DSPToolkitFilterBackend extends FilterBackend {
     }
 
     // Generate unique filter ID
-    const filterId = `${bankName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const filterId = `${bankName}_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
 
     const newFilter: Filter = {
       ...filter,
       id: filterId
     }
 
-    // Insert at specified position or append
-    if (position >= 0 && position < bank.filters.length) {
-      bank.filters.splice(position, 0, newFilter)
-    } else {
-      bank.filters.push(newFilter)
-    }
+    // Clamp insertion position into [0, filters.length].
+    const insertPosition = Math.max(0, Math.min(position, bank.filters.length))
+    bank.filters.splice(insertPosition, 0, newFilter)
 
     console.log(`DSP Toolkit: Added ${filter.type} filter to ${bankName} bank`, {
       filterId,
       frequency: filter.frequency,
-      position: position,
+      position: insertPosition,
       note: 'Updated DSP hardware'
     })
 
@@ -615,12 +612,16 @@ export class DSPToolkitFilterBackend extends FilterBackend {
       return false
     }
 
-    // Apply updates to the filter
+    // Preserve the existing id even if callers pass an id field at runtime.
     const filter = bank.filters[position]
-    Object.assign(filter, updates)
+    bank.filters[position] = {
+      ...filter,
+      ...updates,
+      id: filter.id,
+    }
 
     console.log(`DSP Toolkit: Updated filter in ${bankName} bank`, {
-      filterId: filter.id,
+      filterId: bank.filters[position].id,
       position,
       updates,
       note: 'Updated DSP hardware'
@@ -917,7 +918,7 @@ export class DSPToolkitFilterBackend extends FilterBackend {
       const checksumResponse = await getDSPProgramChecksum()
       const checksum = checksumResponse.checksum
 
-      const metadataKey = this.getMetadataKeyForBank(bankName)
+      const metadataKey = this.filterBanks[bankName]?.metadataKey || this.getMetadataKeyForBank(bankName)
       if (!metadataKey) {
         console.warn(`Cannot store filters for ${bankName}: no metadata key found`)
         return

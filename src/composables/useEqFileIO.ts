@@ -4,7 +4,7 @@
 
 import { type Ref, type ComputedRef } from 'vue';
 import { type Filter } from '@/utils/filtercalc';
-import { useFilterStore } from '@/stores/filter_connector';
+import { useFilterStore } from '@/stores/filter-connector';
 import { useToastStore } from '@/stores/toast';
 import { convertUIFilterToStore } from '@/utils/filter-conversions';
 

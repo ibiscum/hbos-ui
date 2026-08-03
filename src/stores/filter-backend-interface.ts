@@ -6,8 +6,7 @@
  */
 
 /**
- * Interface for the filter. Those filters
- * come directly from the backend.
+ * A filter entry managed by a backend.
  */
 export interface Filter {
   id: string
@@ -19,8 +18,7 @@ export interface Filter {
 }
 
 /**
- * A interface that holds a name of a filterbank, as
- * well as an array of filters.
+ * A named collection of filters.
  */
 export interface FilterBank {
   name: string
@@ -30,6 +28,16 @@ export interface FilterBank {
 export interface FilterBanks {
   [bankName: string]: FilterBank
 }
+
+/**
+ * Payload used when creating a filter in a backend.
+ */
+export type NewFilter = Omit<Filter, 'id'>
+
+/**
+ * Payload used when partially updating an existing filter.
+ */
+export type FilterUpdate = Partial<NewFilter>
 
 /**
  * Stores information about a `FilterBank`.
@@ -80,7 +88,7 @@ export abstract class FilterBackend {
   /**
    * Add a filter to a specific bank at a specific position
    */
-  abstract addFilter(bankName: string, position: number, filter: Omit<Filter, 'id'>): Promise<string>
+  abstract addFilter(bankName: string, position: number, filter: NewFilter): Promise<string>
 
   /**
    * Remove a filter from a specific bank at a specific position
@@ -90,7 +98,7 @@ export abstract class FilterBackend {
   /**
    * Update a filter at a specific position in a bank
    */
-  abstract updateFilter(bankName: string, position: number, updates: Partial<Omit<Filter, 'id'>>): Promise<boolean>
+  abstract updateFilter(bankName: string, position: number, updates: FilterUpdate): Promise<boolean>
 
   /**
    * Clear all filters from a specific bank

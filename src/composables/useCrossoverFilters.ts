@@ -6,7 +6,7 @@
 import { ref, computed } from 'vue';
 import { type Filter } from '@/utils/filtercalc';
 import { type BiquadFilterType } from '@/utils/biquad';
-import { useFilterStore, type BackendCapabilities } from '@/stores/filter_connector';
+import { useFilterStore, type BackendCapabilities } from '@/stores/filter-connector';
 import { useToastStore } from '@/stores/toast';
 import { convertUIFilterToStore, convertStoreFilterToUI } from '@/utils/filter-conversions';
 import { DEFAULT_FREQ_RANGE, DEFAULT_GAIN_RANGE } from '@/utils/filtergraph';

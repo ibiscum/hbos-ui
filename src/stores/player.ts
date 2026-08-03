@@ -85,13 +85,13 @@ export const usePlayerStore = defineStore('player', () => {
   })
 
   // Action
-  const addTrackToQueue = async (track: Track) => {
+  const addTrackToQueue = async (track: Track | string) => {
     loading.value = true
 
-    const trackIdentifier = typeof track === 'object' ? track?.id || track.uri : track
+    const trackIdentifier = typeof track === 'string' ? track : track.id || track.uri
 
-    if (trackIdentifier) {
-      try {
+    try {
+      if (trackIdentifier) {
         // Get the active library player name
         const libraryStore = useLibraryStore()
         if (!libraryStore.activeLibrary) {
@@ -104,16 +104,15 @@ export const usePlayerStore = defineStore('player', () => {
 
         // Use the new addTrackToPlayer function with JSON payload
         await addTrackToPlayer(libraryStore.activeLibrary, trackIdentifier)
-
-      } catch (error) {
-        console.error('Error adding track to queue:', error)
-        toastStore.showErrorToast(`Failed to add track to queue: ${error}`)
+      } else {
+        toastStore.showErrorToast('No valid track identifier available')
       }
-    } else {
-      toastStore.showErrorToast('No valid track identifier available')
+    } catch (error) {
+      console.error('Error adding track to queue:', error)
+      toastStore.showErrorToast(`Failed to add track to queue: ${error}`)
+    } finally {
+      loading.value = false
     }
-
-    loading.value = false
   }
 
   // ! for now we have only mpd player
@@ -241,7 +240,7 @@ export const usePlayerStore = defineStore('player', () => {
       // and the active player has changed, we need to resubscribe
       const oldPlayerName = currentData.value?.player?.name
       const newPlayerName = data.player?.name
-      const needsResubscribe = !currentPlayerName.value && oldPlayerName !== newPlayerName
+      const needsResubscribe = oldPlayerName !== newPlayerName
       console.log('needsResubscribe', needsResubscribe)
       // Notify about player change if it actually changed
       if (oldPlayerName !== newPlayerName) {
@@ -300,6 +299,7 @@ export const usePlayerStore = defineStore('player', () => {
       await fetchCurrentPlayer()
 
       // Set up periodic updates using the configured polling interval
+      clearPollingInterval()
       updateIntervalID.value = setInterval(fetchCurrentPlayer, PLAYER_CONFIG.pollingInterval)
     } finally {
       isSendingCommand.value = false
@@ -325,12 +325,13 @@ export const usePlayerStore = defineStore('player', () => {
     try {
       // Build the URL based on whether we're using a specific player or the active player
       let url
+      const encodedCommand = encodeURIComponent(command)
       if (currentPlayerName.value) {
         // Send to specific player
-        url = `${apiBase}/player/${currentPlayerName.value}/command/${command}`
+        url = `${apiBase}/player/${encodeURIComponent(currentPlayerName.value)}/command/${encodedCommand}`
       } else {
         // Send to active player (default)
-        url = `${apiBase}/player/active/command/${command}`
+        url = `${apiBase}/player/active/command/${encodedCommand}`
       }
       console.log(`Sending command to: ${url}`)
       const response = await apiFetch(url, {
@@ -470,7 +471,7 @@ export const usePlayerStore = defineStore('player', () => {
         throw new Error('No library player available')
       }
 
-      const url = `/player/:activeLibrary/command/${command}`
+      const url = `/player/:activeLibrary/command/${encodeURIComponent(command)}`
       console.log('Sending library command to URL:', url, 'which will resolve to:', url.replace(':activeLibrary', libraryStore.activeLibrary))
 
       const { error } = await libraryFetch(url)

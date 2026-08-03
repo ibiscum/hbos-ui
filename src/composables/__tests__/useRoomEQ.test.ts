@@ -7,14 +7,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ref } from 'vue'
 import { useRoomEQ, type RoomEQConfigItem } from '../useRoomEQ'
 import * as configApi from '@/api/config'
-import { useFilterStore } from '@/stores/filter_connector'
+import { useFilterStore } from '@/stores/filter-connector'
 import { useToastStore } from '@/stores/toast'
 import { convertUIFilterToStore } from '@/utils/filter-conversions'
 import { formatFilterTypeName } from '@/utils/filter-display'
 
 // Mock the dependencies
 vi.mock('@/api/config')
-vi.mock('@/stores/filter_connector')
+vi.mock('@/stores/filter-connector')
 vi.mock('@/stores/toast')
 vi.mock('@/utils/filter-conversions')
 vi.mock('@/utils/filter-display')

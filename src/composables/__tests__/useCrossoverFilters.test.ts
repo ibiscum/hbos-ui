@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useCrossoverFilters } from '@/composables/useCrossoverFilters'
-import { useFilterStore } from '@/stores/filter_connector'
+import { useFilterStore } from '@/stores/filter-connector'
 import { useToastStore } from '@/stores/toast'
 import { writeChannelLevel } from '@/api/dsptoolkit'
 import {
@@ -10,7 +10,7 @@ import {
   updateFilterPropertyLinked,
 } from '@/utils/linked-channel-operations'
 
-vi.mock('@/stores/filter_connector')
+vi.mock('@/stores/filter-connector')
 vi.mock('@/stores/toast')
 vi.mock('@/utils/filter-conversions', () => ({
   convertUIFilterToStore: vi.fn((filter) => ({

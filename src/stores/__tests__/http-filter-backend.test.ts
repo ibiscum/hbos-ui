@@ -8,7 +8,7 @@ vi.mock('@/api/http', () => ({
   apiFetch: mockApiFetch,
 }))
 
-import { HttpFilterBackend } from '@/stores/http_filter_backend'
+import { HttpFilterBackend } from '@/stores/http-filter-backend'
 
 describe('http filter backend - regression tests', () => {
   beforeEach(() => {
