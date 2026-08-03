@@ -29,15 +29,11 @@ const queueResponse = (payload: { error?: unknown; queue?: unknown }) => {
 
 const track = (id: string): Track => ({
   id,
-  title: `Track ${id}`,
-  album: 'Album',
-  artists: ['Artist'],
-  duration: 120,
+  name: `Track ${id}`,
+  uri: `/music/${id}.flac`,
   track_number: 1,
-  disc_number: 1,
-  release_date: '2025-01-01',
-  file: `/music/${id}.flac`,
-}) as Track
+  disc_number: '1',
+})
 
 describe('Playlist Store - Regression Tests', () => {
   beforeEach(() => {

@@ -44,6 +44,7 @@ The project also uses the [pinia store][4] for local storage synchronization.
 - **[MetadataTooltip](./metadata-tooltip.md)** - Track and stream metadata tooltip contract, empty-state rules, and regression coverage
 - **[LyricsOverlay](./lyrics-overlay.md)** - Modal lyrics display contract, synced highlighting behavior, and regression coverage
 - **[ToggleSwitch](./toggle-switch.md)** - Controlled boolean switch contract, accessibility attribute forwarding, and regression coverage
+- **[Crossover Filters Composable](./crossover-filters-composable.md)** - Pair-linking contract, channel-level linking semantics, and regression coverage
 - **[Known Issues & Fixes](./fixes-needed.md)** - Current issues, fixes needed, and technical notes
 - **[Missing Icons](./missing-icons.md)** - Icons that are currently missing
 

@@ -114,21 +114,25 @@ export function useCrossoverFilters() {
 
   // Check if the active channel's pair is linked
   const isCurrentPairLinked = computed(() => {
-    const pairKey = getPairKey(activeChannel.value);
-    return pairKey ? (linkedPairs.value[pairKey] ?? false) : false;
+    return isPairLinked(activeChannel.value);
   });
 
+  function isPairLinked(channel: string): boolean {
+    const pairKey = getPairKey(channel);
+    return pairKey ? (linkedPairs.value[pairKey] ?? false) : false;
+  }
+
   // Determine channel mode based on pair linking
-  function getChannelMode(): LinkedChannelMode {
-    return isCurrentPairLinked.value ? 'both' : 'individual';
+  function getChannelMode(channel: string = activeChannel.value): LinkedChannelMode {
+    return isPairLinked(channel) ? 'both' : 'individual';
   }
 
   // Linked channel config helper
-  function createLinkedChannelConfig(): LinkedChannelConfig {
+  function createLinkedChannelConfig(channel: string = activeChannel.value): LinkedChannelConfig {
     // Determine which channels are affected
-    const targetChannels: string[] = [activeChannel.value];
-    if (isCurrentPairLinked.value) {
-      const partner = getPairPartner(activeChannel.value);
+    const targetChannels: string[] = [channel];
+    if (isPairLinked(channel)) {
+      const partner = getPairPartner(channel);
       if (partner) targetChannels.push(partner);
     }
 
@@ -141,8 +145,8 @@ export function useCrossoverFilters() {
     }
 
     return {
-      channelMode: getChannelMode(),
-      activeChannel: activeChannel.value,
+      channelMode: getChannelMode(channel),
+      activeChannel: channel,
       channelArrays: arrays,
       bankAddresses: addresses,
       updateStoreCallback: async (channelName: string, filterIndex: number, filter: Filter) => {
@@ -275,20 +279,36 @@ export function useCrossoverFilters() {
     activeFilterId.value = currentFilters[0]?.id ?? null;
   }
 
+  function ensureChannelSettings(channel: string) {
+    if (!channelSettings.value[channel]) {
+      channelSettings.value[channel] = {
+        delay: 0,
+        level: 1.0,
+        inverted: false,
+        channelSelect: 0,
+      };
+    }
+
+    return channelSettings.value[channel];
+  }
+
   async function togglePairLink(pairKey?: string) {
-    const key = pairKey ?? getPairKey(activeChannel.value);
+    const key = pairKey
+      ? (getPairKey(pairKey) ?? pairKey)
+      : getPairKey(activeChannel.value);
     if (!key) return;
 
     const wasLinked = linkedPairs.value[key] ?? false;
     linkedPairs.value[key] = !wasLinked;
 
-    // When linking, copy active channel's filters to partner
+    // When linking, copy source channel filters to its partner.
     if (!wasLinked) {
-      const partner = getPairPartner(activeChannel.value);
+      const sourceChannel = key;
+      const partner = getPairPartner(sourceChannel);
       if (partner) {
         try {
-          const config = createLinkedChannelConfig();
-          await copyFiltersToChannels(config, activeChannel.value, [partner]);
+          const config = createLinkedChannelConfig(sourceChannel);
+          await copyFiltersToChannels(config, sourceChannel, [partner]);
           // Reload to reflect the copied filters
           await loadFiltersFromBackend();
         } catch (error) {
@@ -327,13 +347,18 @@ export function useCrossoverFilters() {
   }
 
   async function removeFilter(filterId: number) {
-    const config = createLinkedChannelConfig();
-    await removeFilterFromLinkedChannels(config, filterId);
+    try {
+      const config = createLinkedChannelConfig();
+      await removeFilterFromLinkedChannels(config, filterId);
 
-    if (activeFilterId.value === filterId) {
-      activeFilterId.value = filters.value[0]?.id ?? null;
+      if (activeFilterId.value === filterId) {
+        activeFilterId.value = filters.value[0]?.id ?? null;
+      }
+      await loadBackendCapabilities();
+    } catch (error) {
+      console.error('crossover-design: Failed to remove filter:', error);
+      toastStore.showErrorToast('Failed to remove filter.');
     }
-    await loadBackendCapabilities();
   }
 
   async function toggleFilterEnabled(filter: Filter) {
@@ -443,8 +468,11 @@ export function useCrossoverFilters() {
 
   async function onGraphDragEnd(id: number) {
     const config = createLinkedChannelConfig();
-    await updateFilterPropertyLinked(config, id, () => { /* persist current values */ });
-    isDragging.value = false;
+    try {
+      await updateFilterPropertyLinked(config, id, () => { /* persist current values */ });
+    } finally {
+      isDragging.value = false;
+    }
   }
 
   // Channel settings setters
@@ -453,7 +481,7 @@ export function useCrossoverFilters() {
     if (!features?.hasDelay || features.delayAddress == null) return;
     const samples = Math.round(ms / 1000 * sampleRate.value);
     await writeChannelDelay(features.delayAddress, samples);
-    channelSettings.value[channel].delay = samples;
+    ensureChannelSettings(channel).delay = samples;
   }
 
   async function setChannelLevel(channel: string, dB: number) {
@@ -461,16 +489,16 @@ export function useCrossoverFilters() {
     if (!features?.hasLevel || features.levelAddress == null) return;
     const linearGain = Math.pow(10, dB / 20);
     await writeChannelLevel(features.levelAddress, linearGain);
-    channelSettings.value[channel].level = linearGain;
+    ensureChannelSettings(channel).level = linearGain;
 
     // Level is linked: apply to partner when pair is linked
-    if (isCurrentPairLinked.value) {
+    if (isPairLinked(channel)) {
       const partner = getPairPartner(channel);
       if (partner) {
         const partnerFeatures = channelFeatures.value[partner];
         if (partnerFeatures?.hasLevel && partnerFeatures.levelAddress != null) {
           await writeChannelLevel(partnerFeatures.levelAddress, linearGain);
-          channelSettings.value[partner].level = linearGain;
+          ensureChannelSettings(partner).level = linearGain;
         }
       }
     }
@@ -480,14 +508,14 @@ export function useCrossoverFilters() {
     const features = channelFeatures.value[channel];
     if (!features?.hasInvert || features.invertAddress == null) return;
     await writeChannelInvert(features.invertAddress, inverted);
-    channelSettings.value[channel].inverted = inverted;
+    ensureChannelSettings(channel).inverted = inverted;
   }
 
   async function setChannelSelectMode(channel: string, mode: number) {
     const features = channelFeatures.value[channel];
     if (!features?.hasChannelSelect || features.channelSelectAddress == null) return;
     await writeChannelSelect(features.channelSelectAddress, mode);
-    channelSettings.value[channel].channelSelect = mode;
+    ensureChannelSettings(channel).channelSelect = mode;
   }
 
   // Computed helpers for UI display

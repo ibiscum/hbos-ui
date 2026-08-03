@@ -13,7 +13,7 @@ import {
   type FilterBanks,
   type BackendCapabilities,
   type FilterBankInfo
-} from './filter_backend_interface'
+} from './filter-backend-interface'
 import {
   getMetadata,
   getCacheStatus,

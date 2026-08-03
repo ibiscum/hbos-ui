@@ -7,14 +7,20 @@ export function useMusicBrainz() {
   const error = ref<string | null>(null)
 
   const fetchArtist = async (mbid: string) => {
-    if (!mbid) return
+    const normalizedMbid = mbid.trim()
+    if (!normalizedMbid) return
 
     loading.value = true
     error.value = null
     artistData.value = null
 
     try {
-      const data = await musicBrainzService.getArtist(mbid)
+      const data = await musicBrainzService.getArtist(normalizedMbid)
+      if (!data) {
+        error.value = 'Failed to fetch artist data'
+        return
+      }
+
       artistData.value = data
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to fetch artist data'

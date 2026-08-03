@@ -40,26 +40,27 @@ export const usePlayerWebSocket = defineStore('player-web-socket', () => {
       console.log('Parsed WebSocket URL - hostname:', url.hostname, 'port:', url.port, 'pathname:', url.pathname)
 
       wsController.value = createPlayerWebSocket({
+        protocol: url.protocol,
         hostname: url.hostname,
-        port: parseInt(url.port) || configStore.config.audiocontrol_api.devicePort,
+        port: Number.parseInt(url.port, 10) || configStore.config.audiocontrol_api.devicePort,
         apiPrefix: url.pathname,
-      onConnect: () => {
-        console.log('WebSocket connected')
-        // Use async/await with the subscribe function
-        ;(async () => {
-          await subscribeToPlayerEvents()
-        })()
-      },
-      onDisconnect: (event: Event) => {
-        console.log('WebSocket disconnected', event)
-      },
-      onMessage: (data: WsPlayerEvent) => {
-        debounceHandlePlayerEvent(data)
-      },
-      onError: (error: Event) => {
-        console.error('WebSocket error:', error)
-      },
-    })
+        onConnect: () => {
+          console.log('WebSocket connected')
+          // Use async/await with the subscribe function
+          ;(async () => {
+            await subscribeToPlayerEvents()
+          })()
+        },
+        onDisconnect: (event: Event) => {
+          console.log('WebSocket disconnected', event)
+        },
+        onMessage: (data: WsPlayerEvent) => {
+          debounceHandlePlayerEvent(data)
+        },
+        onError: (error: Event) => {
+          console.error('WebSocket error:', error)
+        },
+      })
 
     console.log('wsController.value', wsController.value)
 
@@ -77,7 +78,8 @@ export const usePlayerWebSocket = defineStore('player-web-socket', () => {
     let reconnectTimer: number | undefined = undefined
     let shouldReconnect = true
 
-    const wsUrl = `ws://${options.hostname}:${options.port}${options.apiPrefix || '/api'}/events`
+    const wsProtocol = options.protocol === 'wss:' ? 'wss' : 'ws'
+    const wsUrl = `${wsProtocol}://${options.hostname}:${options.port}${options.apiPrefix || '/api'}/events`
 
     // Connect to WebSocket
     const connect = () => {
@@ -227,7 +229,7 @@ export const usePlayerWebSocket = defineStore('player-web-socket', () => {
 
     // Get the player name to subscribe to
 
-    let playerToSubscribe
+    let playerToSubscribe: string | null = null
 
     if (playerStore.currentPlayerName) {
       // We have a specific player selected
@@ -320,7 +322,7 @@ export const usePlayerWebSocket = defineStore('player-web-socket', () => {
       eventType = data.event_type
       source = data.source || {}
       playerName = source.player_name
-      isActivePlayer = source.is_active_player
+      isActivePlayer = source.is_active ?? source.is_active_player
     } else if (data.type) {
       // Snake case format (type key from WebSocket)
       eventType = data.type

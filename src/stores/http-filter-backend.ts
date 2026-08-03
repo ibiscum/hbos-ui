@@ -12,7 +12,7 @@
  */
 
 import { apiFetch } from '@/api/http'
-import { FilterBackend, type Filter, type FilterBanks, type BackendCapabilities } from './filter_backend_interface'
+import { FilterBackend, type Filter, type FilterBanks, type BackendCapabilities } from './filter-backend-interface'
 
 export class HttpFilterBackend extends FilterBackend {
   public readonly name = 'HTTP API Filter Backend'

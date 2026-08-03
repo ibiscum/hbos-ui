@@ -50,6 +50,7 @@ export interface WsPlayerEvent {
 }
 
 export interface createPlayerWebSocketOptions {
+  protocol?: string
   hostname?: string
   port?: string | number
   apiPrefix?: string

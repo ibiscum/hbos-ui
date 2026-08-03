@@ -46,9 +46,9 @@
 
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import { ConsoleFilterBackend } from './console_filter_backend'
-import { DSPToolkitFilterBackend } from './dsp_toolkit_filter_backend'
-import type { Filter, FilterBank, FilterBanks, FilterBackend, BackendCapabilities } from './filter_backend_interface'
+import { ConsoleFilterBackend } from './console-filter-backend'
+import { DSPToolkitFilterBackend } from './dsp-toolkit-filter-backend'
+import type { Filter, FilterBank, FilterBanks, FilterBackend, BackendCapabilities } from './filter-backend-interface'
 import { getConfigValue, setConfigValue } from '@/api/config'
 import { useDSPToolkitStore } from './dsp-toolkit'
 

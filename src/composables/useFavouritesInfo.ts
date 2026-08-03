@@ -23,6 +23,18 @@ export function useFavouritesInfo() {
   const error = ref<string | null>(null)
   const favouritesInfo = ref<FavouritesInfo | null>(null)
 
+  const formatErrorMessage = (err: unknown): string => {
+    if (err instanceof Error) {
+      return err.message
+    }
+
+    if (typeof err === 'object' && err !== null) {
+      return JSON.stringify(err)
+    }
+
+    return String(err)
+  }
+
   // Get favourites system information
   const getFavouritesInfo = async () => {
     try {
@@ -32,11 +44,8 @@ export function useFavouritesInfo() {
       const { error: fetchError, data } = await libraryFetch('/favourites/providers').json<FavouritesInfo>()
 
       if (fetchError.value) {
-        const errorMessage = fetchError.value instanceof Error
-          ? fetchError.value.message
-          : typeof fetchError.value === 'object'
-            ? JSON.stringify(fetchError.value)
-            : String(fetchError.value)
+        const errorMessage = formatErrorMessage(fetchError.value)
+        favouritesInfo.value = null
         error.value = `Failed to fetch favourites info: ${errorMessage}`
         return null
       }
@@ -46,11 +55,13 @@ export function useFavouritesInfo() {
         return data.value
       }
 
+      favouritesInfo.value = null
       error.value = 'No data received'
       return null
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
-      error.value = errorMessage
+      favouritesInfo.value = null
+      const errorMessage = formatErrorMessage(err)
+      error.value = `Failed to fetch favourites info: ${errorMessage}`
       console.error('Error fetching favourites info:', err)
       return null
     } finally {

@@ -4,10 +4,10 @@
  * This implementation logs all filter operations to the console without actually
  * communicating with a real backend. Useful for development and testing.
  *
- * Pre-configured with left and right filter banks, each supporting up to 4 filters.
+ * Pre-configured with left/right and crossover banks, each supporting up to 16 filters.
  */
 
-import { FilterBackend, type Filter, type FilterBanks, type BackendCapabilities, type FilterBankInfo } from './filter_backend_interface'
+import { FilterBackend, type Filter, type FilterBanks, type BackendCapabilities, type FilterBankInfo } from './filter-backend-interface'
 
 export class ConsoleFilterBackend extends FilterBackend {
   public readonly name = 'Demo'
@@ -20,7 +20,7 @@ export class ConsoleFilterBackend extends FilterBackend {
       <li><strong>Visual Demonstration:</strong> Shows how filters appear and behave in the interface</li>
       <li><strong>Console Logging:</strong> All filter operations are logged to the browser console for development purposes</li>
       <li><strong>UI Testing:</strong> Allows testing of all filter designer features and interactions</li>
-      <li><strong>Filter Limits:</strong> Demonstrates capacity limits (4 filters per channel)</li>
+      <li><strong>Filter Limits:</strong> Demonstrates capacity limits (16 filters per channel)</li>
     </ul>
 
     <h4>What it does NOT do:</h4>
@@ -40,21 +40,25 @@ export class ConsoleFilterBackend extends FilterBackend {
 
   // Configuration for predefined filter banks
   private readonly PREDEFINED_BANKS = {
-    left: { maxFilters: 16, type: "speaker-equalizer" },
-    right: { maxFilters: 16, type: "speaker-equalizer"},
-    A: { maxFilters: 16, type: "crossover-designer" },
-    B: { maxFilters: 16, type: "crossover-designer" },
-    C: { maxFilters: 16, type: "crossover-designer" },
-    D: { maxFilters: 16, type: "crossover-designer"}
-  }
+    left: { maxFilters: 16, type: 'speaker-equalizer' },
+    right: { maxFilters: 16, type: 'speaker-equalizer' },
+    A: { maxFilters: 16, type: 'crossover-designer' },
+    B: { maxFilters: 16, type: 'crossover-designer' },
+    C: { maxFilters: 16, type: 'crossover-designer' },
+    D: { maxFilters: 16, type: 'crossover-designer' },
+  } as const
 
   constructor() {
     super()
     this.initializePredefinedBanks()
   }
 
+  private cloneBanks(config: FilterBanks): FilterBanks {
+    return JSON.parse(JSON.stringify(config)) as FilterBanks
+  }
+
   private initializePredefinedBanks(): void {
-    // Initialize left and right banks with empty filter arrays
+    // Initialize all predefined banks with empty filter arrays.
     for (const [bankName] of Object.entries(this.PREDEFINED_BANKS)) {
       this.filterBanks[bankName] = {
         name: bankName,
@@ -85,7 +89,7 @@ export class ConsoleFilterBackend extends FilterBackend {
   private canAddFilterToBank(bankName: string): boolean {
     const bank = this.filterBanks[bankName]
     const maxFilters = this.getMaxFiltersForBank(bankName)
-    return bank ? bank.filters.length < maxFilters : false
+    return bank ? bank.filters.length < maxFilters : maxFilters > 0
   }
 
   async getBackendCapabilities(): Promise<BackendCapabilities> {
@@ -241,7 +245,7 @@ export class ConsoleFilterBackend extends FilterBackend {
   }
 
   async exportFilterConfig(): Promise<FilterBanks> {
-    const config = JSON.parse(JSON.stringify(this.filterBanks))
+    const config = this.cloneBanks(this.filterBanks)
 
     // Console logging
     console.log(`[${this.name}] Exported filter configuration:`, config)
@@ -250,7 +254,7 @@ export class ConsoleFilterBackend extends FilterBackend {
   }
 
   async importFilterConfig(config: FilterBanks): Promise<void> {
-    this.filterBanks = JSON.parse(JSON.stringify(config))
+    this.filterBanks = this.cloneBanks(config)
 
     // Update nextFilterId to prevent ID conflicts
     let maxId = 0
@@ -269,7 +273,7 @@ export class ConsoleFilterBackend extends FilterBackend {
   }
 
   async getCurrentConfig(): Promise<FilterBanks> {
-    return JSON.parse(JSON.stringify(this.filterBanks))
+    return this.cloneBanks(this.filterBanks)
   }
 
   // Additional methods for local state management (not part of the interface)
