@@ -59,7 +59,7 @@ import VolumeControl from '@/components/VolumeControl.vue'
 import MetadataTooltip from '@/components/MetadataTooltip.vue'
 
 import { storeToRefs } from 'pinia'
-import { usePlayerStore } from '@/stores/player.ts'
+import { usePlayerStore } from '@/stores/player'
 
 const { currentSong: song } = storeToRefs(usePlayerStore())
 

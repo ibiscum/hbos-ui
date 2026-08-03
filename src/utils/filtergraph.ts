@@ -41,6 +41,28 @@ export const DEFAULT_GAIN_RANGE = {
   max: 20
 } as const;
 
+function resolveFreqRange(minFreq: number, maxFreq: number): { min: number; max: number } {
+  const min = Number.isFinite(minFreq) && minFreq > 0 ? minFreq : DEFAULT_FREQ_RANGE.min;
+  let max = Number.isFinite(maxFreq) && maxFreq > min ? maxFreq : DEFAULT_FREQ_RANGE.max;
+  if (max <= min) {
+    max = min * 10;
+  }
+  return { min, max };
+}
+
+function resolveGainRange(minGain: number, maxGain: number): { min: number; max: number } {
+  const min = Number.isFinite(minGain) ? minGain : DEFAULT_GAIN_RANGE.min;
+  let max = Number.isFinite(maxGain) && maxGain !== min ? maxGain : DEFAULT_GAIN_RANGE.max;
+  if (max === min) {
+    max = min + 1;
+  }
+  return { min, max };
+}
+
+function sanitizePlotSize(size: number): number {
+  return Number.isFinite(size) && size > 0 ? size : 1;
+}
+
 /**
  * Convert frequency to X coordinate using logarithmic scaling
  */
@@ -50,10 +72,13 @@ export function frequencyToX(
   minFreq: number = DEFAULT_FREQ_RANGE.min,
   maxFreq: number = DEFAULT_FREQ_RANGE.max
 ): number {
-  const logMinFreq = Math.log10(minFreq);
-  const logMaxFreq = Math.log10(maxFreq);
-  const logFreq = Math.log10(freq);
-  return ((logFreq - logMinFreq) / (logMaxFreq - logMinFreq)) * plotWidth;
+  const { min, max } = resolveFreqRange(minFreq, maxFreq);
+  const clampedFreq = Number.isFinite(freq) ? Math.min(max, Math.max(min, freq)) : min;
+  const width = sanitizePlotSize(plotWidth);
+  const logMinFreq = Math.log10(min);
+  const logMaxFreq = Math.log10(max);
+  const logFreq = Math.log10(clampedFreq);
+  return ((logFreq - logMinFreq) / (logMaxFreq - logMinFreq)) * width;
 }
 
 /**
@@ -65,9 +90,12 @@ export function xToFrequency(
   minFreq: number = DEFAULT_FREQ_RANGE.min,
   maxFreq: number = DEFAULT_FREQ_RANGE.max
 ): number {
-  const logMinFreq = Math.log10(minFreq);
-  const logMaxFreq = Math.log10(maxFreq);
-  const logFreq = logMinFreq + (x / plotWidth) * (logMaxFreq - logMinFreq);
+  const { min, max } = resolveFreqRange(minFreq, maxFreq);
+  const width = sanitizePlotSize(plotWidth);
+  const clampedX = Number.isFinite(x) ? Math.min(width, Math.max(0, x)) : 0;
+  const logMinFreq = Math.log10(min);
+  const logMaxFreq = Math.log10(max);
+  const logFreq = logMinFreq + (clampedX / width) * (logMaxFreq - logMinFreq);
   return Math.pow(10, logFreq);
 }
 
@@ -80,7 +108,10 @@ export function gainToY(
   minGain: number = DEFAULT_GAIN_RANGE.min,
   maxGain: number = DEFAULT_GAIN_RANGE.max
 ): number {
-  return plotHeight - ((gain - minGain) / (maxGain - minGain)) * plotHeight;
+  const { min, max } = resolveGainRange(minGain, maxGain);
+  const height = sanitizePlotSize(plotHeight);
+  const clampedGain = Number.isFinite(gain) ? Math.min(max, Math.max(min, gain)) : 0;
+  return height - ((clampedGain - min) / (max - min)) * height;
 }
 
 /**
@@ -92,7 +123,10 @@ export function yToGain(
   minGain: number = DEFAULT_GAIN_RANGE.min,
   maxGain: number = DEFAULT_GAIN_RANGE.max
 ): number {
-  return maxGain - (y / plotHeight) * (maxGain - minGain);
+  const { min, max } = resolveGainRange(minGain, maxGain);
+  const height = sanitizePlotSize(plotHeight);
+  const clampedY = Number.isFinite(y) ? Math.min(height, Math.max(0, y)) : 0;
+  return max - (clampedY / height) * (max - min);
 }
 
 /**
@@ -123,12 +157,14 @@ export function generateFilterResponse(
   sampleRate = 48000
 ): VisualFrequencyResponsePoint[] {
   const points: VisualFrequencyResponsePoint[] = [];
+  const pointCount = Math.max(1, Math.floor(numPoints));
+  const { min, max } = resolveFreqRange(minFreq, maxFreq);
 
-  for (let i = 0; i <= numPoints; i++) {
-    const logFreq = Math.log10(minFreq) + (i / numPoints) * (Math.log10(maxFreq) - Math.log10(minFreq));
+  for (let i = 0; i <= pointCount; i++) {
+    const logFreq = Math.log10(min) + (i / pointCount) * (Math.log10(max) - Math.log10(min));
     const frequency = Math.pow(10, logFreq);
     const gain = calculateFilterGain(frequency, filter, sampleRate);
-    const x = frequencyToX(frequency, dimensions.plotWidth, minFreq, maxFreq);
+    const x = frequencyToX(frequency, dimensions.plotWidth, min, max);
     const y = gainToY(gain, dimensions.plotHeight, dimensions.minGain ?? DEFAULT_GAIN_RANGE.min, dimensions.maxGain ?? DEFAULT_GAIN_RANGE.max);
 
     points.push({ frequency, gain, x, y });
@@ -149,9 +185,11 @@ export function generateCombinedResponse(
   sampleRate = 48000
 ): VisualFrequencyResponsePoint[] {
   const points: VisualFrequencyResponsePoint[] = [];
+  const pointCount = Math.max(1, Math.floor(numPoints));
+  const { min, max } = resolveFreqRange(minFreq, maxFreq);
 
-  for (let i = 0; i <= numPoints; i++) {
-    const logFreq = Math.log10(minFreq) + (i / numPoints) * (Math.log10(maxFreq) - Math.log10(minFreq));
+  for (let i = 0; i <= pointCount; i++) {
+    const logFreq = Math.log10(min) + (i / pointCount) * (Math.log10(max) - Math.log10(min));
     const frequency = Math.pow(10, logFreq);
 
     // Sum gains from all enabled filters
@@ -162,7 +200,7 @@ export function generateCombinedResponse(
       }
     });
 
-    const x = frequencyToX(frequency, dimensions.plotWidth, minFreq, maxFreq);
+    const x = frequencyToX(frequency, dimensions.plotWidth, min, max);
     const y = gainToY(totalGain, dimensions.plotHeight, dimensions.minGain ?? DEFAULT_GAIN_RANGE.min, dimensions.maxGain ?? DEFAULT_GAIN_RANGE.max);
 
     points.push({ frequency, gain: totalGain, x, y });
@@ -192,9 +230,11 @@ export function pointsToSVGAreaPath(
 ): string {
   if (points.length === 0) return '';
 
+  const { min, max } = resolveFreqRange(minFreq, maxFreq);
+
   const baselineY = gainToY(0, dimensions.plotHeight, dimensions.minGain ?? DEFAULT_GAIN_RANGE.min, dimensions.maxGain ?? DEFAULT_GAIN_RANGE.max);
-  const startX = frequencyToX(minFreq, dimensions.plotWidth, minFreq, maxFreq);
-  const endX = frequencyToX(maxFreq, dimensions.plotWidth, minFreq, maxFreq);
+  const startX = frequencyToX(min, dimensions.plotWidth, min, max);
+  const endX = frequencyToX(max, dimensions.plotWidth, min, max);
 
   const areaPoints: string[] = [];
 
