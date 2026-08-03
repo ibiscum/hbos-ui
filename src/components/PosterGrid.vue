@@ -23,7 +23,7 @@
       </template>
     </div>
 
-    <div v-if="loaded && items.length === 0" class="no-items">
+    <div v-if="loaded && !loading && items.length === 0" class="no-items">
       <div v-if="isLibraryUpdating" class="library-updating">
         <div class="updating-content">
           <div class="loading-icon">
@@ -126,6 +126,9 @@ function loadNextChunk() {
   } else {
     if (items.length > 0) {
       const start = currentPage.value * chunkSize.value
+      if (start >= items.length) {
+        return
+      }
       const end = start + chunkSize.value
       const nextChunk = items.slice(start, end)
 

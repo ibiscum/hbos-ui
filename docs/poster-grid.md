@@ -52,10 +52,12 @@ When `inRow` is true, the component renders only the calculated number of visibl
 
 ### Empty States
 
-When `loaded` is true and `items` is empty:
+When `loaded` is true, `loading` is false, and `items` is empty:
 
 - if library store reports updating (`isLibraryUpdating`), show an updating status card with loading icon
 - otherwise show generic text: `No available items found`
+
+The empty-state is intentionally suppressed while `loading` is true to avoid contradictory UI (skeleton + empty-state at the same time).
 
 ## Regression and Unit Coverage
 
@@ -65,6 +67,8 @@ When `loaded` is true and `items` is empty:
 - chunked loading in grid mode with scroll-triggered append
 - `showAll` behavior bypassing pagination
 - row-mode item cap calculation
+- row-mode recalculation after viewport resize
 - click and context-menu event payload contracts
 - library-updating empty-state rendering with `Icon` prop wiring regression (`icon="loading"`)
 - generic empty-state messaging when no update is in progress
+- regression guard that empty-state is not rendered while loading

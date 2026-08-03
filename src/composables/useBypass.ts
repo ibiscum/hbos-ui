@@ -22,28 +22,54 @@ export function useBypass(
   isDragging: Ref<boolean>
 ) {
   const isBypassed = ref(false);
-  const previousFilterStates = ref<string[]>([]);
+  const bypassedBanks = ref<string[]>([]);
+
+  function getUniqueBanks(): string[] {
+    const banks = getBanksToBypass().filter((bank): bank is string => Boolean(bank));
+    return [...new Set(banks)];
+  }
 
   async function startBypass() {
     if (isBypassed.value || isDragging.value) return;
 
-    isBypassed.value = true;
+    const successfullyBypassed: string[] = [];
 
     try {
-      const banksToBypass = getBanksToBypass();
+      const banksToBypass = getUniqueBanks();
+      if (banksToBypass.length === 0) return;
 
-      previousFilterStates.value = [...banksToBypass];
+      isBypassed.value = true;
 
-      const bypassPromises: Promise<FilterBypassSetResponse>[] = banksToBypass.map(bankName =>
-        setFilterBankBypassState(bankName, true).catch((error: Error) => {
+      for (const bankName of banksToBypass) {
+        try {
+          await setFilterBankBypassState(bankName, true);
+          successfullyBypassed.push(bankName);
+        } catch (error) {
           console.error(`Failed to bypass filter bank ${bankName}:`, error);
           throw error;
-        })
-      );
+        }
+      }
 
-      await Promise.all(bypassPromises);
+      bypassedBanks.value = [...successfullyBypassed];
     } catch (error) {
       console.error('Failed to start bypass:', error);
+
+      if (successfullyBypassed.length > 0) {
+        try {
+          await Promise.all(
+            successfullyBypassed.map(bankName =>
+              setFilterBankBypassState(bankName, false).catch((rollbackError: Error) => {
+                console.error(`Failed to rollback filter bank ${bankName}:`, rollbackError);
+                throw rollbackError;
+              })
+            )
+          );
+        } catch (rollbackError) {
+          console.error('Failed to rollback bypass state after start error:', rollbackError);
+        }
+      }
+
+      bypassedBanks.value = [];
       isBypassed.value = false;
     }
   }
@@ -51,12 +77,13 @@ export function useBypass(
   async function endBypass() {
     if (!isBypassed.value) return;
 
-    isBypassed.value = false;
-
-    if (previousFilterStates.value.length === 0) return;
+    if (bypassedBanks.value.length === 0) {
+      isBypassed.value = false;
+      return;
+    }
 
     try {
-      const restorePromises: Promise<FilterBypassSetResponse>[] = previousFilterStates.value.map(bankName =>
+      const restorePromises: Promise<FilterBypassSetResponse>[] = bypassedBanks.value.map(bankName =>
         setFilterBankBypassState(bankName, false).catch((error: Error) => {
           console.error(`Failed to restore filter bank ${bankName}:`, error);
           throw error;
@@ -64,7 +91,8 @@ export function useBypass(
       );
 
       await Promise.all(restorePromises);
-      previousFilterStates.value = [];
+      bypassedBanks.value = [];
+      isBypassed.value = false;
     } catch (error) {
       console.error('Failed to end bypass:', error);
     }

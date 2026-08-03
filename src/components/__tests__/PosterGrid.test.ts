@@ -159,6 +159,25 @@ describe('PosterGrid.vue', () => {
     expect(wrapper.findAll('.poster-item')).toHaveLength(6)
   })
 
+  it('recalculates in-row visible items on resize', async () => {
+    setViewport(1200, 900)
+
+    const wrapper = mount(PosterGrid<TestPosterItem>, {
+      props: {
+        items: createItems(20),
+        inRow: true,
+      },
+    })
+
+    expect(wrapper.findAll('.poster-item')).toHaveLength(6)
+
+    setViewport(400, 900)
+    window.dispatchEvent(new Event('resize'))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.findAll('.poster-item')).toHaveLength(4)
+  })
+
   it('emits click and contextmenu with the selected item payload', async () => {
     const items = createItems(2)
     const wrapper = mount(PosterGrid<TestPosterItem>, {
@@ -204,5 +223,22 @@ describe('PosterGrid.vue', () => {
     })
 
     expect(wrapper.text()).toContain('No available items found')
+  })
+
+  it('regression: does not render empty-state while still loading', () => {
+    mockState.isLibraryUpdatingRef!.value = true
+
+    const wrapper = mount(PosterGrid<TestPosterItem>, {
+      props: {
+        loading: true,
+        loaded: true,
+        items: [],
+      },
+    })
+
+    expect(wrapper.find('.no-items').exists()).toBe(false)
+    expect(wrapper.find('.poster-skeleton-stub').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Library update still running')
+    expect(wrapper.text()).not.toContain('No available items found')
   })
 })
