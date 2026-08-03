@@ -132,7 +132,7 @@ describe('usePlayerPosition', () => {
   it('clears timer id 0 when auto-update is stopped (regression)', () => {
     mockState.currentDataRef.value = { state: 'paused', position: 0 }
 
-    vi.spyOn(window, 'setInterval').mockReturnValue(0 as unknown as number)
+    vi.spyOn(window, 'setInterval').mockReturnValue(0 as unknown as ReturnType<typeof setInterval>)
     const clearIntervalSpy = vi.spyOn(window, 'clearInterval')
 
     const { startAutoUpdate, stopAutoUpdate } = usePlayerPosition()
@@ -146,7 +146,7 @@ describe('usePlayerPosition', () => {
   it('cleans up running interval on unmount', () => {
     mockState.currentDataRef.value = { state: 'paused', position: 0 }
 
-    vi.spyOn(window, 'setInterval').mockReturnValue(0 as unknown as number)
+    vi.spyOn(window, 'setInterval').mockReturnValue(0 as unknown as ReturnType<typeof setInterval>)
     const clearIntervalSpy = vi.spyOn(window, 'clearInterval')
 
     let api: ReturnType<typeof usePlayerPosition> | null = null
@@ -160,7 +160,7 @@ describe('usePlayerPosition', () => {
 
     const wrapper = mount(Harness)
 
-    api?.startAutoUpdate()
+    ;(api as any)?.startAutoUpdate()
     wrapper.unmount()
 
     expect(clearIntervalSpy).toHaveBeenCalledWith(0)

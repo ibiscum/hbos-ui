@@ -64,13 +64,13 @@ function runFrames(count: number) {
 function getFillWidths(wrapper: ReturnType<typeof mount>) {
   return wrapper
     .findAll('.vu-meter__fill')
-    .map((el) => Number.parseFloat(el.attributes('style').match(/width:\s*([\d.]+)%/)?.[1] ?? '0'))
+    .map((el) => Number.parseFloat((el.attributes('style') ?? '').match(/width:\s*([\d.]+)%/)?.[1] ?? '0'))
 }
 
 function getPeakPositions(wrapper: ReturnType<typeof mount>) {
   return wrapper
     .findAll('.vu-meter__peak')
-    .map((el) => Number.parseFloat(el.attributes('style').match(/left:\s*([\d.]+)%/)?.[1] ?? '0'))
+    .map((el) => Number.parseFloat((el.attributes('style') ?? '').match(/left:\s*([\d.]+)%/)?.[1] ?? '0'))
 }
 
 describe('VuMeter.vue', () => {

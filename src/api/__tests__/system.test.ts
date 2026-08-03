@@ -442,7 +442,7 @@ describe('system.ts - Code Review & Regression Tests', () => {
       } as AnyType)
 
       const result = await systemApi.getSoundCards()
-      expect(result.data.soundcards).toHaveLength(1)
+      expect(result.data?.soundcards).toHaveLength(1)
     })
 
     it('detectSoundCard returns detection result', async () => {
@@ -456,7 +456,7 @@ describe('system.ts - Code Review & Regression Tests', () => {
       } as AnyType)
 
       const result = await systemApi.detectSoundCard()
-      expect(result.data.card_detected).toBe(true)
+      expect(result.data?.card_detected).toBe(true)
     })
 
     it('detectSoundCardLive returns live detection result', async () => {
@@ -470,7 +470,7 @@ describe('system.ts - Code Review & Regression Tests', () => {
       } as AnyType)
 
       const result = await systemApi.detectSoundCardLive()
-      expect(result.data.card_detected).toBe(true)
+      expect(result.data?.card_detected).toBe(true)
     })
 
     it('checkFileExistence returns file existence data', async () => {

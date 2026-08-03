@@ -157,8 +157,8 @@ describe('LibraryPlayer - Regression Tests', () => {
 
   describe('Type narrowing and null safety', () => {
     it('safely handles null or undefined response data', () => {
-      const nullResponse: LibraryPlayerResponse | null = null
-      const undefinedResponse: LibraryPlayerResponse | undefined = undefined
+      const nullResponse = null as LibraryPlayerResponse | null
+      const undefinedResponse = undefined as LibraryPlayerResponse | undefined
 
       // Simulate defensive code patterns
       const players1 = nullResponse?.players ?? []

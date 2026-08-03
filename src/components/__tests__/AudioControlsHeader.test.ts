@@ -72,7 +72,7 @@ describe('AudioControlsHeader.vue', () => {
     vi.clearAllMocks()
   })
 
-  const createWrapper = (global = {}) => {
+  const createWrapper = (global: any = {}) => {
     return mount(AudioControlsHeader, {
       global: {
         stubs: {
@@ -175,7 +175,7 @@ describe('AudioControlsHeader.vue', () => {
       })
 
       // Icon should be updated based on isPlaying state
-      expect(wrapper.vm.audioControls).toBeDefined()
+      expect((wrapper.vm as any).audioControls).toBeDefined()
     })
 
     it('should call togglePlayPause on play button click', async () => {
@@ -679,7 +679,7 @@ describe('AudioControlsHeader.vue', () => {
       await flushPromises()
 
       // showLyricsOverlay should be set to false after close
-      expect(wrapper.vm.showLyricsOverlay).toBe(false)
+      expect((wrapper.vm as any).showLyricsOverlay).toBe(false)
     })
   })
 
@@ -845,7 +845,7 @@ describe('AudioControlsHeader.vue', () => {
     it('should handle undefined currentSong gracefully', async () => {
       const { usePlayerStore } = await import('@/stores/player')
       const playerStore = usePlayerStore()
-      playerStore.currentSong = undefined as any
+      ;(playerStore as any).currentSong = undefined
 
       const wrapper = createWrapper()
       expect(wrapper.find('.app-audio-controls-header').exists()).toBe(true)
@@ -854,7 +854,7 @@ describe('AudioControlsHeader.vue', () => {
     it('should handle null currentSong gracefully', async () => {
       const { usePlayerStore } = await import('@/stores/player')
       const playerStore = usePlayerStore()
-      playerStore.currentSong = null as any
+      ;(playerStore as any).currentSong = null
 
       const wrapper = createWrapper()
       expect(wrapper.find('.app-audio-controls-header').exists()).toBe(true)
@@ -924,8 +924,11 @@ describe('AudioControlsHeader.vue', () => {
         canPrevious: false,
         canPlay: false,
         canPause: false,
+        canStop: false,
         canNext: false,
-        canLoop: false
+        canSeek: false,
+        hasQueue: false,
+        canLoop: false,
       }
 
       const wrapper = createWrapper()

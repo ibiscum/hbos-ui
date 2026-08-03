@@ -216,8 +216,8 @@ describe('audio-controls store - unit and regression tests', () => {
         .spyOn(globalThis, 'setInterval')
         .mockImplementation(((callback: TimerHandler) => {
           callbacks.push(callback as () => void)
-          return 1 as ReturnType<typeof setInterval>
-        }) as typeof setInterval)
+          return 1 as unknown as ReturnType<typeof setInterval>
+        }) as unknown as typeof setInterval)
 
       store.startAutoProgress()
       expect(store.progressIntervalID).toBeDefined()
@@ -234,7 +234,7 @@ describe('audio-controls store - unit and regression tests', () => {
       const store = useAudioControls()
       const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval')
 
-      store.progressIntervalID = 0 as ReturnType<typeof setInterval>
+      store.progressIntervalID = 0 as unknown as ReturnType<typeof setInterval>
       store.stopAutoProgress()
 
       expect(clearIntervalSpy).toHaveBeenCalledWith(0)

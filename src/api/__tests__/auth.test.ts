@@ -1,9 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   AuthApiError,
-  AuthStatus,
-  AuthTokenResponse,
-  ProtectionLevel,
   getAuthStatus,
   getCsrf,
   login,
@@ -11,6 +8,7 @@ import {
   setPassword,
   setPolicy,
 } from '@/api/auth'
+import type { AuthStatus, AuthTokenResponse, ProtectionLevel } from '@/api/auth'
 
 const ok = (data: unknown) => vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => data })
 const noContent = () => vi.fn().mockResolvedValue({ ok: true, status: 204, json: async () => undefined })

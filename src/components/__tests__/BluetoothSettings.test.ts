@@ -86,7 +86,7 @@ describe('BluetoothSettings.vue', () => {
       const toggles = wrapper.findAll('input[type="checkbox"]')
       expect(toggles.length).toBeGreaterThan(0)
       // First toggle represents discoverable state
-      expect(toggles[0].element.checked).toBe(true)
+      expect((toggles[0].element as HTMLInputElement).checked).toBe(true)
     })
 
     it('should start countdown when discoverable is true on mount', async () => {
@@ -554,7 +554,7 @@ describe('BluetoothSettings.vue', () => {
       await flushPromises()
 
       // Toggle should not have changed due to error
-      expect(toggles[0].element.checked).toBe(false)
+      expect((toggles[0].element as HTMLInputElement).checked).toBe(false)
     })
   })
 
@@ -873,7 +873,7 @@ describe('BluetoothSettings.vue', () => {
       await flushPromises()
 
       // Check that state was updated (indicating success)
-      expect(toggles[0].element.checked).toBe(true)
+      expect((toggles[0].element as HTMLInputElement).checked).toBe(true)
     })
   })
 

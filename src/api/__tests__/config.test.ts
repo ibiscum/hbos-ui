@@ -859,7 +859,7 @@ describe('config.ts - comprehensive unit and regression tests', () => {
     })
 
     it('sends settings as JSON body', async () => {
-      const settings = { enabled: true, volume: 80 }
+      const settings = { enabled: true, volume: '80' }
       await saveExternalPlayerSettings('mpd', settings)
 
       expect(mockApiFetch).toHaveBeenCalledWith(

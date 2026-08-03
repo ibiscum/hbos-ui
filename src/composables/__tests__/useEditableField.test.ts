@@ -78,7 +78,7 @@ describe('useEditableField', () => {
   })
 
   it('handles transformer failures gracefully', async () => {
-    const initialValue = ref('10')
+    const initialValue = ref<number | null>(10)
     const updateFunction = vi.fn().mockResolvedValue({ status: 'success' as const })
 
     const editableField = useEditableField<number>(initialValue, updateFunction, {

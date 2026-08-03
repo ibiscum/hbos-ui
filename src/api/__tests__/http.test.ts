@@ -4,7 +4,7 @@ import { useAuthStore, type AuthHint } from '@/stores/auth'
 
 // Mock the auth store
 let mockAuthStore = {
-  csrf: 'test-csrf-token',
+  csrf: 'test-csrf-token' as string | null,
   ensureCsrf: vi.fn(),
   promptForAuth: vi.fn(),
 }
@@ -19,7 +19,7 @@ global.fetch = vi.fn()
 describe('HTTP API Module', () => {
   beforeEach(() => {
     mockAuthStore = {
-      csrf: 'test-csrf-token',
+      csrf: 'test-csrf-token' as string | null,
       ensureCsrf: vi.fn(),
       promptForAuth: vi.fn(),
     }
@@ -627,12 +627,12 @@ describe('HTTP API Module', () => {
       })
 
       const callArgs = vi.mocked(global.fetch).mock.calls[0]
-      const headers = callArgs[1]?.headers
+      const headers = callArgs[1]?.headers as Headers
 
       expect(headers).toBeInstanceOf(Headers)
-      expect(headers?.get('Authorization')).toBe('Bearer token')
-      expect(headers?.get('Content-Type')).toBe('application/json')
-      expect(headers?.get('X-CSRF-Token')).toBe('test-csrf-token')
+      expect(headers.get('Authorization')).toBe('Bearer token')
+      expect(headers.get('Content-Type')).toBe('application/json')
+      expect(headers.get('X-CSRF-Token')).toBe('test-csrf-token')
     })
 
     it('should handle response with multiple Set-Cookie headers', async () => {

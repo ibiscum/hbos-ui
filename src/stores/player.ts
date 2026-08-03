@@ -46,7 +46,7 @@ export const usePlayerStore = defineStore('player', () => {
   const favourites = useFavourites()
 
   // State
-  const updateIntervalID = ref<number | undefined>(undefined)
+  const updateIntervalID = ref<ReturnType<typeof setInterval> | undefined>(undefined)
   const currentData = ref<CurrentPlayer | null>(null)
 
   const loading = ref<boolean>(false)

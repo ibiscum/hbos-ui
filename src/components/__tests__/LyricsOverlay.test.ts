@@ -109,7 +109,7 @@ describe('LyricsOverlay.vue', () => {
   })
 
   it('shows loading state while lyrics request is in flight', async () => {
-    let resolveFetch: ((value: unknown) => void) | null = null
+    let resolveFetch: ((value: unknown) => void) | undefined
     const pendingFetch = new Promise((resolve) => {
       resolveFetch = resolve
     })
@@ -121,9 +121,11 @@ describe('LyricsOverlay.vue', () => {
 
     expect(wrapper.find('.lyrics-overlay__loading').exists()).toBe(true)
 
-    resolveFetch?.({
-      json: async () => ({ found: true, lyrics: { type: 'synced', lyrics: [] } }),
-    })
+    if (resolveFetch) {
+      resolveFetch({
+        json: async () => ({ found: true, lyrics: { type: 'synced', lyrics: [] } }),
+      })
+    }
     await flushPromises()
 
     expect(wrapper.find('.lyrics-overlay__loading').exists()).toBe(false)

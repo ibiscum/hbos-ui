@@ -533,6 +533,7 @@ describe('RoomEQ API - Comprehensive Unit & Regression Tests', () => {
             peak_frequency: 1000,
             peak_magnitude: -10,
             spectral_centroid: 500,
+            normalization: { applied: false },
             frequency_bands: {
               sub_bass: { range: '20-60', avg_magnitude: -35, peak_frequency: 40 },
               bass: { range: '60-250', avg_magnitude: -30, peak_frequency: 100 },
@@ -574,6 +575,7 @@ describe('RoomEQ API - Comprehensive Unit & Regression Tests', () => {
             peak_frequency: 100,
             peak_magnitude: 0,
             spectral_centroid: 60,
+            normalization: { applied: false },
             frequency_bands: {
               sub_bass: { range: '20-60', avg_magnitude: 0, peak_frequency: 40 },
               bass: { range: '60-250', avg_magnitude: 0, peak_frequency: 100 },

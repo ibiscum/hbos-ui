@@ -12,7 +12,7 @@ describe('BackRouter.vue', () => {
     vi.clearAllMocks()
   })
 
-  const createWrapper = (props = {}, options = {}) => {
+  const createWrapper = (props = {}, options: any = {}) => {
     const { slots = {}, attrs = {}, ...other } = options
     return mount(BackRouter, {
       props: {

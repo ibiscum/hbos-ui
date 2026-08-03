@@ -87,7 +87,7 @@ describe('roomeq.ts - Regression Tests', () => {
       }
 
       expect(legacyFilter.coefficients).toBeDefined()
-      expect(newFilter.coefficients).not.toBeDefined()
+      expect('coefficients' in newFilter).toBe(false)
     })
   })
 
@@ -259,6 +259,7 @@ describe('roomeq.ts - Regression Tests', () => {
           peak_frequency: 100,
           peak_magnitude: 0,
           spectral_centroid: 500,
+          normalization: { applied: false },
           frequency_bands: {
             sub_bass: { range: '20-60', avg_magnitude: 0, peak_frequency: 40 },
             bass: { range: '60-250', avg_magnitude: 0, peak_frequency: 100 },
@@ -612,7 +613,7 @@ describe('roomeq.ts - Regression Tests', () => {
         max_frequency: 18000
       }
 
-      expect(result.usable_freq_low).toBeLessThan(result.usable_freq_high)
+      expect(result.usable_freq_low).toBeLessThan(result.usable_freq_high ?? 0)
       expect(typeof result.usable_freq_low).toBe('number')
       expect(typeof result.usable_freq_high).toBe('number')
     })
@@ -627,7 +628,7 @@ describe('roomeq.ts - Regression Tests', () => {
       }
 
       expect(request.measured_curve.frequencies.length).toBe(request.measured_curve.magnitudes_db.length)
-      expect(request.sample_rate).toBeGreaterThan(0)
+      expect((request.sample_rate as number)).toBeGreaterThan(0)
     })
   })
 
@@ -962,7 +963,7 @@ describe('roomeq.ts - Regression Tests', () => {
 
         expect(legacyFilter.filter_type).toBe(newFilter.filter_type)
         expect(legacyFilter.coefficients).toBeDefined()
-        expect(newFilter.coefficients).not.toBeDefined()
+        expect('coefficients' in newFilter).toBe(false)
       })
     })
   })

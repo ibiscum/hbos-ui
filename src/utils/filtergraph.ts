@@ -151,10 +151,10 @@ export function addCoordinatesToPoints(
 export function generateFilterResponse(
   filter: Filter,
   dimensions: GraphDimensions,
-  numPoints = 200,
-  minFreq = DEFAULT_FREQ_RANGE.min,
-  maxFreq = DEFAULT_FREQ_RANGE.max,
-  sampleRate = 48000
+  numPoints: number = 200,
+  minFreq: number = DEFAULT_FREQ_RANGE.min,
+  maxFreq: number = DEFAULT_FREQ_RANGE.max,
+  sampleRate: number = 48000
 ): VisualFrequencyResponsePoint[] {
   const points: VisualFrequencyResponsePoint[] = [];
   const pointCount = Math.max(1, Math.floor(numPoints));
@@ -179,10 +179,10 @@ export function generateFilterResponse(
 export function generateCombinedResponse(
   filters: Filter[],
   dimensions: GraphDimensions,
-  numPoints = 200,
-  minFreq = DEFAULT_FREQ_RANGE.min,
-  maxFreq = DEFAULT_FREQ_RANGE.max,
-  sampleRate = 48000
+  numPoints: number = 200,
+  minFreq: number = DEFAULT_FREQ_RANGE.min,
+  maxFreq: number = DEFAULT_FREQ_RANGE.max,
+  sampleRate: number = 48000
 ): VisualFrequencyResponsePoint[] {
   const points: VisualFrequencyResponsePoint[] = [];
   const pointCount = Math.max(1, Math.floor(numPoints));
@@ -293,8 +293,8 @@ export function generateCombinedGraphData(
  * Generate frequency grid lines for logarithmic display
  */
 export function generateFrequencyGridLines(
-  minFreq = DEFAULT_FREQ_RANGE.min,
-  maxFreq = DEFAULT_FREQ_RANGE.max
+  minFreq: number = DEFAULT_FREQ_RANGE.min,
+  maxFreq: number = DEFAULT_FREQ_RANGE.max
 ): number[] {
   const lines: Set<number> = new Set();
 
@@ -325,8 +325,8 @@ export function generateFrequencyGridLines(
  * Generate frequency labels (excludes 40, 400, 4k to reduce clutter)
  */
 export function generateFrequencyLabels(
-  minFreq = DEFAULT_FREQ_RANGE.min,
-  maxFreq = DEFAULT_FREQ_RANGE.max
+  minFreq: number = DEFAULT_FREQ_RANGE.min,
+  maxFreq: number = DEFAULT_FREQ_RANGE.max
 ): number[] {
   const lines: Set<number> = new Set();
 
@@ -357,9 +357,9 @@ export function generateFrequencyLabels(
  * Generate gain grid lines for linear dB display
  */
 export function generateGainGridLines(
-  minGain = DEFAULT_GAIN_RANGE.min,
-  maxGain = DEFAULT_GAIN_RANGE.max,
-  step = 5
+  minGain: number = DEFAULT_GAIN_RANGE.min,
+  maxGain: number = DEFAULT_GAIN_RANGE.max,
+  step: number = 5
 ): number[] {
   const lines: number[] = [];
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as volumeApi from '../volume'
-import {
+import type {
   VolumeInfo,
   VolumeState,
   VolumeResponse,

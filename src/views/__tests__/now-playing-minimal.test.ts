@@ -71,7 +71,7 @@ vi.mock('@/stores/player', async () => {
   }
 })
 
-const getCurrentSong = () => usePlayerStore().currentSong as Ref<Song | null>
+const getCurrentSong = () => usePlayerStore().currentSong as unknown as Ref<Song | null>
 
 const makeRouter = () =>
   createRouter({

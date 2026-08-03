@@ -88,7 +88,7 @@ describe('Extensions API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -114,7 +114,7 @@ describe('Extensions API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -135,7 +135,7 @@ describe('Extensions API', () => {
           headers: { 'Content-Type': 'application/json' },
         }
       )
-      mockFetchResponse.ok = false
+      ;(mockFetchResponse as any).ok = false
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -149,7 +149,7 @@ describe('Extensions API', () => {
         status: 500,
         statusText: 'Internal Server Error',
       })
-      mockFetchResponse.ok = false
+      ;(mockFetchResponse as any).ok = false
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -163,7 +163,7 @@ describe('Extensions API', () => {
         status: 400,
         statusText: 'Bad Request',
       })
-      mockFetchResponse.ok = false
+      ;(mockFetchResponse as any).ok = false
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -198,7 +198,7 @@ describe('Extensions API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -236,7 +236,7 @@ describe('Extensions API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -259,7 +259,7 @@ describe('Extensions API', () => {
           headers: { 'Content-Type': 'application/json' },
         }
       )
-      mockFetchResponse.ok = false
+      ;(mockFetchResponse as any).ok = false
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -293,7 +293,7 @@ describe('Extensions API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -318,7 +318,7 @@ describe('Extensions API', () => {
           headers: { 'Content-Type': 'application/json' },
         }
       )
-      mockFetchResponse.ok = false
+      ;(mockFetchResponse as any).ok = false
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -352,7 +352,7 @@ describe('Extensions API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -390,7 +390,7 @@ describe('Extensions API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -435,7 +435,7 @@ describe('Extensions API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -478,7 +478,7 @@ describe('Extensions API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -518,7 +518,7 @@ describe('Extensions API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -552,7 +552,7 @@ describe('Extensions API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -573,7 +573,7 @@ describe('Extensions API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -610,7 +610,7 @@ describe('Extensions API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -646,7 +646,7 @@ describe('Extensions API', () => {
             headers: { 'Content-Type': 'application/json' },
           }
         )
-        mockFetchResponse.ok = false
+        ;(mockFetchResponse as any).ok = false
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -667,7 +667,7 @@ describe('Extensions API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -689,7 +689,7 @@ describe('Extensions API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -712,7 +712,7 @@ describe('Extensions API', () => {
             headers: { 'Content-Type': 'application/json' },
           }
         )
-        mockFetchResponse.ok = false
+        ;(mockFetchResponse as any).ok = false
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -741,7 +741,7 @@ describe('Extensions API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -768,7 +768,7 @@ describe('Extensions API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -796,7 +796,7 @@ describe('Extensions API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -818,7 +818,7 @@ describe('Extensions API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -843,7 +843,7 @@ describe('Extensions API', () => {
       const mockFetchResponse = new Response('Invalid JSON {{{', {
         status: 400,
       })
-      mockFetchResponse.ok = false
+      ;(mockFetchResponse as any).ok = false
       mockFetchResponse.json = vi.fn().mockRejectedValue(new SyntaxError('JSON parse error'))
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
@@ -863,7 +863,7 @@ describe('Extensions API', () => {
           status: 500,
         }
       )
-      mockFetchResponse.ok = false
+      ;(mockFetchResponse as any).ok = false
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -882,7 +882,7 @@ describe('Extensions API', () => {
           status: 400,
         }
       )
-      mockFetchResponse.ok = false
+      ;(mockFetchResponse as any).ok = false
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -920,7 +920,7 @@ describe('Extensions API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -942,7 +942,7 @@ describe('Extensions API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 

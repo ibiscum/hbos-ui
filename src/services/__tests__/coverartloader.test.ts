@@ -431,7 +431,8 @@ describe('CoverArtLoader', () => {
     const mockSong: Song = {
       title: 'Test Song',
       artist: 'Test Artist',
-      album: 'Test Album'
+      album: 'Test Album',
+      duration: 180,
     }
 
     it('should use existing artwork_url if available', async () => {
@@ -475,7 +476,7 @@ describe('CoverArtLoader', () => {
         ...mockSong,
         metadata: {
           coverart_url: 'http://example.com/metadata.jpg'
-        }
+        } as any,
       }
 
       vi.mocked(mockApiFetch).mockResolvedValue(
@@ -494,7 +495,7 @@ describe('CoverArtLoader', () => {
         ...mockSong,
         metadata: {
           logo_url: 'http://example.com/logo.jpg'
-        }
+        } as any,
       }
 
       vi.mocked(mockApiFetch).mockResolvedValue(
@@ -525,7 +526,8 @@ describe('CoverArtLoader', () => {
     const mockSong: Song = {
       title: 'Test Song',
       artist: 'Test Artist',
-      album: 'Test Album'
+      album: 'Test Album',
+      duration: 180,
     }
 
     it('should try song cover art first', async () => {
@@ -614,7 +616,7 @@ describe('CoverArtLoader', () => {
     })
 
     it('should handle missing title', async () => {
-      const song: Song = { ...mockSong, title: undefined }
+      const song = { ...mockSong, title: undefined } as unknown as Song
 
       vi.mocked(mockApiFetch).mockResolvedValue(
         new Response(JSON.stringify({ results: [] }), { status: 200 })
@@ -627,7 +629,7 @@ describe('CoverArtLoader', () => {
     })
 
     it('should handle missing album', async () => {
-      const song: Song = { ...mockSong, album: undefined }
+      const song = { ...mockSong, album: undefined } as unknown as Song
 
       vi.mocked(mockApiFetch).mockResolvedValue(
         new Response(JSON.stringify({ results: [] }), { status: 200 })
@@ -640,7 +642,7 @@ describe('CoverArtLoader', () => {
     })
 
     it('should handle missing artist', async () => {
-      const song: Song = { ...mockSong, artist: undefined }
+      const song = { ...mockSong, artist: undefined } as unknown as Song
 
       vi.mocked(mockApiFetch).mockResolvedValue(
         new Response(JSON.stringify({ results: [] }), { status: 200 })
@@ -658,6 +660,7 @@ describe('CoverArtLoader', () => {
       title: 'Test Song',
       artist: 'Test Artist',
       album: 'Test Album',
+      duration: 180,
       artwork_url: 'http://example.com/best.jpg'
     }
 
@@ -672,7 +675,7 @@ describe('CoverArtLoader', () => {
         new Response(JSON.stringify({ results: [] }), { status: 200 })
       )
 
-      const song: Song = { title: 'Test', artist: 'Test' }
+      const song: Song = { title: 'Test', artist: 'Test', duration: 180 }
       const result = await loader.getBestCoverArt(song)
 
       expect(result).toBeNull()
@@ -814,7 +817,8 @@ describe('CoverArtLoader', () => {
 
         const result = await loader.findCoverArtFromAPI({
           title: 'Test',
-          artist: 'Test'
+          artist: 'Test',
+          duration: 180,
         })
 
         expect(result.urls).toHaveLength(2)

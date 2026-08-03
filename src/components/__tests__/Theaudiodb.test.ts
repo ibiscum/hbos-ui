@@ -180,7 +180,7 @@ describe('Theaudiodb.vue', () => {
     wrapper.unmount()
     await flushPromises()
 
-    expect(capturedSignal?.aborted).toBe(true)
+    expect((capturedSignal as AbortSignal | null)?.aborted ?? false).toBe(true)
     expect(consoleErrorSpy).not.toHaveBeenCalled()
   })
 })

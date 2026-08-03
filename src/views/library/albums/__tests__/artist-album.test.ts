@@ -109,10 +109,12 @@ describe('ArtistAlbum.vue', () => {
         {
           path: '/album/:albumId',
           name: 'album',
+          component: { template: '<div></div>' },
         },
         {
           path: '/artists',
           name: 'artists',
+          component: { template: '<div></div>' },
         },
       ],
     })
@@ -133,7 +135,7 @@ describe('ArtistAlbum.vue', () => {
       },
     })
     await flushPromises()
-    return wrapper
+    return wrapper as any
   }
 
   it('renders component with breadcrumb and card sections', async () => {

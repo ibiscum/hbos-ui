@@ -43,7 +43,7 @@ describe('FilterChain API', () => {
           status: 200,
           headers: { 'content-type': 'text/plain; charset=utf-8' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -68,7 +68,7 @@ describe('FilterChain API', () => {
           status: 200,
           headers: { 'content-type': 'text/plain' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -86,7 +86,7 @@ describe('FilterChain API', () => {
           status: 200,
           headers: { 'content-type': 'text/plain' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -105,7 +105,7 @@ describe('FilterChain API', () => {
           status: 200,
           headers: { 'content-type': 'text/plain; charset=utf-8' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -125,7 +125,7 @@ describe('FilterChain API', () => {
           status: 200,
           headers: { 'content-type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -144,7 +144,7 @@ describe('FilterChain API', () => {
           status: 200,
           headers: { 'content-type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -165,7 +165,7 @@ describe('FilterChain API', () => {
           status: 200,
           headers: { 'content-type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -182,7 +182,7 @@ describe('FilterChain API', () => {
           status: 404,
           statusText: 'Not Found'
         })
-        mockFetchResponse.ok = false
+        ;(mockFetchResponse as any).ok = false
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -196,7 +196,7 @@ describe('FilterChain API', () => {
           status: 500,
           statusText: 'Internal Server Error'
         })
-        mockFetchResponse.ok = false
+        ;(mockFetchResponse as any).ok = false
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -210,7 +210,7 @@ describe('FilterChain API', () => {
           status: 403,
           statusText: 'Forbidden'
         })
-        mockFetchResponse.ok = false
+        ;(mockFetchResponse as any).ok = false
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -224,7 +224,7 @@ describe('FilterChain API', () => {
           status: 401,
           statusText: 'Unauthorized'
         })
-        mockFetchResponse.ok = false
+        ;(mockFetchResponse as any).ok = false
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -238,7 +238,7 @@ describe('FilterChain API', () => {
           status: 418,
           statusText: "I'm a teapot"
         })
-        mockFetchResponse.ok = false
+        ;(mockFetchResponse as any).ok = false
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -254,7 +254,7 @@ describe('FilterChain API', () => {
           status: 200,
           headers: { 'content-type': 'text/plain' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -273,7 +273,7 @@ describe('FilterChain API', () => {
           status: 200,
           headers: { 'content-type': 'text/plain' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -292,7 +292,7 @@ describe('FilterChain API', () => {
           status: 200,
           headers: { 'content-type': 'text/plain; charset=utf-8' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -308,7 +308,7 @@ describe('FilterChain API', () => {
           status: 200,
           headers: { 'content-type': 'text/plain' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -324,7 +324,7 @@ describe('FilterChain API', () => {
           status: 200,
           headers: { 'content-type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -340,7 +340,7 @@ describe('FilterChain API', () => {
           status: 200,
           headers: { 'content-type': 'application/json; charset=utf-8' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -356,7 +356,7 @@ describe('FilterChain API', () => {
           status: 200,
           headers: { 'content-type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -384,7 +384,7 @@ ${Array.from({ length: 1000 }, (_, i) => `  "Node${i}" -> "Node${i + 1}";`).join
           status: 200,
           headers: { 'content-type': 'text/plain' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -400,7 +400,7 @@ ${Array.from({ length: 1000 }, (_, i) => `  "Node${i}" -> "Node${i + 1}";`).join
           status: 200,
           headers: { 'content-type': 'text/plain' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
         mockFetchResponse.text = vi.fn().mockRejectedValueOnce(
           new Error('Failed to read response body')
         )
@@ -415,7 +415,7 @@ ${Array.from({ length: 1000 }, (_, i) => `  "Node${i}" -> "Node${i + 1}";`).join
           status: 200,
           headers: { 'content-type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
         mockFetchResponse.json = vi.fn().mockRejectedValueOnce(
           new Error('Invalid JSON')
         )
@@ -430,7 +430,7 @@ ${Array.from({ length: 1000 }, (_, i) => `  "Node${i}" -> "Node${i + 1}";`).join
           status: 200,
           headers: { 'content-type': 'text/plain' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -449,7 +449,7 @@ ${Array.from({ length: 1000 }, (_, i) => `  "Node${i}" -> "Node${i + 1}";`).join
             headers: { 'content-type': 'application/json' }
           }
         )
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -465,7 +465,7 @@ ${Array.from({ length: 1000 }, (_, i) => `  "Node${i}" -> "Node${i + 1}";`).join
           status: 200,
           headers: { 'content-type': 'text/plain' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 

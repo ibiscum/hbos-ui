@@ -75,7 +75,7 @@ export const usePlayerWebSocket = defineStore('player-web-socket', () => {
 
   function createPlayerWebSocket(options: createPlayerWebSocketOptions) {
     let socket: WebSocket | null = null
-    let reconnectTimer: number | undefined = undefined
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined = undefined
     let shouldReconnect = true
 
     const wsProtocol = options.protocol === 'wss:' ? 'wss' : 'ws'

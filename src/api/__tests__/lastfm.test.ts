@@ -7,6 +7,8 @@ import {
   prepareLastFMAuthCompletion,
   completeLastFMAuth,
   disconnectLastFM,
+} from '@/api/lastfm'
+import type {
   LastFMStatusResponse,
   LastFMAuthResponse,
   LastFMPrepareAuthResponse,

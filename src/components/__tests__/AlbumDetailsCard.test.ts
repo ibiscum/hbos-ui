@@ -116,7 +116,7 @@ const createMockAlbum = (overrides?: Partial<AlbumDetails>): AlbumDetails => ({
     }
   ] as Track[],
   ...overrides
-})
+} as unknown as AlbumDetails)
 
 describe('AlbumDetailsCard.vue - Comprehensive Tests', () => {
   beforeEach(() => {

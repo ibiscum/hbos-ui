@@ -80,7 +80,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -107,7 +107,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -121,7 +121,7 @@ describe('DSP Toolkit API', () => {
           status: 404,
           statusText: 'Not Found'
         })
-        mockFetchResponse.ok = false
+        ;(mockFetchResponse as any).ok = false
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -145,7 +145,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'text/html' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
         mockFetchResponse.text = vi.fn().mockResolvedValue('<!DOCTYPE html><html></html>')
         mockFetchResponse.json = vi.fn().mockRejectedValue(new SyntaxError('Unexpected token <'))
 
@@ -172,7 +172,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -194,7 +194,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -224,7 +224,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -244,7 +244,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -266,7 +266,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -291,7 +291,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -315,7 +315,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -342,7 +342,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -384,7 +384,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -423,7 +423,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -457,7 +457,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -477,7 +477,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -502,7 +502,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -528,7 +528,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -557,7 +557,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -599,7 +599,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -618,7 +618,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -642,7 +642,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/xml' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
         mockFetchResponse.text = vi.fn().mockResolvedValue(profileXml)
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
@@ -657,7 +657,7 @@ describe('DSP Toolkit API', () => {
           status: 404,
           statusText: 'Not Found'
         })
-        mockFetchResponse.ok = false
+        ;(mockFetchResponse as any).ok = false
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -681,7 +681,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -736,7 +736,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -758,7 +758,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -781,7 +781,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -817,7 +817,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -837,7 +837,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -861,7 +861,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -894,7 +894,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -919,7 +919,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -949,7 +949,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -980,7 +980,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -1011,7 +1011,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -1040,7 +1040,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -1063,7 +1063,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -1085,7 +1085,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -1109,7 +1109,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -1131,7 +1131,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -1154,7 +1154,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -1178,7 +1178,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -1197,7 +1197,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -1219,7 +1219,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -1243,7 +1243,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -1265,7 +1265,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -1291,7 +1291,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -1310,7 +1310,7 @@ describe('DSP Toolkit API', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         })
-        mockFetchResponse.ok = true
+        ;(mockFetchResponse as any).ok = true
 
         vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 

@@ -201,10 +201,10 @@ describe('SecurityPrompt.vue', () => {
     const authStore = getAuthStoreMock()
     authStore.promptOpen = true
 
-    let resolveLogin: (() => void) | null = null
+    let resolveLogin: (() => void) | undefined
     authStore.login.mockImplementationOnce(
       () =>
-        new Promise((resolve) => {
+        new Promise<void>((resolve) => {
           resolveLogin = resolve
         }),
     )
@@ -222,7 +222,9 @@ describe('SecurityPrompt.vue', () => {
     await wrapper.find('.modal-overlay').trigger('click')
     expect(authStore.resolvePrompt).not.toHaveBeenCalledWith(false)
 
-    resolveLogin?.()
+    if (resolveLogin) {
+      resolveLogin()
+    }
     await flushPromises()
   })
 

@@ -40,7 +40,7 @@ describe('Cover Art API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -61,7 +61,7 @@ describe('Cover Art API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -89,7 +89,7 @@ describe('Cover Art API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -109,7 +109,7 @@ describe('Cover Art API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -129,7 +129,7 @@ describe('Cover Art API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -153,7 +153,7 @@ describe('Cover Art API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -172,7 +172,7 @@ describe('Cover Art API', () => {
         statusText: 'Not Found',
         headers: { 'Content-Type': 'text/plain' }
       })
-      mockFetchResponse.ok = false
+      ;(mockFetchResponse as any).ok = false
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -187,7 +187,7 @@ describe('Cover Art API', () => {
         statusText: 'Internal Server Error',
         headers: { 'Content-Type': 'text/plain' }
       })
-      mockFetchResponse.ok = false
+      ;(mockFetchResponse as any).ok = false
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -209,7 +209,7 @@ describe('Cover Art API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -250,7 +250,7 @@ describe('Cover Art API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -289,7 +289,7 @@ describe('Cover Art API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -310,7 +310,7 @@ describe('Cover Art API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -332,7 +332,7 @@ describe('Cover Art API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -350,7 +350,7 @@ describe('Cover Art API', () => {
         statusText: 'Unauthorized',
         headers: { 'Content-Type': 'text/plain' }
       })
-      mockFetchResponse.ok = false
+      ;(mockFetchResponse as any).ok = false
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -363,7 +363,7 @@ describe('Cover Art API', () => {
         statusText: 'Internal Server Error',
         headers: { 'Content-Type': 'text/plain' }
       })
-      mockFetchResponse.ok = false
+      ;(mockFetchResponse as any).ok = false
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -381,7 +381,7 @@ describe('Cover Art API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -397,7 +397,7 @@ describe('Cover Art API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -418,7 +418,7 @@ describe('Cover Art API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -447,7 +447,7 @@ describe('Cover Art API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      mockFetchResponse.ok = true
+      ;(mockFetchResponse as any).ok = true
 
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse)
 
@@ -474,7 +474,7 @@ describe('Cover Art API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      mockFetchResponse1.ok = true
+      ;(mockFetchResponse1 as any).ok = true
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse1)
       const result1 = await updateArtistImage('Björk', 'https://example.com/image1.jpg')
 
@@ -483,7 +483,7 @@ describe('Cover Art API', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      mockFetchResponse2.ok = true
+      ;(mockFetchResponse2 as any).ok = true
       vi.mocked(mockApiFetch).mockResolvedValueOnce(mockFetchResponse2)
       const result2 = await updateArtistImage('Björk', 'https://example.com/image2.jpg')
 

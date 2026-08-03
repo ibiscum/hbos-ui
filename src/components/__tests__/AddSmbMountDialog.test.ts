@@ -77,7 +77,7 @@ const mockSmbShareNoType: SmbShare = {
 // ============================================================================
 
 describe('AddSmbMountDialog', () => {
-  let wrapper: VueWrapper<unknown>
+  let wrapper: VueWrapper<any>
 
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -160,6 +160,7 @@ describe('AddSmbMountDialog', () => {
       getSmbServersMock.mockResolvedValue({
         status: 'error',
         message: 'Network error',
+        data: { servers: [], count: 0 },
       })
 
       wrapper = mount(AddSmbMountDialog, {
@@ -174,6 +175,7 @@ describe('AddSmbMountDialog', () => {
       getSmbServersMock.mockResolvedValue({
         status: 'error',
         message: 'Network error',
+        data: { servers: [], count: 0 },
       })
 
       wrapper = mount(AddSmbMountDialog, {
@@ -189,6 +191,7 @@ describe('AddSmbMountDialog', () => {
       getSmbServersMock.mockResolvedValue({
         status: 'error',
         message: 'Network error',
+        data: { servers: [], count: 0 },
       })
 
       wrapper = mount(AddSmbMountDialog, {

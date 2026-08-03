@@ -36,7 +36,7 @@ const externalPlayer = {
   ],
 }
 
-const mountCard = (player: Record<string, unknown>, isExpanded = false) =>
+const mountCard = (player: any, isExpanded = false) =>
   mount(PlayerCard, {
     props: { player, isExpanded },
     global: {
