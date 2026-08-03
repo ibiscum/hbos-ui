@@ -8,12 +8,34 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * BackRouter Component - A stylized back navigation button
+ *
+ * A navigation component that provides a stylized back button with animated
+ * hover effects. Renders a rotated caret icon with underline text decoration
+ * that appears on hover. Built on top of Vue Router's router-link.
+ *
+ * @see docs/back-router.md for complete documentation and usage examples
+ */
+
 import Icon from '@/components/Icon.vue'
 
+/**
+ * Props for the BackRouter component
+ */
 interface BackRouterProps {
-  to: string | object
+  /**
+   * Target route for navigation
+   * - String: simple path like "/albums"
+   * - Object: route object like { name: 'AlbumDetail', params: { id: 123 } }
+   * @default ''
+   */
+  to?: string | object
 }
-const { to = '' } = defineProps<BackRouterProps>()
+
+withDefaults(defineProps<BackRouterProps>(), {
+  to: '',
+})
 </script>
 
 <style scoped lang="scss">

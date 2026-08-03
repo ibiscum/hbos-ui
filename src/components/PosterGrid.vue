@@ -27,7 +27,7 @@
       <div v-if="isLibraryUpdating" class="library-updating">
         <div class="updating-content">
           <div class="loading-icon">
-            <Icon name="loading" />
+            <Icon icon="loading" />
           </div>
           <div class="updating-text">
             <div class="primary-text">Library update still running</div>
@@ -57,7 +57,7 @@ interface PosterGridProps<T> {
   items: T[]
   inRow?: boolean
   posterForm?: 'circle' | 'square'
-  showAll?: boolean // New prop to disable pagination
+  showAll?: boolean // Disable pagination and render all items.
 }
 
 const {
@@ -94,8 +94,6 @@ const getChunkSize = () => {
 const chunkSize = ref(getChunkSize())
 const currentPage = ref<number>(0)
 const data = ref<T[]>([]) as Ref<T[]>
-
-const scrolledToBottom = ref<boolean>(false)
 
 // Calculate how many items fit based on screen size
 const getMaxItemsForRow = () => {
@@ -146,10 +144,7 @@ function handleScroll() {
   const scrollPosition = window.innerHeight + window.scrollY + scrollBuffer
 
   if (scrollPosition >= document.body.scrollHeight) {
-    scrolledToBottom.value = true
     loadNextChunk()
-  } else {
-    scrolledToBottom.value = false
   }
 }
 

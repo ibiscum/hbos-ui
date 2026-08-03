@@ -1,7 +1,7 @@
 <template>
-  <div class="app-cover" :class="{ 'no-img': isLoading || error }">
+  <div class="app-cover" :class="{ 'no-img': showPlaceholder }">
     <Icon
-      v-if="isLoading || error"
+      v-if="showPlaceholder"
       class="app-cover__placeholder-icon"
       :icon="isLoading ? 'loading' : 'music'"
     />
@@ -9,7 +9,7 @@
     <Transition name="app-cover--fade" mode="out-in">
       <img
         :key="src"
-        v-if="!(isLoading || error)"
+        v-if="!showPlaceholder"
         :src="imageOptions.src"
         :alt="alt"
         loading="lazy"
@@ -19,7 +19,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref as deepRef, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useImage } from '@vueuse/core'
 
 import Icon from '@/components/Icon.vue'
@@ -32,8 +32,11 @@ interface CoverProps {
 
 const { src = '', alt = '', delay = 0 } = defineProps<CoverProps>()
 
-const imageOptions = deepRef({ src })
-const { isLoading, error } = useImage(imageOptions, { delay: delay })
+const imageOptions = ref({ src })
+const { isLoading, error } = useImage(imageOptions, { delay })
+
+const hasSrc = computed(() => src.trim().length > 0)
+const showPlaceholder = computed(() => !hasSrc.value || isLoading.value || !!error.value)
 
 watch(
   () => src,

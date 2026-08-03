@@ -211,32 +211,6 @@ const heartButtonTitle = computed(() => {
     }
   }
 
-  /* Lyrics button styling */
-  .lyrics-button {
-    opacity: 0.4;
-    margin-left: 15px;
-    margin-right: 15px;
-
-    img {
-      width: 20px;
-      height: 20px;
-      filter: invert(17%) sepia(89%) saturate(6472%) hue-rotate(342deg) brightness(92%) contrast(89%) opacity(0.4);
-
-      @include media-down(md) {
-        width: 18px;
-        height: 18px;
-      }
-    }
-
-    &--active {
-      opacity: 1 !important;
-      cursor: pointer;
-
-      img {
-        filter: invert(17%) sepia(89%) saturate(6472%) hue-rotate(342deg) brightness(92%) contrast(89%) !important;
-      }
-    }
-  }
 }
 .audio-controls-placeholder {
   width: 50px;

@@ -29,7 +29,7 @@
           <summary>All URLs ({{ coverArtUrls.length }})</summary>
           <ul>
             <li v-for="(url, index) in coverArtUrls" :key="index">
-              <a :href="url" target="_blank">{{ url }}</a>
+              <a :href="url" target="_blank" rel="noopener noreferrer">{{ url }}</a>
             </li>
           </ul>
         </details>
@@ -58,13 +58,13 @@
         </label>
       </div>
       <div class="button-group">
-        <button @click="testCoverArt" :disabled="!testSong.title || !testSong.artist">
+        <button type="button" @click="testCoverArt" :disabled="!hasRequiredFields">
           Load Cover Art
         </button>
-        <button @click="clearTest">
+        <button type="button" @click="clearTest">
           Clear
         </button>
-        <button @click="loadSampleData">
+        <button type="button" @click="loadSampleData">
           Load Sample
         </button>
       </div>
@@ -72,7 +72,7 @@
 
     <!-- API Status -->
     <div class="api-status">
-      <button @click="checkApi">Check API Status</button>
+      <button type="button" @click="checkApi">Check API Status</button>
       <span v-if="apiStatus !== null" :class="['status', apiStatus ? 'online' : 'offline']">
         API {{ apiStatus ? 'Available' : 'Unavailable' }}
       </span>
@@ -81,7 +81,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useCoverArt } from '@/composables/useCoverArt'
 import type { Song } from '@/types/player'
 
@@ -108,15 +108,26 @@ const testSong = ref<Partial<Song>>({
 
 const currentSong = ref<Song | null>(null)
 const apiStatus = ref<boolean | null>(null)
+const hasRequiredFields = computed(() => {
+  return Boolean(testSong.value.title?.trim() && testSong.value.artist?.trim())
+})
+
+const normalizeField = (value?: string) => {
+  const normalized = value?.trim()
+  return normalized ? normalized : undefined
+}
 
 // Methods
 const testCoverArt = async () => {
-  if (!testSong.value.title || !testSong.value.artist) return
+  const normalizedTitle = normalizeField(testSong.value.title)
+  const normalizedArtist = normalizeField(testSong.value.artist)
+
+  if (!normalizedTitle || !normalizedArtist) return
 
   const song: Song = {
-    title: testSong.value.title,
-    artist: testSong.value.artist,
-    album: testSong.value.album || undefined,
+    title: normalizedTitle,
+    artist: normalizedArtist,
+    album: normalizeField(testSong.value.album),
     duration: testSong.value.duration || 0
   }
 

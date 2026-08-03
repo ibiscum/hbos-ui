@@ -164,6 +164,8 @@ const startAuthPolling = () => {
   if (authPollInterval) {
     clearInterval(authPollInterval)
   }
+  // Auth request completed, polling now owns the in-progress state.
+  isConnecting.value = false
   isAuthInProgress.value = true
   authPollInterval = setInterval(attemptToCompleteAuth, 5000)
 }

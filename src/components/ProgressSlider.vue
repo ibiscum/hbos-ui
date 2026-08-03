@@ -71,7 +71,7 @@ watch(
 const displayPercent = computed(() => {
   const range = max - min
   if (range === 0) return 0
-  return Math.max(0, Math.min(100, ((value - min) / range) * 100))
+  return Math.max(0, Math.min(100, ((internalValue.value - min) / range) * 100))
 })
 
 const centerMarkPercent = computed(() => {
@@ -182,13 +182,13 @@ function startTouch(event: TouchEvent) {
   touchMoved = false
   touchStartX = event.touches[0].clientX
 
+  document.addEventListener('touchmove', onTouchMove)
+  document.addEventListener('touchend', stopTouch)
+
   if (!isDraggable) return
 
   dragging.value = true
   hasDragged.value = false
-
-  document.addEventListener('touchmove', onTouchMove)
-  document.addEventListener('touchend', stopTouch)
 }
 
 function onTouchMove(event: TouchEvent) {

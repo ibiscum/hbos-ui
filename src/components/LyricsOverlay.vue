@@ -107,11 +107,6 @@ const currentLineIndex = computed((): number => {
   return currentIndex
 })
 
-// Get the current line index (legacy function, now uses computed)
-const getCurrentLineIndex = (): number => {
-  return currentLineIndex.value
-}
-
 // Check if lyrics are timed (have varying timestamps) or untimed (all timestamps are 0)
 const areTimedLyrics = (): boolean => {
   if (!lyrics.value?.lyrics || lyrics.value.lyrics.length === 0) return false
@@ -143,7 +138,7 @@ const scrollToCurrentLine = () => {
     return
   }
 
-  const currentIndex = getCurrentLineIndex()
+  const currentIndex = currentLineIndex.value
 
   if (currentIndex === -1) {
     return
@@ -259,7 +254,7 @@ watch(() => props.song?.metadata?.lyrics_url, (newLyricsUrl) => {
   if (newLyricsUrl && props.isVisible) {
     fetchLyrics(newLyricsUrl)
   }
-}, { immediate: true })
+})
 
 // Watch for visibility changes
 watch(() => props.isVisible, (isVisible) => {
@@ -270,7 +265,7 @@ watch(() => props.isVisible, (isVisible) => {
     error.value = null
     lyricsRefs.value = {} // Clear refs when overlay closes
   }
-})
+}, { immediate: true })
 
 // Watch for lyrics changes to reset refs
 watch(() => lyrics.value, () => {

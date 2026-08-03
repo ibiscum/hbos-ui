@@ -19,7 +19,7 @@
               <span class="error-message">{{ player.error }}</span>
             </div>
             <router-link
-              v-if="!player.exists && player.extension_package"
+              v-if="player.exists === false && player.extension_package"
               data-test="install-link"
               class="player-card__install"
               :to="{ name: 'extensions', query: { install: player.extension_package } }"

@@ -48,8 +48,11 @@ const retryCount = ref(0)
 const MAX_RETRIES = 3
 
 /**
-  * Type guard to validate BluetoothDevice response structure
-  */
+ * Type guard to validate BluetoothDevice response structure.
+ * Ensures device has required fields with correct types.
+ * @param device - Unknown value to validate
+ * @returns True if device is a valid BluetoothDevice
+ */
 function isValidDevice(device: unknown): device is BluetoothDevice {
   if (typeof device !== 'object' || device === null) return false
   const obj = device as Record<string, unknown>
@@ -62,10 +65,11 @@ function isValidDevice(device: unknown): device is BluetoothDevice {
 }
 
 /**
-  * Fetches and validates bluetooth paired devices from the backend.
-  * Validates response structure and individual device objects.
-  * Retries up to MAX_RETRIES times on failure.
-  */
+ * Fetches and validates Bluetooth paired devices from the backend.
+ * Validates response structure and individual device objects.
+ * Retries automatically up to MAX_RETRIES times on failure with 1s delay.
+ * Resets retry counter on successful fetch.
+ */
 const fetchDevices = async () => {
   loading.value = true
   error.value = null
@@ -99,7 +103,7 @@ const fetchDevices = async () => {
     if (retryCount.value < MAX_RETRIES) {
       retryCount.value++
       console.log(`Retrying device fetch (${retryCount.value}/${MAX_RETRIES})...`)
-      // Retry after 1 second
+      // Retry after 1 second delay
       setTimeout(() => {
         fetchDevices()
       }, 1000)
@@ -121,7 +125,7 @@ onMounted(fetchDevices)
   width: 100%;
   display: flex;
   flex-direction: column;
-  justify-items: center;
+  justify-content: center;
   align-items: center;
 }
 
@@ -129,7 +133,7 @@ onMounted(fetchDevices)
   width: 95%;
   display: flex;
   flex-direction: column;
-  justify-items: center;
+  justify-content: center;
   align-items: center;
 }
 

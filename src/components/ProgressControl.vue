@@ -2,8 +2,8 @@
   <div class="app-progress-control">
     <ProgressTime
       v-if="!isOnHeader"
-      :seekPositionTime="audioControls.seekPositionTime"
-      :songDurationTime="audioControls.songDurationTime"
+      :seek-position-time="audioControls.seekPositionTime"
+      :song-duration-time="audioControls.songDurationTime"
     />
 
     <ProgressSlider
@@ -12,10 +12,10 @@
       :min="min"
       :max="max"
       :step="step"
-      :hasThumb="hasThumb"
-      :isDraggable="isDraggable"
-      :isOnHeader="isOnHeader"
-      @click:progress="audioControls.seekToPosition"
+      :has-thumb="hasThumb"
+      :is-draggable="isDraggable"
+      :is-on-header="isOnHeader"
+      @click:progress="handleSeek"
     />
   </div>
 </template>
@@ -48,6 +48,14 @@ const {
 
 const { isSendingCommand, playerCapabilities: caps } = storeToRefs(usePlayerStore())
 const audioControls = useAudioControls()
+
+function handleSeek(position: number) {
+  if (isSendingCommand.value || !caps.value.canSeek) {
+    return
+  }
+
+  audioControls.seekToPosition(position)
+}
 </script>
 
 <style lang="scss">

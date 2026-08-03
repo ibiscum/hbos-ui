@@ -1,8 +1,8 @@
 <template>
   <div class="poster">
-    <div :class="['poster-img', posterForm, { placeholder: error }]">
+    <div :class="['poster-img', posterForm, { placeholder: hasPlaceholder }]">
       <Icon
-        v-if="error"
+        v-if="hasPlaceholder"
         class="poster-img__placeholder"
         :icon="posterForm === 'circle' ? 'users-thin' : 'notebook-thin'"
       />
@@ -29,20 +29,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref as deepRef, watch } from 'vue'
+import { computed, ref as deepRef, watch } from 'vue'
 import { useImage } from '@vueuse/core'
 
 import Icon from '@/components/Icon.vue'
 import CustomMarquee from '@/components/CustomMarquee.vue'
 
-type PoserForm = 'square' | 'circle'
+type PosterForm = 'square' | 'circle'
 
 interface PosterProps {
-  title: string
-  subtitle: string
+  title?: string
+  subtitle?: string
   note?: string
-  src: string
-  posterForm?: PoserForm
+  src?: string
+  posterForm?: PosterForm
 }
 
 const {
@@ -55,6 +55,7 @@ const {
 
 const imageOptions = deepRef({ src })
 const { error } = useImage(imageOptions, { delay: 0 })
+const hasPlaceholder = computed(() => !src || Boolean(error.value))
 
 watch(
   () => src,

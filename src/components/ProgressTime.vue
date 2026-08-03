@@ -10,14 +10,18 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-interface ProgressTime {
+interface ProgressTimeProps {
   seekPositionTime?: string
   songDurationTime?: string
 }
 
-const { seekPositionTime = '00:00', songDurationTime = '00:00' } = defineProps<ProgressTime>()
+const { seekPositionTime = '00:00', songDurationTime = '00:00' } = defineProps<ProgressTimeProps>()
 
-const hasSongDurationTime = computed(() => songDurationTime !== '00:00')
+const hasSongDurationTime = computed(() => {
+  const normalizedDuration = songDurationTime.trim()
+
+  return normalizedDuration.length > 0 && normalizedDuration !== '00:00'
+})
 </script>
 
 <style lang="scss">
