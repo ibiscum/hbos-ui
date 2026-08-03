@@ -182,7 +182,7 @@ describe('Artist Store - Regression Tests', () => {
 
       await store.getArtists()
 
-      expect(mockRewriteImageUrl).not.toHaveBeenCalled()
+      expect(mockRewriteImageUrl).toHaveBeenCalledTimes(0)
       expect(store.artists[0].$cover_src).toBeUndefined()
     })
 
