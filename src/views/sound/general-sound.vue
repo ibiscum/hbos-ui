@@ -151,7 +151,6 @@ import PageContent from '@/components/PageContent.vue'
 import ProgressSlider from '@/components/ProgressSlider.vue'
 import { ref, computed, onMounted } from 'vue'
 import { getSpeakerEQCrossbar, setSpeakerEQCrossbarMatrix, getSpeakerEQMasterGain, setSpeakerEQMasterGain } from '@/api/pipewire'
-import { getSystemInfo, type SystemInfo } from '@/api/system'
 import { getHeadphoneControls, getHeadphoneVolume, setHeadphoneVolume } from '@/api/volume'
 import { settingsToMatrix, matrixToSettings, type AudioMode } from '@/helpers/mixing_matrix'
 
@@ -178,7 +177,6 @@ const headphoneVolumePercent = ref<number>(100)
 const headphoneVolumeDb = ref<number | null>(null)
 const headphoneVolumeAvailable = ref<boolean>(false)
 const headphoneVolumeControlType = ref<string | null>(null)
-const systemInfo = ref<SystemInfo | null>(null)
 
 // Convert percentage to attenuation in dB (linear mapping)
 const displayDb = computed(() => {
@@ -276,7 +274,7 @@ const sliderPercentToBalance = (percent: number): number => {
   // Handle invalid input
   if (typeof percent !== 'number' || isNaN(percent) || !isFinite(percent)) {
     console.error('Invalid percent input to sliderPercentToBalance:', percent)
-    return 0 // Default to center balance
+    return Number.NaN
   }
   // 0% -> -1, 50% -> 0, 100% -> +1
   return (percent / 50) - 1
@@ -419,16 +417,6 @@ onMounted(async () => {
   } catch (e) {
     console.warn('Failed to check headphone volume controls:', e)
     headphoneVolumeAvailable.value = false
-  }
-
-  // Load system info for other information
-  try {
-    const sysRes = await getSystemInfo()
-    if (sysRes.status === 'success') {
-      systemInfo.value = sysRes
-    }
-  } catch (e) {
-    console.warn('Failed to load system info:', e)
   }
 
   // Load master gain from PipeWire SpeakerEQ

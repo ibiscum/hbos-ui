@@ -260,9 +260,8 @@ const selectedBand = ref<Filter | null>(null);
 
 const graphContainer = ref<HTMLDivElement | null>(null);
 
-// **MODIFICATION 1: Initial svgHeight set to a smaller fixed value**
 const svgWidth = ref(900);
-const svgHeight = ref(100); // Set a smaller initial height, e.g., 100px
+const svgHeight = ref(100);
 
 const margin = { top: 10, right: 30, bottom: 30, left: 50 };
 const plotWidth = computed(() => svgWidth.value - margin.left - margin.right);
@@ -271,7 +270,6 @@ const plotHeight = computed(() => svgHeight.value - margin.top - margin.bottom);
 const gainGridLines = [-25, -15, -5, 0, 5, 15, 25];
 const gainGridLabels = [-25, -15, -5, 0, 5, 15, 25];
 
-// MODIFIED: Computed properties for dynamic bandwidth lines (now for all filter types)
 const activeFilterBandwidthStart = computed(() => {
   const filter = currentFilter.value;
   // Lines should always be shown for the active filter if Q is valid and positive
@@ -279,7 +277,7 @@ const activeFilterBandwidthStart = computed(() => {
     let bandwidthHz;
 
     // Different interpretations of Q for different filter types
-    if (filter.icon === 'filter-peak') {
+    if (filter.icon === 'peaking') {
       bandwidthHz = filter.frequency / filter.Q; // Standard Q for peak filter
     } else {
       // For shelf filters, Q influences the slope. We'll use a scaled Fc/Q
@@ -299,7 +297,7 @@ const activeFilterBandwidthEnd = computed(() => {
   if (typeof filter.Q === 'number' && filter.Q > 0) {
     let bandwidthHz;
 
-    if (filter.icon === 'filter-peak') {
+    if (filter.icon === 'peaking') {
       bandwidthHz = filter.frequency / filter.Q;
     } else {
       bandwidthHz = filter.frequency / (filter.Q * 2);
@@ -564,13 +562,10 @@ const formatHzForSVG = (val: number) => {
   return `${val}`;
 };
 
-// **MODIFICATION 2: Updated updateSvgDimensions to set a fixed height**
 const updateSvgDimensions = () => {
   if (graphContainer.value) {
     svgWidth.value = graphContainer.value.offsetWidth;
-    // Set a fixed height here. This will override the initial ref value.
-    // If you want it responsive but shorter, use Math.max(MIN_HEIGHT, graphContainer.value.offsetWidth / LARGER_DIVISOR);
-    svgHeight.value = 500; // Example: Set to a fixed 100px. Adjust as needed (e.g., 80, 60).
+    svgHeight.value = 500;
   }
 };
 
@@ -676,9 +671,6 @@ watch(filters, () => {
 
     svg {
       width: 100%;
-      // **MODIFICATION 3: Removed or commented out height: 100%;**
-      /* height: 100%; */
-      // The height attribute bound via Vue (:height="svgHeight") will now control the height.
       overflow: visible;
       cursor: grab;
 
@@ -984,9 +976,6 @@ watch(filters, () => {
             display: flex;
             align-items: center;
             gap: 15px;
-
-            .filter-toggle {
-            }
 
             .filter-remove {
               @include delete-button-small;

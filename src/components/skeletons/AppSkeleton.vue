@@ -1,5 +1,9 @@
 <template>
-  <div :class="['skeleton', { 'skeleton--circle': shape === 'circle' }]">&nbsp;</div>
+  <div
+    :class="['skeleton', { 'skeleton--circle': shape === 'circle' }]"
+    aria-hidden="true"
+    role="presentation"
+  />
 </template>
 
 <script setup lang="ts">
@@ -8,7 +12,7 @@ interface SkeletonProps {
   height?: string
   shape?: 'circle' | 'square'
 }
-const { width = '100%', height = 'auto', shape = 'square' } = defineProps<SkeletonProps>()
+const { width = '100%', height = '1em', shape = 'square' } = defineProps<SkeletonProps>()
 </script>
 
 <style lang="scss" scoped>

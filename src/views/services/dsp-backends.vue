@@ -2,6 +2,7 @@
   <PageContent title="DSP Backends" :backrouterLink="{ name: 'services' }">
     <div class="dsp-backends-content">
       <div class="dsp-backends-header">
+        <h2>Backend Selection</h2>
         <p>Select the backend system for digital signal processing. The backend determines how filter changes are applied and managed.</p>
       </div>
 
@@ -290,19 +291,21 @@ const showBackendDetails = async (backendId: 'console' | 'dspToolkit') => {
       description: capabilities.backendDescription
     };
     showBackendInfoModal.value = true;
-
-    console.log('Backend details loaded:', {
-      backendId,
-      name: capabilities.backendName,
-      shortDescription: capabilities.backendShortDescription
-    });
   } catch (error) {
     console.error('Failed to load backend details:', error);
+    toastStore.showErrorToast('Failed to load backend details')
   }
-};// Initialize on mount
+};
+
+// Initialize on mount
 onMounted(async () => {
-  await filterStore.initializeBackend();
-  await loadBackendInfo();
+  try {
+    await filterStore.initializeBackend();
+    await loadBackendInfo();
+  } catch (error) {
+    console.error('Failed to initialize DSP backends view:', error)
+    toastStore.showErrorToast('Failed to initialize DSP backends')
+  }
 });
 </script>
 

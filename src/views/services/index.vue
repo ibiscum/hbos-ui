@@ -67,13 +67,13 @@
         <p>Manage Bluetooth settings</p>
       </ContentBoxLink>
 
-      <ContentBoxLink :to="{ name: 'system-tools'}" :height="150">
+      <ContentBoxLink :to="{ name: 'system-tools' }" :height="150">
         <div class="settingsCardHeader">
           <Icon icon="tool" class="settingsCardHeaderIcon" />
           <h2>System Tools</h2>
         </div>
         <p class="settingsCardWarningText">
-          <strong>⚠️ Use with caution:</strong> These tools can leave the system in an unusable state if used incorrectly.
+          <strong>Warning:</strong> These tools can leave the system in an unusable state if used incorrectly.
         </p>
       </ContentBoxLink>
 
@@ -98,30 +98,30 @@
 
 <script setup lang="ts">
 import Icon from '@/components/Icon.vue'
-import ContentBoxLink from "@/components/ContentBoxLink.vue"
-import PageContent from "@/components/PageContent.vue"
+import ContentBoxLink from '@/components/ContentBoxLink.vue'
+import PageContent from '@/components/PageContent.vue'
 </script>
 
 <style scoped lang="scss">
-.settingsOverview{
+.settingsOverview {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 25px;
 
-  .settingsCardHeader{
+  .settingsCardHeader {
     display: flex;
     flex-direction: row;
     align-items: center;
     margin-bottom: 10px;
 
-    .settingsCardHeaderIcon{
+    .settingsCardHeaderIcon {
       margin-right: 10px;
     }
   }
 
-  .settingsCardWarningText{
-    strong{
-      color: var(--primary);
+  .settingsCardWarningText {
+    strong {
+      color: var(--color-error, #dc3545);
     }
   }
 }

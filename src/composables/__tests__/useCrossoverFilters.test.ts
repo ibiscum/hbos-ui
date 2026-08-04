@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useCrossoverFilters } from '@/composables/useCrossoverFilters'
 import { useFilterStore } from '@/stores/filter-connector'
 import { useToastStore } from '@/stores/toast'
-import { writeChannelLevel } from '@/api/dsptoolkit'
+import { writeChannelDelay, writeChannelLevel, writeChannelInvert, writeChannelSelect } from '@/api/dsptoolkit'
 import {
   copyFiltersToChannels,
   removeFilterFromLinkedChannels,
@@ -302,5 +302,121 @@ describe('useCrossoverFilters', () => {
 
     // initialize loads once, and toggling link reloads once after copy
     expect(mockFilterStore.syncFromBackend).toHaveBeenCalledTimes(2)
+  })
+
+  it('ignores invalid channel when setting active channel (regression)', () => {
+    const composable = useCrossoverFilters()
+
+    composable.channelNames.value = ['A', 'B']
+    composable.channelFilters.value = {
+      A: [makeUiFilter(1)],
+      B: [makeUiFilter(2)],
+    }
+    composable.activeChannel.value = 'A'
+    composable.activeFilterId.value = 1
+
+    composable.setActiveChannel('Z')
+
+    expect(composable.activeChannel.value).toBe('A')
+    expect(composable.activeFilterId.value).toBe(1)
+  })
+
+  it('ignores invalid pair key when toggling link (regression)', async () => {
+    const composable = useCrossoverFilters()
+
+    composable.channelNames.value = ['A', 'B', 'C', 'D']
+    composable.linkedPairs.value = { A: false, C: false }
+
+    await composable.togglePairLink('Z')
+
+    expect(composable.linkedPairs.value).toEqual({ A: false, C: false })
+    expect(copyFiltersToChannels).not.toHaveBeenCalled()
+  })
+
+  it('converts delay milliseconds to samples and writes channel delay when supported', async () => {
+    const composable = useCrossoverFilters()
+
+    composable.sampleRate.value = 48000
+    composable.channelFeatures.value = {
+      A: {
+        hasDelay: true,
+        hasLevel: false,
+        hasInvert: false,
+        hasChannelSelect: false,
+        delayAddress: 123,
+      },
+    }
+
+    await composable.setChannelDelay('A', 10)
+
+    expect(writeChannelDelay).toHaveBeenCalledWith(123, 480)
+    expect(composable.channelSettings.value.A.delay).toBe(480)
+    expect(composable.getChannelDelayMs('A')).toBe(10)
+  })
+
+  it('skips delay write when channel has no delay capability', async () => {
+    const composable = useCrossoverFilters()
+
+    composable.channelFeatures.value = {
+      A: {
+        hasDelay: false,
+        hasLevel: false,
+        hasInvert: false,
+        hasChannelSelect: false,
+      },
+    }
+
+    await composable.setChannelDelay('A', 5)
+
+    expect(writeChannelDelay).not.toHaveBeenCalled()
+    expect(composable.channelSettings.value.A).toBeUndefined()
+  })
+
+  it('writes invert/select settings only when corresponding channel features are available', async () => {
+    const composable = useCrossoverFilters()
+
+    composable.channelFeatures.value = {
+      A: {
+        hasDelay: false,
+        hasLevel: false,
+        hasInvert: true,
+        hasChannelSelect: true,
+        invertAddress: 201,
+        channelSelectAddress: 202,
+      },
+      B: {
+        hasDelay: false,
+        hasLevel: false,
+        hasInvert: false,
+        hasChannelSelect: false,
+      },
+    }
+
+    await composable.setChannelInvert('A', true)
+    await composable.setChannelSelectMode('A', 2)
+    await composable.setChannelInvert('B', true)
+    await composable.setChannelSelectMode('B', 2)
+
+    expect(writeChannelInvert).toHaveBeenCalledWith(201, true)
+    expect(writeChannelSelect).toHaveBeenCalledWith(202, 2)
+    expect(writeChannelInvert).toHaveBeenCalledTimes(1)
+    expect(writeChannelSelect).toHaveBeenCalledTimes(1)
+    expect(composable.channelSettings.value.A.inverted).toBe(true)
+    expect(composable.channelSettings.value.A.channelSelect).toBe(2)
+    expect(composable.channelSettings.value.B).toBeUndefined()
+  })
+
+  it('returns safe defaults for delay and level helper getters', () => {
+    const composable = useCrossoverFilters()
+
+    composable.channelSettings.value = {
+      A: { delay: 960, level: 0, inverted: false, channelSelect: 0 },
+    }
+    composable.sampleRate.value = 48000
+
+    expect(composable.getChannelDelayMs('A')).toBe(20)
+    expect(composable.getChannelDelayMs('missing')).toBe(0)
+    expect(composable.getChannelLevelDb('A')).toBe(-60)
+    expect(composable.getChannelLevelDb('missing')).toBe(-60)
   })
 })

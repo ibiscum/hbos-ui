@@ -420,6 +420,7 @@ const generatePreviewPath = (measurement: RoomMeasurement): string => {
   const maxFreq = 20000
   const minMag = Math.min(...measurement.magnitudes)
   const maxMag = Math.max(...measurement.magnitudes)
+  const magRange = maxMag - minMag
   const width = 300
   const height = 100
 
@@ -428,7 +429,10 @@ const generatePreviewPath = (measurement: RoomMeasurement): string => {
   }
 
   const magScale = (mag: number) => {
-    return height - ((mag - minMag) / (maxMag - minMag)) * height
+    if (magRange === 0) {
+      return height / 2
+    }
+    return height - ((mag - minMag) / magRange) * height
   }
 
   let path = ''
@@ -460,11 +464,6 @@ onMounted(() => {
 
 <style scoped lang="scss">
 @use '@/assets/scss/mixins' as *;
-.room-acoustics-page {
-  width: 100%;
-  height: 100%;
-}
-
 .room-acoustics {
   padding: 20px;
 

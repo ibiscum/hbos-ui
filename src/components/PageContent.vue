@@ -3,29 +3,29 @@
     <BackRouter
       v-if="backrouterLink"
       :to="backrouterLink"
-      class="backrouter"
-      :class="{'noPadding': headerHasContentBelow}"
+      class="back-router-header backrouter"
+      :class="{ 'no-padding': headerHasContentBelow, noPadding: headerHasContentBelow }"
     >
       {{ title }}
     </BackRouter>
 
     <router-link
-      v-else-if="hintLink"
+      v-else-if="hintLink && title"
       :to="hintLink"
-      class="titleHintLink"
-      :class="{'noPadding': headerHasContentBelow}"
+      class="title-hint-link titleHintLink"
+      :class="{ 'no-padding': headerHasContentBelow, noPadding: headerHasContentBelow }"
     >
       <h1>
         {{ title }}
       </h1>
-      <span class="minimalHint">
+      <span v-if="hintString" class="minimal-hint minimalHint">
         {{ hintString }}
       </span>
     </router-link>
 
     <h1
       v-else-if="title"
-      :class="{'noPadding': headerHasContentBelow}"
+      :class="{ 'no-padding': headerHasContentBelow, noPadding: headerHasContentBelow }"
     >
       {{ title }}
     </h1>
@@ -42,20 +42,24 @@ import type { RouteLocationRaw } from 'vue-router'
 defineProps<{
   title?: string
   backrouterLink?: RouteLocationRaw
-  hintLink?: string
+  hintLink?: RouteLocationRaw
   hintString?: string
   headerHasContentBelow?: boolean
 }>()
 </script>
 
 <style scoped lang="scss">
-h1, .backrouter {
+h1,
+.back-router-header,
+.backrouter {
   padding-bottom: 25px;
-  &.noPadding{
-    padding-bottom: 0px;
+  &.no-padding,
+  &.noPadding {
+    padding-bottom: 0;
   }
 }
 
+.title-hint-link,
 .titleHintLink {
   color: var(--color-text);
   text-decoration: none;
@@ -67,6 +71,7 @@ h1, .backrouter {
     color: var(--color-accent);
     cursor: pointer;
 
+    .minimal-hint,
     .minimalHint {
       opacity: 1;
       visibility: visible;
@@ -74,6 +79,7 @@ h1, .backrouter {
   }
 }
 
+.minimal-hint,
 .minimalHint {
   position: absolute;
   top: 50%;
@@ -92,7 +98,7 @@ h1, .backrouter {
 
   /* Create a CSS triangle */
   &::before {
-    content: "";
+    content: '';
     position: absolute;
     top: -4px;
     left: 50%;

@@ -3,5 +3,5 @@
 </template>
 
 <script setup lang="ts">
-import PlaylistView from './playlist.vue'
+import PlaylistView from '@/views/playlist.vue'
 </script>

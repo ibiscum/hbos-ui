@@ -33,7 +33,7 @@ const router = createRouter({
       redirect: { name: 'now-playing' },
       children: [
         {
-          path: '/library',
+          path: 'library',
           component: () => import('@/views/router-view.vue'),
           children: [
             {
@@ -88,10 +88,26 @@ const router = createRouter({
                 },
               ],
             },
+            {
+              path: 'categories',
+              component: () => import('@/views/router-view.vue'),
+              children: [
+                {
+                  path: '',
+                  name: 'categories',
+                  component: () => import('@/views/library/categories.vue'),
+                },
+                {
+                  path: ':category',
+                  name: 'albums-by-category',
+                  component: () => import('@/views/library/albums-by-category.vue'),
+                },
+              ],
+            },
           ],
         },
         {
-          path: '/services',
+          path: 'services',
           component: () => import('@/views/router-view.vue'),
           children: [
             {
@@ -167,17 +183,17 @@ const router = createRouter({
           ],
         },
         {
-          path: '/now-playing',
+          path: 'now-playing',
           name: 'now-playing',
           component: () => import('@/views/now-playing.vue'),
         },
         {
-          path: '/playlist',
+          path: 'playlist',
           name: 'playlist',
           component: () => import('@/views/queue.vue'),
         },
         {
-          path: '/sound',
+          path: 'sound',
           component: () => import('@/views/router-view.vue'),
           children: [
             {

@@ -1,30 +1,42 @@
 <template>
   <PageContent title="Music Library">
     <ContentBox>
-      <div class="libaryCard">
+      <div class="libraryCard">
         <div class="title">
           <h2>Artists</h2>
           <router-link v-if="artists.length > 0" :to="{ name: 'artists' }" class="text-link">View All</router-link>
         </div>
         <PosterGrid :loading="loadingArtists" :loaded="loadedArtists" :items="artists" poster-form="circle" in-row
-          @click="(artist) => router.push({ name: 'artist-album', params: { artistId: artist.id } })" />
+          @click="(artist) => {
+            const artistId = getRouteItemId(artist)
+            if (artistId) {
+              router.push({ name: 'artist-album', params: { artistId } })
+            }
+          }"
+        />
       </div>
     </ContentBox>
 
-    <ContentBox class="libaryContentBox">
-      <div class="libaryCard">
+    <ContentBox class="libraryContentBox">
+      <div class="libraryCard">
         <div class="title">
           <h2>Albums</h2>
           <router-link v-if="sortedAlbumsByReleaseDate.length > 0" :to="{ name: 'albums' }" class="text-link">View
             All</router-link>
         </div>
         <PosterGrid :loading="loadingAlbums" :loaded="loadedAlbums" :items="sortedAlbumsByReleaseDate" in-row
-          @click="(album) => router.push({ name: 'album', params: { albumId: album.id } })" />
+          @click="(album) => {
+            const albumId = getRouteItemId(album)
+            if (albumId) {
+              router.push({ name: 'album', params: { albumId } })
+            }
+          }"
+        />
       </div>
     </ContentBox>
 
-    <ContentBox class="libaryContentBox">
-      <div class="libaryCard">
+    <ContentBox class="libraryContentBox">
+      <div class="libraryCard">
         <div class="title">
           <h2>Radio</h2>
           <router-link :to="{ name: 'radio' }" class="text-link">View All</router-link>
@@ -43,8 +55,8 @@
 </template>
 
 <script setup lang="ts">
-import ContentBox from "@/components/ContentBox.vue"
-import PageContent from "@/components/PageContent.vue"
+import ContentBox from '@/components/ContentBox.vue'
+import PageContent from '@/components/PageContent.vue'
 import { onMounted, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 
@@ -67,14 +79,27 @@ const {
   loaded
 } = storeToRefs(radioStore)
 
+interface RouteItem {
+  id?: string
+  $id?: string
+}
+
+const getRouteItemId = (item: RouteItem | undefined) => item?.id ?? item?.$id
+
 // Convert radio favorites to poster grid format
 const favoriteStationsForDisplay = computed(() => {
   return favoritesList.value.map((station: RadioFavorite) => ({
     $id: station.id,
     $title: station.title,
     $subtitle: station.metadata?.country || station.country || 'Radio Station',
-    $note: (station.metadata?.tags || station.tags) ?
-           String(station.metadata?.tags || station.tags).split(',').map(tag => tag.trim()).slice(0, 3).join(', ') : '',
+    $note: (station.metadata?.tags || station.tags)
+      ? String(station.metadata?.tags || station.tags)
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+          .slice(0, 3)
+          .join(', ')
+      : '',
     $cover_src: (typeof station.metadata?.logo_url === 'string' ? station.metadata.logo_url : '') ||
                 (typeof station.metadata?.coverart_url === 'string' ? station.metadata.coverart_url : '') ||
                 station.img || ''
@@ -101,10 +126,19 @@ const {
 const { getAlbums } = albumStore
 
 onMounted(async () => {
-  await libraryStore.getAvailableLibrary()
-  getArtists()
-  getAlbums()
-  await radioStore.initialize()
+  try {
+    await libraryStore.getAvailableLibrary()
+  } catch (error) {
+    console.error('Failed to resolve active library for library view:', error)
+  }
+
+  const results = await Promise.allSettled([getArtists(), getAlbums(), radioStore.initialize()])
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      const section = ['artists', 'albums', 'radio'][index]
+      console.error(`Failed to load ${section} section:`, result.reason)
+    }
+  })
 })
 </script>
 
@@ -119,7 +153,8 @@ onMounted(async () => {
     margin-bottom: 0;
   }
 }
-.libaryCard{
+
+.libraryCard {
   padding: 25px;
 }
 

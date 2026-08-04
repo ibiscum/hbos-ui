@@ -36,3 +36,8 @@ Coverage is implemented in `src/composables/__tests__/useCrossoverFilters.test.t
 - Lazy settings unit test: linked level writes create missing channel settings entries before updating values.
 - Drag-end unit test: drag state resets even if filter property persistence rejects.
 - Remove-filter unit test: failures emit toast + log and do not throw to callers.
+- Active-channel guard regression: unknown channel names are ignored and do not mutate active state.
+- Pair-toggle guard regression: unknown pair keys are ignored and do not mutate link state.
+- Delay conversion unit test: `setChannelDelay(channel, ms)` converts milliseconds to samples using backend sample rate and updates local settings consistently.
+- Capability-gating unit tests: delay/invert/channel-select writes execute only when corresponding channel feature addresses are present.
+- Helper fallback unit tests: delay/level display helpers return safe defaults for missing channels and non-positive gain values.

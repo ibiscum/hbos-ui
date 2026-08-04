@@ -195,10 +195,14 @@ const refreshMounts = async () => {
       mounts.value = response.data.mounts
       mountsSummary.value = response.data.summary
     } else {
+      mounts.value = []
+      mountsSummary.value = null
       error.value = response.message || 'Failed to load SMB mounts'
     }
   } catch (err) {
     console.error('Error fetching SMB mounts:', err)
+    mounts.value = []
+    mountsSummary.value = null
     error.value = err instanceof Error ? err.message : 'Unknown error occurred'
   } finally {
     loading.value = false
@@ -263,10 +267,12 @@ const removeMount = async (mount: SmbMount) => {
       }
       await refreshMounts()
     } else {
+      mountsSummary.value = null
       error.value = response.message || 'Failed to remove mount'
     }
   } catch (err) {
     console.error('Error removing mount:', err)
+    mountsSummary.value = null
     error.value = err instanceof Error ? err.message : 'Failed to remove mount'
   } finally {
     removing.value = false
@@ -703,27 +709,24 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
-  .music-files {
-    .music-files-content {
-      .section {
-        .section-header {
-          flex-direction: column;
-          align-items: flex-start;
-          gap: 16px;
-        }
+  .music-files-content {
+    .section {
+      .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+      }
 
-        .mounts-list {
-          .mount-item {
-            .mount-main {
-              .mount-info {
-                .mount-details {
-                  h3 {
-                    font-size: 1rem;
-                  }
+      .mounts-list {
+        .mount-item {
+          .mount-main {
+            .mount-info {
+              .mount-details {
+                h3 {
+                  font-size: 1rem;
                 }
               }
             }
-
           }
         }
       }

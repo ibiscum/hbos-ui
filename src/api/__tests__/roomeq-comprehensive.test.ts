@@ -13,6 +13,23 @@ describe('RoomEQ API - Comprehensive Unit & Regression Tests', () => {
   let mockConfigStore: any
   let mockApiFetch: any
 
+  const createSseResponse = (chunks: string[], status = 200): Response => {
+    const encoder = new TextEncoder()
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const chunk of chunks) {
+          controller.enqueue(encoder.encode(chunk))
+        }
+        controller.close()
+      }
+    })
+
+    return new Response(stream, {
+      status,
+      headers: { 'content-type': 'text/event-stream' }
+    })
+  }
+
   beforeEach(() => {
     // Create fresh mocks for each test
     mockConfigStore = {
@@ -863,6 +880,21 @@ describe('RoomEQ API - Comprehensive Unit & Regression Tests', () => {
         expect(result.data?.optimizer_presets).toHaveLength(1)
         expect(result.data?.optimizer_presets[0].key).toBe('default')
       })
+
+      it('should fallback when optimizer_presets payload is malformed', async () => {
+        mockApiFetch.mockResolvedValue(
+          new Response(JSON.stringify({ optimizer_presets: { default: true } }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        )
+
+        const result = await roomeq.getRoomEQOptimizerPresets()
+
+        expect(result.success).toBe(true)
+        expect(result.data?.count).toBe(1)
+        expect(result.data?.optimizer_presets[0].key).toBe('default')
+      })
     })
 
     describe('getRoomEQOptimizationTargetCurves', () => {
@@ -892,6 +924,161 @@ describe('RoomEQ API - Comprehensive Unit & Regression Tests', () => {
         expect(result.success).toBe(true)
         expect(result.data).toContain('flat')
         expect(result.data).toContain('harman')
+      })
+
+      it('should extract curve names from target_curves object shape', async () => {
+        mockApiFetch.mockResolvedValue(
+          new Response(JSON.stringify({
+            target_curves: {
+              flat: { curve: [] },
+              harman: { curve: [] }
+            }
+          }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        )
+
+        const result = await roomeq.getRoomEQOptimizationTargetCurves()
+
+        expect(result.success).toBe(true)
+        expect(result.data).toEqual(expect.arrayContaining(['flat', 'harman']))
+      })
+
+      it('should extract curve names from targets object shape', async () => {
+        mockApiFetch.mockResolvedValue(
+          new Response(JSON.stringify({
+            targets: {
+              weighted_flat: {},
+              diffuse_field: {}
+            }
+          }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        )
+
+        const result = await roomeq.getRoomEQOptimizationTargetCurves()
+
+        expect(result.success).toBe(true)
+        expect(result.data).toEqual(expect.arrayContaining(['weighted_flat', 'diffuse_field']))
+      })
+
+      it('should fallback with detail when candidate parsing fails', async () => {
+        mockApiFetch.mockResolvedValue(
+          new Response('not-json', {
+            status: 200,
+            headers: { 'content-type': 'text/plain' }
+          })
+        )
+
+        const result = await roomeq.getRoomEQOptimizationTargetCurves()
+
+        expect(result.success).toBe(true)
+        expect(result.data).toContain('flat')
+        expect(result.detail).toContain('Using fallback curves:')
+      })
+
+      it('should hit outer catch fallback when store lookup throws', async () => {
+        vi.mocked(useAppConfigStore).mockImplementation(() => {
+          throw new Error('store unavailable')
+        })
+
+        const result = await roomeq.getRoomEQOptimizationTargetCurves()
+
+        expect(result.success).toBe(true)
+        expect(result.data).toEqual(['flat', 'weighted_flat', 'harman'])
+      })
+    })
+
+    describe('Legacy Optimization Endpoints', () => {
+      it('should start legacy optimization successfully', async () => {
+        mockApiFetch.mockResolvedValue(
+          new Response(JSON.stringify({
+            status: 'started',
+            optimization_id: 'opt-1',
+            message: 'started',
+            estimated_duration: 12,
+            target_curve: 'flat',
+            optimizer_preset: 'default',
+            filter_count: 8
+          }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        )
+
+        const result = await roomeq.startRoomEQOptimization({ target_curve: 'flat' })
+
+        expect(result.success).toBe(true)
+        expect(result.data?.optimization_id).toBe('opt-1')
+      })
+
+      it('should return detail when legacy optimization start fails', async () => {
+        mockApiFetch.mockResolvedValue(new Response('bad request', { status: 400, statusText: 'Bad Request' }))
+
+        const result = await roomeq.startRoomEQOptimization({ target_curve: 'flat' })
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('Failed to start optimization')
+      })
+
+      it('should return error detail for optimization status fetch failure', async () => {
+        mockApiFetch.mockResolvedValue(new Response('missing', { status: 404, statusText: 'Not Found' }))
+
+        const result = await roomeq.getRoomEQOptimizationStatus('opt/abc')
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('Failed to get optimization status')
+      })
+
+      it('should cancel optimization successfully', async () => {
+        mockApiFetch.mockResolvedValue(
+          new Response(JSON.stringify({
+            status: 'cancelled',
+            optimization_id: 'opt-9',
+            message: 'cancelled'
+          }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        )
+
+        const result = await roomeq.cancelRoomEQOptimization('opt-9')
+
+        expect(result.success).toBe(true)
+        expect(result.data?.status).toBe('cancelled')
+      })
+
+      it('should fetch optimization result successfully', async () => {
+        mockApiFetch.mockResolvedValue(
+          new Response(JSON.stringify({
+            optimization_id: 'opt-2',
+            status: 'completed',
+            success: true,
+            target_curve: 'flat',
+            optimizer_preset: 'default',
+            processing_time: 22,
+            final_rms_error: 0.2,
+            improvement_db: 3.1,
+            filters: [],
+            frequency_response: {
+              frequencies: [20],
+              original_response: [0],
+              corrected_response: [0],
+              target_response: [0]
+            },
+            timestamp: '2024-01-01T00:00:00Z'
+          }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        )
+
+        const result = await roomeq.getRoomEQOptimizationResult('opt-2')
+
+        expect(result.success).toBe(true)
+        expect(result.data?.optimization_id).toBe('opt-2')
       })
     })
   })
@@ -1002,6 +1189,205 @@ describe('RoomEQ API - Comprehensive Unit & Regression Tests', () => {
         expect(result.success).toBe(true)
         expect(result.data?.fft.points).toBe(4)
       })
+
+      it('should include timeout, normalize and fft_points in query parameters', async () => {
+        const mockResponse: roomeq.RoomMeasureResponse = {
+          status: 'success',
+          device: 'hw:0,0',
+          channel: 'left',
+          count: 2,
+          fft_points: 32,
+          csv_path: '/data/measurement.csv',
+          fft: {
+            frequencies: [20, 100],
+            magnitudes_db: [-20, -10],
+            phase: [0, 0],
+            points: 2
+          },
+          message: 'ok'
+        }
+
+        mockApiFetch.mockResolvedValue(
+          new Response(JSON.stringify(mockResponse), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        )
+
+        await roomeq.startRoomMeasure({
+          device: 'hw:0,0',
+          channel: 'left',
+          count: 2,
+          timeout: 45,
+          normalize_frequency: 'none',
+          fft_points: 32
+        })
+
+        const calledUrl = String(mockApiFetch.mock.calls[0]?.[0] || '')
+        expect(calledUrl).toContain('timeout=45')
+        expect(calledUrl).toContain('normalize_frequency=none')
+        expect(calledUrl).toContain('fft_points=32')
+      })
+
+      it('should return detail when room measurement request fails', async () => {
+        mockApiFetch.mockResolvedValue(
+          new Response('service unavailable', {
+            status: 503,
+            statusText: 'Service Unavailable'
+          })
+        )
+
+        const result = await roomeq.startRoomMeasure({ device: 'hw:0,0' })
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('Failed to start room measurement')
+      })
+    })
+
+    describe('performRoomMeasurement', () => {
+      it('should fail when recording does not complete before timeout', async () => {
+        vi.useFakeTimers()
+
+        mockApiFetch.mockImplementation((url: string) => {
+          if (url.includes('/audio/noise/start')) {
+            return Promise.resolve(new Response(JSON.stringify({
+              message: 'Noise started',
+              status: 'playing',
+              filename: 'noise.wav'
+            }), { status: 200, headers: { 'content-type': 'application/json' } }))
+          }
+
+          if (url.includes('/audio/record/start')) {
+            return Promise.resolve(new Response(JSON.stringify({
+              status: 'recording',
+              recording_id: 'rec-timeout',
+              filename: 'rec-timeout.wav',
+              duration: 0
+            }), { status: 200, headers: { 'content-type': 'application/json' } }))
+          }
+
+          if (url.includes('/audio/record/status/')) {
+            return Promise.resolve(new Response(JSON.stringify({
+              status: 'recording',
+              recording_id: 'rec-timeout',
+              state: 'recording'
+            }), { status: 200, headers: { 'content-type': 'application/json' } }))
+          }
+
+          if (url.includes('/audio/analyze/fft-diff')) {
+            return Promise.resolve(new Response('unexpected fft call', { status: 500 }))
+          }
+
+          return Promise.resolve(new Response('unexpected URL', { status: 404 }))
+        })
+
+        const promise = roomeq.performRoomMeasurement(0, 0.5)
+        await vi.runAllTimersAsync()
+        const result = await promise
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('did not complete')
+        expect(mockApiFetch).not.toHaveBeenCalledWith(
+          expect.stringContaining('/audio/analyze/fft-diff'),
+          expect.anything()
+        )
+
+        vi.useRealTimers()
+      })
+    })
+
+    describe('completeRoomMeasurement', () => {
+      it('should fail when FFT difference response misses required analysis block', async () => {
+        vi.useFakeTimers()
+
+        mockApiFetch.mockResolvedValue(
+          new Response(JSON.stringify({ status: 'ok' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        )
+
+        const promise = roomeq.completeRoomMeasurement('noise.wav', 'rec-10', {}, 0)
+        await vi.runAllTimersAsync()
+        const result = await promise
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('missing difference_analysis')
+
+        vi.useRealTimers()
+      })
+
+      it('should fail when FFT difference request itself is unsuccessful', async () => {
+        vi.useFakeTimers()
+
+        mockApiFetch.mockResolvedValue(
+          new Response('failed', {
+            status: 500,
+            statusText: 'Internal Server Error'
+          })
+        )
+
+        const promise = roomeq.completeRoomMeasurement('noise.wav', 'rec-11', {}, 0)
+        await vi.runAllTimersAsync()
+        const result = await promise
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('Failed to analyze FFT difference between noise and recording')
+
+        vi.useRealTimers()
+      })
+
+      it('should fail when difference analysis has frequencies but no magnitudes', async () => {
+        vi.useFakeTimers()
+
+        mockApiFetch.mockResolvedValue(
+          new Response(JSON.stringify({
+            status: 'success',
+            difference_analysis: {
+              frequencies: [20, 100]
+            }
+          }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        )
+
+        const promise = roomeq.completeRoomMeasurement('noise.wav', 'rec-12', {}, 0)
+        await vi.runAllTimersAsync()
+        const result = await promise
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('missing frequencies or magnitudes arrays')
+
+        vi.useRealTimers()
+      })
+
+      it('should return extracted frequencies and magnitudes on valid FFT difference payload', async () => {
+        vi.useFakeTimers()
+
+        mockApiFetch.mockResolvedValue(
+          new Response(JSON.stringify({
+            status: 'success',
+            difference_analysis: {
+              frequencies: [20, 100, 1000],
+              magnitudes: [-2, -1, 0]
+            }
+          }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        )
+
+        const promise = roomeq.completeRoomMeasurement('noise.wav', 'rec-13', {}, 0)
+        await vi.runAllTimersAsync()
+        const result = await promise
+
+        expect(result.success).toBe(true)
+        expect(result.data?.frequencyResponse.frequencies).toEqual([20, 100, 1000])
+        expect(result.data?.frequencyResponse.magnitudes).toEqual([-2, -1, 0])
+
+        vi.useRealTimers()
+      })
     })
   })
 
@@ -1044,6 +1430,246 @@ describe('RoomEQ API - Comprehensive Unit & Regression Tests', () => {
         expect(result.data?.usable_freq_low).toBe(40)
         expect(result.data?.usable_freq_high).toBe(15000)
       })
+
+      it('should return detailed HTTP errors for non-ok responses', async () => {
+        mockApiFetch.mockResolvedValue(
+          new Response('invalid curve payload', {
+            status: 422,
+            statusText: 'Unprocessable Entity',
+            headers: { 'content-type': 'text/plain' }
+          })
+        )
+
+        const payload: roomeq.RoomEQUsableRangeRequest = {
+          measured_curve: {
+            frequencies: [20, 100, 1000],
+            magnitudes_db: [-20, -10, -5]
+          }
+        }
+
+        const result = await roomeq.detectUsableFrequencyRange(payload)
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('HTTP 422')
+        expect(result.detail).toContain('invalid curve payload')
+        expect(mockApiFetch).toHaveBeenCalledWith(
+          `${mockBaseUrl}/eq/usable-range`,
+          expect.objectContaining({ method: 'POST' })
+        )
+      })
+    })
+  })
+
+  // ============= STREAMING OPTIMIZATION TESTS =============
+  describe('Streaming Optimization Functions', () => {
+    describe('startNewRoomEQOptimizationStream', () => {
+      it('should parse completion result and call onComplete once', async () => {
+        const finalResult: roomeq.NewRoomEQOptimizationResult = {
+          success: true,
+          filters: [],
+          final_error: 0.42,
+          original_error: 1.0,
+          improvement_db: 2.5,
+          processing_time_ms: 345,
+          error_message: null,
+          usable_freq_low: 40,
+          usable_freq_high: 16000
+        }
+
+        const completedEvent = {
+          type: 'completed',
+          message: 'done',
+          line: JSON.stringify(finalResult)
+        }
+
+        mockApiFetch.mockResolvedValue(createSseResponse([
+          `data: ${JSON.stringify({ type: 'started', message: 'starting' })}\n`,
+          `data: ${JSON.stringify(completedEvent)}\n\n`
+        ]))
+
+        const onEvent = vi.fn()
+        const onError = vi.fn()
+        const onComplete = vi.fn()
+
+        const result = await roomeq.startNewRoomEQOptimizationStream(
+          {
+            measured_curve: { frequencies: [20, 100], magnitudes_db: [-3, -1] },
+            target_curve: { curve: [{ frequency: 20, target_db: 0, weight: null }] },
+            optimizer_params: {
+              qmax: 10,
+              mindb: -10,
+              maxdb: 3,
+              add_highpass: true,
+              acceptable_error: 0.5
+            },
+            sample_rate: 48000,
+            filter_count: 6
+          },
+          onEvent,
+          onError,
+          onComplete
+        )
+
+        expect(result.success).toBe(true)
+        expect(onError).not.toHaveBeenCalled()
+        expect(onEvent).toHaveBeenCalledTimes(2)
+        expect(onComplete).toHaveBeenCalledTimes(1)
+        expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({
+          success: true,
+          usable_freq_low: 40,
+          usable_freq_high: 16000
+        }))
+      })
+
+      it('should ignore malformed events and still complete stream', async () => {
+        mockApiFetch.mockResolvedValue(createSseResponse([
+          'data: {"type":"started","message":"ok"}\n',
+          'data: {invalid json\n'
+        ]))
+
+        const onEvent = vi.fn()
+        const onError = vi.fn()
+        const onComplete = vi.fn()
+
+        const result = await roomeq.startNewRoomEQOptimizationStream(
+          {
+            measured_curve: { frequencies: [20, 100], magnitudes_db: [-3, -1] },
+            target_curve: { curve: [{ frequency: 20, target_db: 0, weight: null }] },
+            optimizer_params: {
+              qmax: 10,
+              mindb: -10,
+              maxdb: 3,
+              add_highpass: true,
+              acceptable_error: 0.5
+            },
+            sample_rate: 48000,
+            filter_count: 6
+          },
+          onEvent,
+          onError,
+          onComplete
+        )
+
+        expect(result.success).toBe(true)
+        expect(onEvent).toHaveBeenCalledTimes(1)
+        expect(onError).not.toHaveBeenCalled()
+        expect(onComplete).toHaveBeenCalledTimes(1)
+        expect(onComplete).toHaveBeenCalledWith(undefined)
+      })
+    })
+
+    describe('startRoomEQOptimizationStream', () => {
+      it('should surface stream error events via onError and return failure', async () => {
+        mockApiFetch.mockResolvedValue(createSseResponse([
+          `data: ${JSON.stringify({ type: 'error', error: 'backend failed' })}\n\n`
+        ]))
+
+        const onEvent = vi.fn()
+        const onError = vi.fn()
+        const onComplete = vi.fn()
+
+        const result = await roomeq.startRoomEQOptimizationStream(
+          { target_curve: 'flat' },
+          onEvent,
+          onError,
+          onComplete
+        )
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('backend failed')
+        expect(onError).toHaveBeenCalledWith('backend failed')
+        expect(onComplete).not.toHaveBeenCalled()
+      })
+
+      it('should call onComplete when stream closes without completed event', async () => {
+        mockApiFetch.mockResolvedValue(createSseResponse([
+          `data: ${JSON.stringify({ type: 'started', message: 'starting' })}\n`
+        ]))
+
+        const onEvent = vi.fn()
+        const onError = vi.fn()
+        const onComplete = vi.fn()
+
+        const result = await roomeq.startRoomEQOptimizationStream(
+          { target_curve: 'flat' },
+          onEvent,
+          onError,
+          onComplete
+        )
+
+        expect(result.success).toBe(true)
+        expect(onEvent).toHaveBeenCalledTimes(1)
+        expect(onError).not.toHaveBeenCalled()
+        expect(onComplete).toHaveBeenCalledTimes(1)
+      })
+    })
+  })
+
+  describe('Additional Error Branches', () => {
+    it('should return fallback detail for version requirement if version endpoint cannot be determined', async () => {
+      mockApiFetch.mockResolvedValue(new Response('down', { status: 500 }))
+
+      const result = await roomeq.checkRoomEQVersionRequirement()
+
+      if (import.meta.env.DEV) {
+        expect(result.success).toBe(true)
+        expect(result.currentVersion).toBe('unknown')
+      } else {
+        expect(result.success).toBe(false)
+        expect(result.error).toContain('Unable to determine RoomEQ API version')
+      }
+    })
+
+    it('should handle noise volume endpoint failures', async () => {
+      mockApiFetch.mockResolvedValue(new Response('forbidden', { status: 403, statusText: 'Forbidden' }))
+
+      const result = await roomeq.setRoomEQNoiseVolume(0.25)
+
+      expect(result.success).toBe(false)
+      expect(result.detail).toContain('Failed to set noise volume')
+    })
+
+    it('should handle SPL measurement endpoint failures', async () => {
+      mockApiFetch.mockResolvedValue(new Response('bad gateway', { status: 502, statusText: 'Bad Gateway' }))
+
+      const result = await roomeq.measureRoomEQSPL()
+
+      expect(result.success).toBe(false)
+      expect(result.detail).toContain('Failed to measure SPL')
+    })
+
+    it('should append optional duration for pre-recorded signal requests', async () => {
+      mockApiFetch.mockResolvedValue(
+        new Response(JSON.stringify({ message: 'started', status: 'playing' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+
+      const result = await roomeq.startRoomEQPrerecordedSignal('noise sweep.wav', 0.7, 2, 6)
+
+      expect(result.success).toBe(true)
+      const calledUrl = String(mockApiFetch.mock.calls[0]?.[0] || '')
+      expect(calledUrl).toContain('filename=noise%20sweep.wav')
+      expect(calledUrl).toContain('duration=6')
+    })
+
+    it('should return detail when pre-recorded signal start fails', async () => {
+      mockApiFetch.mockResolvedValue(new Response('bad', { status: 400, statusText: 'Bad Request' }))
+
+      const result = await roomeq.startRoomEQPrerecordedSignal('bad.wav')
+
+      expect(result.success).toBe(false)
+      expect(result.detail).toContain('Failed to start pre-recorded signal')
+    })
+
+    it('should handle raw microphone endpoint failures', async () => {
+      mockApiFetch.mockResolvedValue(new Response('nope', { status: 500, statusText: 'Internal Server Error' }))
+
+      const result = await roomeq.getRoomEQMicrophonesRaw()
+
+      expect(result.success).toBe(false)
+      expect(result.detail).toContain('Failed to get raw microphones')
     })
   })
 

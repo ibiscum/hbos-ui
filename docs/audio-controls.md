@@ -48,6 +48,31 @@
 - Composable (`useAudioControls`)
 - Child components: `IconButton`, `LyricsOverlay`
 
+## Testing Snapshot (2026-08-04)
+
+Validated with [src/components/__tests__/AudioControls.test.ts](../src/components/__tests__/AudioControls.test.ts) using a targeted per-file coverage run.
+
+- Tests passing: 11/11
+- Statements: 100%
+- Lines: 100%
+- Functions: 100%
+- Branches: 97.77%
+
+Coverage command:
+
+```bash
+pnpm vitest run src/components/__tests__/AudioControls.test.ts --coverage --coverage.include=src/components/AudioControls.vue
+```
+
+Consolidated coverage areas:
+
+- unit: class composition and sticky/non-sticky rendering
+- unit: play/pause and loop icon/title bindings
+- unit: favorite heart title/icon state and provider formatting
+- unit: capability, checking-favorite, and sending-command disable gates
+- unit: control action dispatch for shuffle/previous/play-next/loop/favorite
+- regression: lyrics overlay open/close behavior and null-song guard path
+
 ---
 
 ## Component Architecture

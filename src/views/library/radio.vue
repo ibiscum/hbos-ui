@@ -174,13 +174,19 @@ const onImageError = (event: Event) => {
 
 const getStationTags = (tags?: string): string[] => {
   if (!tags) return []
-  return tags.split(',').map(tag => tag.trim()).slice(0, 3)
+  return tags
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+    .slice(0, 3)
 }
 
 // Long press handling functions
 const startLongPress = (station: RadioFavorite) => {
+  cancelLongPress()
   isLongPressing.value = false
   longPressTimer.value = window.setTimeout(() => {
+    longPressTimer.value = null
     isLongPressing.value = true
     openEditPopup(station)
   }, longPressDelay)
@@ -200,6 +206,7 @@ const openEditPopup = (station: RadioFavorite) => {
 }
 
 const closeEditPopup = () => {
+  isLongPressing.value = false
   showEditPopup.value = false
   editingStation.value = null
 }
@@ -210,7 +217,11 @@ const saveEditedStation = (editedStation: RadioFavorite) => {
 }
 
 onMounted(async () => {
-  await radioStore.initialize()
+  try {
+    await radioStore.initialize()
+  } catch (error) {
+    console.error('Failed to initialize radio view:', error)
+  }
 })
 </script>
 

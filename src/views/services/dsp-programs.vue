@@ -12,7 +12,7 @@
           <div class="alert alert-info mb-0">
             <div class="d-flex align-items-center justify-content-center">
               <div class="text-center">
-                <Icon name="info-circle" class="text-info mb-3" size="3rem" />
+                <Icon icon="info-circle" class="text-info mb-3" size="3rem" />
                 <h4 class="alert-title">{{ dspError || 'No DSP hardware detected' }}</h4>
               </div>
             </div>
@@ -234,7 +234,7 @@ const deployModalTitle = computed(() => {
 
   if (selectedProfileForDeploy.value) {
     const profile = selectedProfileForDeploy.value
-    const isInstalled = profile.programChecksum === programChecksum.value
+    const isInstalled = profile.checksum === programChecksum.value?.checksum
     return isInstalled
       ? `${profile.profileName} - Already Installed`
       : `Deploy ${profile.profileName}?`
@@ -398,6 +398,9 @@ const loadAll = async () => {
 
 // Deploy modal methods
 const openDeployModal = (profile: DSPProfile & { filename: string; isInstalled?: boolean }) => {
+  deployResult.value = null
+  selectedProfileForDeploy.value = null
+
   if (profile.isInstalled) {
     // Show a simple info modal for already installed profiles
     deployResult.value = {
@@ -426,13 +429,15 @@ const closeDeployModal = () => {
 }
 
 const deployProfile = async () => {
-  if (!selectedProfileForDeploy.value || isDeploying.value) return
+  if (isDeploying.value) return
 
   // If showing result, close the modal
   if (deployResult.value) {
     closeDeployModal()
     return
   }
+
+  if (!selectedProfileForDeploy.value) return
 
   isDeploying.value = true
 
@@ -562,7 +567,7 @@ onMounted(() => {
     padding-top: 25px;
     margin-bottom: 32px;
 
-    h3 {
+    h2 {
       margin: 0 0 8px 0;
       color: var(--color-head);
       font-size: 1.25rem;

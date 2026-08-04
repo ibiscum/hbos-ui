@@ -237,9 +237,10 @@ async function onSavePassword() {
   passwordError.value = null
   passwordSuccess.value = null
   try {
+    const hadPassword = Boolean(status.value?.has_password)
     const current = status.value?.has_password ? currentPassword.value : undefined
     await authStore.setPassword(newPassword.value, current, remember.value)
-    passwordSuccess.value = status.value?.has_password
+    passwordSuccess.value = hadPassword
       ? 'Password changed.'
       : 'Password set. Settings changes are now protected.'
     currentPassword.value = ''
@@ -278,8 +279,13 @@ async function onLogout() {
   } catch {
     // best-effort: refresh status regardless so the UI reflects reality
   } finally {
-    await authStore.refreshStatus()
-    busy.value = false
+    try {
+      await authStore.refreshStatus()
+    } catch {
+      // ignore refresh failures so logout action never leaves the UI stuck
+    } finally {
+      busy.value = false
+    }
   }
 }
 

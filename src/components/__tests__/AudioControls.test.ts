@@ -1,679 +1,285 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { defineComponent, ref, type Ref } from 'vue'
 import AudioControls from '@/components/AudioControls.vue'
-import { storeToRefs } from 'pinia'
 
-// Mock player store
+type SongState = { metadata?: { lyrics_available?: boolean } } | null
+type CapabilitiesState = {
+  canShuffle: boolean
+  canPrevious: boolean
+  canPlay: boolean
+  canPause: boolean
+  canNext: boolean
+  canLoop: boolean
+}
+
+const toggleCurrentSongFavouriteMock = vi.fn()
+const playerState: {
+  isSendingCommand: Ref<boolean>
+  currentSongIsFavourite: Ref<boolean>
+  currentSongFavouriteProviders: Ref<string[]>
+  checkingFavourite: Ref<boolean>
+  currentSong: Ref<SongState>
+  playerCapabilities: Ref<CapabilitiesState>
+} = {
+  isSendingCommand: ref(false),
+  currentSongIsFavourite: ref(false),
+  currentSongFavouriteProviders: ref<string[]>([]),
+  checkingFavourite: ref(false),
+  currentSong: ref<SongState>({ metadata: { lyrics_available: false } }),
+  playerCapabilities: ref<CapabilitiesState>({
+    canShuffle: true,
+    canPrevious: true,
+    canPlay: true,
+    canPause: true,
+    canNext: true,
+    canLoop: true,
+  }),
+}
+
+const resetPlayerState = () => {
+  playerState.isSendingCommand.value = false
+  playerState.currentSongIsFavourite.value = false
+  playerState.currentSongFavouriteProviders.value = []
+  playerState.checkingFavourite.value = false
+  playerState.currentSong.value = { metadata: { lyrics_available: false } }
+  playerState.playerCapabilities.value = {
+    canShuffle: true,
+    canPrevious: true,
+    canPlay: true,
+    canPause: true,
+    canNext: true,
+    canLoop: true,
+  }
+  toggleCurrentSongFavouriteMock.mockClear()
+}
+
+const audioControlsState = {
+  isShuffle: false,
+  isPlaying: false,
+  iscurrentLoopModeNone: true,
+  iscurrentLoopModeTrack: false,
+  iscurrentLoopModePlaylist: false,
+  toggleShuffle: vi.fn(),
+  playNextOrPrev: vi.fn(),
+  togglePlayPause: vi.fn(),
+  cycleLoopMode: vi.fn(),
+}
+
+const resetAudioControlsState = () => {
+  audioControlsState.isShuffle = false
+  audioControlsState.isPlaying = false
+  audioControlsState.iscurrentLoopModeNone = true
+  audioControlsState.iscurrentLoopModeTrack = false
+  audioControlsState.iscurrentLoopModePlaylist = false
+  audioControlsState.toggleShuffle.mockClear()
+  audioControlsState.playNextOrPrev.mockClear()
+  audioControlsState.togglePlayPause.mockClear()
+  audioControlsState.cycleLoopMode.mockClear()
+}
+
 vi.mock('@/stores/player', async () => {
   const { defineStore } = await import('pinia')
-  const { ref } = await import('vue')
-
   return {
-    usePlayerStore: defineStore('player', () => {
-      const isSendingCommand = ref(false)
-      const currentSongIsFavourite = ref(false)
-      const currentSongFavouriteProviders = ref<string[]>([])
-      const checkingFavourite = ref(false)
-      const currentSong = ref({
-        metadata: {
-          lyrics_available: false
-        }
-      })
-
-      const playerCapabilities = ref({
-        canShuffle: true,
-        canPrevious: true,
-        canPlay: true,
-        canPause: true,
-        canNext: true,
-        canLoop: true
-      })
-
-      const toggleCurrentSongFavourite = vi.fn()
-
-      return {
-        isSendingCommand,
-        playerCapabilities,
-        currentSongIsFavourite,
-        currentSongFavouriteProviders,
-        checkingFavourite,
-        currentSong,
-        toggleCurrentSongFavourite
-      }
-    })
+    usePlayerStore: defineStore('player', () => ({
+      ...playerState,
+      toggleCurrentSongFavourite: toggleCurrentSongFavouriteMock,
+    })),
   }
 })
 
-// Mock audio controls composable
 vi.mock('@/stores/audio-controls', () => ({
-  useAudioControls: () => ({
-    isShuffle: false,
-    isPlaying: false,
-    iscurrentLoopModeNone: true,
-    iscurrentLoopModeTrack: false,
-    iscurrentLoopModePlaylist: false,
-    toggleShuffle: vi.fn(),
-    playNextOrPrev: vi.fn(),
-    togglePlayPause: vi.fn(),
-    cycleLoopMode: vi.fn()
-  })
+  useAudioControls: () => audioControlsState,
 }))
 
-describe('AudioControls.vue - Comprehensive Tests', () => {
+const IconButtonStub = defineComponent({
+  name: 'IconButton',
+  props: {
+    icon: { type: String, default: '' },
+    title: { type: String, default: '' },
+    disabled: { type: Boolean, default: false },
+  },
+  emits: ['click'],
+  template:
+    '<button class="icon-button-stub" :data-icon="icon" :data-title="title" :data-disabled="String(disabled)" :disabled="disabled" @click="$emit(\'click\')" />',
+})
+
+const LyricsOverlayStub = defineComponent({
+  name: 'LyricsOverlay',
+  props: {
+    isVisible: { type: Boolean, default: false },
+    song: { type: Object, default: null },
+  },
+  emits: ['close'],
+  template: '<div class="lyrics-overlay-stub" :data-visible="String(isVisible)" />',
+})
+
+const mountComponent = (props: Record<string, unknown> = {}, attrs: Record<string, unknown> = {}) => {
+  return mount(AudioControls, {
+    props,
+    attrs,
+    global: {
+      stubs: {
+        IconButton: IconButtonStub,
+        LyricsOverlay: LyricsOverlayStub,
+      },
+    },
+  })
+}
+
+describe('AudioControls.vue', () => {
   beforeEach(() => {
-    const pinia = createPinia()
-    setActivePinia(pinia)
+    setActivePinia(createPinia())
     vi.clearAllMocks()
+    resetPlayerState()
+    resetAudioControlsState()
   })
 
-  // ============================================================================
-  // Basic Rendering Tests
-  // ============================================================================
+  describe('unit: rendering and state binding', () => {
+    it('renders full non-sticky layout and composes root classes from props and attrs', () => {
+      const wrapper = mountComponent({ isSeparate: true, isOnHeader: true }, { class: 'custom-class' })
 
-  describe('Basic Rendering - Component Layout', () => {
-    it('should render the component with default props', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      expect(wrapper.find('.app-audio-controls').exists()).toBe(true)
-    })
-
-    it('should render left section with lyrics button', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      expect(wrapper.find('.app-audio-controls__left').exists()).toBe(true)
-      expect(wrapper.find('.lyrics-button').exists()).toBe(true)
-    })
-
-    it('should render center section with main controls', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: { template: '<button />' },
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      expect(wrapper.find('.app-audio-controls--main').exists()).toBe(true)
-    })
-
-    it('should render right section with heart button', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      expect(wrapper.find('.app-audio-controls__right').exists()).toBe(true)
+      const root = wrapper.get('.app-audio-controls')
+      expect(root.classes()).toContain('is-separate')
+      expect(root.classes()).toContain('is-on-header')
+      expect(root.classes()).toContain('custom-class')
+      expect(wrapper.findAll('.app-audio-controls__spacer')).toHaveLength(2)
+      expect(wrapper.findAll('.icon-button-stub')).toHaveLength(5)
       expect(wrapper.find('.heart-button').exists()).toBe(true)
     })
 
-    it('should render spacer elements', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
+    it('hides shuffle, loop, and heart controls in sticky mode while preserving core button order', () => {
+      const wrapper = mountComponent({ isOnSticky: true })
+      const iconButtons = wrapper.findAll('.icon-button-stub')
 
-      const spacers = wrapper.findAll('.app-audio-controls__spacer')
-      expect(spacers.length).toBe(2)
-    })
-
-    it('should render LyricsOverlay component', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: { template: '<div class="lyrics-overlay-stub" />' }
-          }
-        }
-      })
-
-      expect(wrapper.find('.lyrics-overlay-stub').exists()).toBe(true)
-    })
-  })
-
-  // ============================================================================
-  // Props Tests
-  // ============================================================================
-
-  describe('Props - Layout Modifiers', () => {
-    it('should apply is-separate class when isSeparate prop is true', () => {
-      const wrapper = mount(AudioControls, {
-        props: { isSeparate: true },
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      expect(wrapper.find('.app-audio-controls.is-separate').exists()).toBe(true)
-    })
-
-    it('should apply is-on-header class when isOnHeader prop is true', () => {
-      const wrapper = mount(AudioControls, {
-        props: { isOnHeader: true },
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      expect(wrapper.find('.app-audio-controls.is-on-header').exists()).toBe(true)
-    })
-
-    it('should apply multiple layout classes when multiple props are true', () => {
-      const wrapper = mount(AudioControls, {
-        props: { isSeparate: true, isOnHeader: true },
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      const element = wrapper.find('.app-audio-controls')
-      expect(element.classes()).toContain('is-separate')
-      expect(element.classes()).toContain('is-on-header')
-    })
-  })
-
-  // ============================================================================
-  // Lyrics Overlay Tests
-  // ============================================================================
-
-  describe('Lyrics Overlay - Display Control', () => {
-    it('should initialize with lyrics overlay hidden', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      // Component should render with LyricsOverlay stub
-      expect(wrapper.find('.app-audio-controls').exists()).toBe(true)
-    })
-
-    it('should disable lyrics button when lyrics not available', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      const lyricsButton = wrapper.find('.lyrics-button')
-      expect(lyricsButton.attributes('disabled')).toBeDefined()
-    })
-
-    it('should show lyrics overlay when lyrics button clicked', async () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      // Component should render with button
-      const lyricsButton = wrapper.find('.lyrics-button')
-      expect(lyricsButton.exists()).toBe(true)
-    })
-
-    it('should close lyrics overlay when close event emitted', async () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      // Component should render with button
-      const lyricsButton = wrapper.find('.lyrics-button')
-      expect(lyricsButton.exists()).toBe(true)
-    })
-  })
-
-  // ============================================================================
-  // Heart Button Tests (Favorite Toggle)
-  // ============================================================================
-
-  describe('Heart Button - Favorite Control', () => {
-    it('should display heart button when not on sticky position', () => {
-      const wrapper = mount(AudioControls, {
-        props: { isOnSticky: false },
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      expect(wrapper.find('.heart-button').exists()).toBe(true)
-    })
-
-    it('should hide heart button when on sticky position', () => {
-      const wrapper = mount(AudioControls, {
-        props: { isOnSticky: true },
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
+      expect(iconButtons).toHaveLength(3)
+      expect(iconButtons.map(button => button.attributes('data-title'))).toEqual(['Previous', 'Play/Pause', 'Next'])
       expect(wrapper.find('.heart-button').exists()).toBe(false)
     })
 
-    it('should show inactive heart icon when song not favorite', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
+    it('uses play icon when paused and pause icon when playing', () => {
+      const paused = mountComponent()
+      expect(paused.get('[data-title="Play/Pause"]').attributes('data-icon')).toBe('lucide/play')
 
-      const heartImg = wrapper.find('.heart-button img')
-      // Component should render with heart button
-      expect(wrapper.find('.heart-button').exists()).toBe(true)
+      audioControlsState.isPlaying = true
+      const playing = mountComponent()
+      expect(playing.get('[data-title="Play/Pause"]').attributes('data-icon')).toBe('lucide/pause')
     })
 
-    it('should show active heart icon when song is favorite', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
+    it('renders loop icon and title for track mode and playlist mode', () => {
+      audioControlsState.iscurrentLoopModeNone = false
+      audioControlsState.iscurrentLoopModeTrack = true
+      const trackWrapper = mountComponent()
+      const trackLoopButton = trackWrapper.get('[data-title="Loop Track"]')
+      expect(trackLoopButton.attributes('data-icon')).toBe('lucide/repeat-1')
+      expect(trackLoopButton.classes()).toContain('active')
 
-      const heartImg = wrapper.find('.heart-button img')
-      // Component should render with heart button
-      expect(wrapper.find('.heart-button').exists()).toBe(true)
+      audioControlsState.iscurrentLoopModeTrack = false
+      audioControlsState.iscurrentLoopModePlaylist = true
+      const playlistWrapper = mountComponent()
+      const playlistLoopButton = playlistWrapper.get('[data-title="Loop Playlist"]')
+      expect(playlistLoopButton.attributes('data-icon')).toBe('lucide/repeat')
+      expect(playlistLoopButton.classes()).toContain('active')
     })
 
-    it('should apply active class to heart button when favorite', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
+    it('computes heart button title and icon for favorite and non-favorite states', () => {
+      const nonFavorite = mountComponent()
+      expect(nonFavorite.get('.heart-button').attributes('title')).toBe('Add to favorites')
+      expect(nonFavorite.get('.heart-button img').attributes('src')).toContain('heart-outline.svg')
 
-      const heartButton = wrapper.find('.heart-button')
-      expect(heartButton.exists()).toBe(true)
+      playerState.currentSongIsFavourite.value = true
+      playerState.currentSongFavouriteProviders.value = ['spotify', 'local', 'apple music']
+      const favorite = mountComponent()
+      expect(favorite.get('.heart-button').classes()).toContain('heart-button--active')
+      expect(favorite.get('.heart-button').attributes('title')).toBe('Remove from favorites (Spotify, Local, Apple music)')
+      expect(favorite.get('.heart-button img').attributes('src')).toContain('heart-filled.svg')
     })
 
-    it('should call toggleCurrentSongFavourite when heart button clicked', async () => {
-      const { usePlayerStore } = await import('@/stores/player')
-      const playerStore = usePlayerStore()
-      const toggleSpy = vi.spyOn(playerStore, 'toggleCurrentSongFavourite')
+    it('computes fallback favorite title when no providers are present', () => {
+      playerState.currentSongIsFavourite.value = true
+      playerState.currentSongFavouriteProviders.value = []
 
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      const heartButton = wrapper.find('.heart-button')
-      await heartButton.trigger('click')
-      await flushPromises()
-
-      expect(toggleSpy).toHaveBeenCalled()
+      const wrapper = mountComponent()
+      expect(wrapper.get('.heart-button').attributes('title')).toBe('Remove from favorites')
     })
 
-    it('should disable heart button when checking favorite', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
+    it('applies disabled states from capabilities, checking flag, and sending-command guard', async () => {
+      playerState.playerCapabilities.value.canPrevious = false
+      playerState.playerCapabilities.value.canPlay = false
+      playerState.playerCapabilities.value.canPause = false
+      playerState.checkingFavourite.value = true
+
+      const wrapper = mountComponent()
+      expect(wrapper.get('[data-title="Previous"]').attributes('data-disabled')).toBe('true')
+      expect(wrapper.get('[data-title="Play/Pause"]').attributes('data-disabled')).toBe('true')
+      expect(wrapper.get('.heart-button').attributes('disabled')).toBeDefined()
+
+      playerState.isSendingCommand.value = true
+      await wrapper.vm.$nextTick()
+      wrapper.findAll('.icon-button-stub').forEach((button) => {
+        expect(button.attributes('data-disabled')).toBe('true')
       })
-
-      const heartButton = wrapper.find('.heart-button')
-      expect(heartButton.exists()).toBe(true)
-    })
-
-    it('should disable heart button when sending command', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      const heartButton = wrapper.find('.heart-button')
-      expect(heartButton.exists()).toBe(true)
-    })
-
-    it('should show correct title for add to favorites', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      const heartButton = wrapper.find('.heart-button')
-      expect(heartButton.exists()).toBe(true)
-    })
-
-    it('should show correct title for remove from favorites', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      const heartButton = wrapper.find('.heart-button')
-      expect(heartButton.exists()).toBe(true)
-    })
-
-    it('should include provider info in title when favorite', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      const heartButton = wrapper.find('.heart-button')
-      expect(heartButton.exists()).toBe(true)
     })
   })
 
-  // ============================================================================
-  // Main Controls Tests
-  // ============================================================================
+  describe('unit: control actions', () => {
+    it('dispatches click actions to the audio controls composable and player store', async () => {
+      const wrapper = mountComponent()
 
-  describe('Main Controls - Playback Actions', () => {
-    it('should render shuffle button when not on sticky', () => {
-      const wrapper = mount(AudioControls, {
-        props: { isOnSticky: false },
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
+      await wrapper.get('[data-title="Shuffle"]').trigger('click')
+      await wrapper.get('[data-title="Previous"]').trigger('click')
+      await wrapper.get('[data-title="Play/Pause"]').trigger('click')
+      await wrapper.get('[data-title="Next"]').trigger('click')
+      await wrapper.get('[data-title="Loop"]').trigger('click')
+      await wrapper.get('.heart-button').trigger('click')
 
-      // Component should render successfully
-      expect(wrapper.find('.app-audio-controls').exists()).toBe(true)
-    })
-
-    it('should disable prev button when not capable', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      expect(wrapper.find('.app-audio-controls').exists()).toBe(true)
-    })
-
-    it('should disable all buttons when sending command', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      expect(wrapper.find('.app-audio-controls').exists()).toBe(true)
+      expect(audioControlsState.toggleShuffle).toHaveBeenCalledTimes(1)
+      expect(audioControlsState.playNextOrPrev).toHaveBeenNthCalledWith(1, 'previous')
+      expect(audioControlsState.playNextOrPrev).toHaveBeenNthCalledWith(2, 'next')
+      expect(audioControlsState.togglePlayPause).toHaveBeenCalledTimes(1)
+      expect(audioControlsState.cycleLoopMode).toHaveBeenCalledTimes(1)
+      expect(toggleCurrentSongFavouriteMock).toHaveBeenCalledTimes(1)
     })
   })
 
-  // ============================================================================
-  // Responsive Layout Tests
-  // ============================================================================
+  describe('regression: lyrics overlay behavior', () => {
+    it('does not open overlay when lyrics are unavailable', async () => {
+      playerState.currentSong.value = { metadata: { lyrics_available: false } }
+      const wrapper = mountComponent()
 
-  describe('Responsive Layout - CSS Classes', () => {
-    it('should have default grid layout', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
+      const lyricsButton = wrapper.get('.lyrics-button')
+      expect(lyricsButton.attributes('disabled')).toBeDefined()
+      expect(wrapper.get('.lyrics-overlay-stub').attributes('data-visible')).toBe('false')
 
-      const element = wrapper.find('.app-audio-controls')
-      expect(element.exists()).toBe(true)
+      await lyricsButton.trigger('click')
+      expect(wrapper.get('.lyrics-overlay-stub').attributes('data-visible')).toBe('false')
     })
 
-    it('should have flex layout when is-separate is true', () => {
-      const wrapper = mount(AudioControls, {
-        props: { isSeparate: true },
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
+    it('opens on lyrics click and closes on overlay close event when lyrics are available', async () => {
+      playerState.currentSong.value = { metadata: { lyrics_available: true } }
+      const wrapper = mountComponent()
 
-      const element = wrapper.find('.app-audio-controls.is-separate')
-      expect(element.exists()).toBe(true)
+      const lyricsButton = wrapper.get('.lyrics-button')
+      expect(lyricsButton.classes()).toContain('lyrics-button--active')
+
+      await lyricsButton.trigger('click')
+      expect(wrapper.get('.lyrics-overlay-stub').attributes('data-visible')).toBe('true')
+
+      wrapper.getComponent(LyricsOverlayStub).vm.$emit('close')
+      await wrapper.vm.$nextTick()
+      expect(wrapper.get('.lyrics-overlay-stub').attributes('data-visible')).toBe('false')
     })
 
-    it('should have grid layout when is-on-header is true', () => {
-      const wrapper = mount(AudioControls, {
-        props: { isOnHeader: true },
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
+    it('guards against missing song metadata without opening overlay', async () => {
+      playerState.currentSong.value = null
+      const wrapper = mountComponent()
 
-      const element = wrapper.find('.app-audio-controls.is-on-header')
-      expect(element.exists()).toBe(true)
-    })
+      const lyricsButton = wrapper.get('.lyrics-button')
+      expect(lyricsButton.attributes('disabled')).toBeDefined()
 
-    it('should override layout when both is-separate and is-on-header are true', () => {
-      const wrapper = mount(AudioControls, {
-        props: { isSeparate: true, isOnHeader: true },
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      const element = wrapper.find('.app-audio-controls.is-separate.is-on-header')
-      expect(element.exists()).toBe(true)
-    })
-  })
-
-  // ============================================================================
-  // Attribute Inheritance Tests
-  // ============================================================================
-
-  describe('Attribute Inheritance - inheritAttrs: false', () => {
-    it('should apply class from attrs to root element', () => {
-      const wrapper = mount(AudioControls, {
-        attrs: {
-          class: 'custom-class'
-        },
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      const element = wrapper.find('.app-audio-controls.custom-class')
-      expect(element.exists()).toBe(true)
-    })
-  })
-
-  // ============================================================================
-  // Edge Cases & Regression Tests
-  // ============================================================================
-
-  describe('Edge Cases - Boundary Conditions', () => {
-    it('should handle missing player capabilities', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      expect(wrapper.find('.app-audio-controls').exists()).toBe(true)
-    })
-
-    it('should handle null current song', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      expect(wrapper.find('.app-audio-controls').exists()).toBe(true)
-    })
-
-    it('should handle multiple favorite providers', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      const heartButton = wrapper.find('.heart-button')
-      expect(heartButton.exists()).toBe(true)
-    })
-  })
-
-  // ============================================================================
-  // Regression Tests - Behavior Patterns
-  // ============================================================================
-
-  describe('Regression: Component Behavior Patterns', () => {
-    it('should sync heart button state with store', () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      const heartButton = wrapper.find('.heart-button')
-      expect(heartButton.classes()).not.toContain('heart-button--active')
-
-      // In a real scenario, the store would update and the component would reactively update
-      expect(wrapper.find('.app-audio-controls').exists()).toBe(true)
-    })
-
-    it('should handle rapid button clicks', async () => {
-      const { usePlayerStore } = await import('@/stores/player')
-      const playerStore = usePlayerStore()
-      const toggleSpy = vi.spyOn(playerStore, 'toggleCurrentSongFavourite')
-
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: true
-          }
-        }
-      })
-
-      const heartButton = wrapper.find('.heart-button')
-      await heartButton.trigger('click')
-      await heartButton.trigger('click')
-      await heartButton.trigger('click')
-      await flushPromises()
-
-      expect(toggleSpy).toHaveBeenCalledTimes(3)
-    })
-
-    it('should maintain state when lyrics overlay opens/closes', async () => {
-      const wrapper = mount(AudioControls, {
-        global: {
-          stubs: {
-            IconButton: true,
-            LyricsOverlay: { template: '<div class="lyrics-overlay" @close="$emit(\'close\')" />', emits: ['close'], props: ['isVisible', 'song'] }
-          }
-        }
-      })
-
-      expect(wrapper.find('.app-audio-controls').exists()).toBe(true)
+      await lyricsButton.trigger('click')
+      expect(wrapper.get('.lyrics-overlay-stub').attributes('data-visible')).toBe('false')
     })
   })
 })
