@@ -1,4 +1,39 @@
-import type { LoopMode, Song } from '@/types/player'
+import type { LoopMode, PlayerCapability, PlayerState, Song } from '@/types/player'
+
+export type WsEventType =
+  | 'state_changed'
+  | 'song_changed'
+  | 'position_changed'
+  | 'loop_mode_changed'
+  | 'shuffle_changed'
+  | 'random_changed'
+  | 'queue_changed'
+  | 'capabilities_changed'
+  | 'metadata_changed'
+  | 'song_information_update'
+  | 'volume_changed'
+  | 'welcome'
+  | 'subscription_updated'
+
+export interface WsEventMetadata {
+  title?: string
+  artist?: string
+  album?: string
+  artwork_url?: string
+  song?: Song
+}
+
+export interface WsEventPosition {
+  position: number | string
+  duration?: number | string
+}
+
+export interface WsEventSource {
+  player_id?: string
+  player_name?: string
+  is_active?: boolean
+  is_active_player?: boolean
+}
 
 export interface Subscription {
   players: string[] | null
@@ -18,38 +53,22 @@ export interface WsPlayerEvent {
   player_id?: string // 'mpd:6600'
   is_active?: boolean // true | false
   is_active_player?: boolean // true | false
-  type?: string // 'state_changed'
-  event_type?: string // 'state_changed'
-  state?: string // 'playing'
-  metadata?: {
-    title: string // 'Updated Song Title'
-    artist: string // 'Updated Artist'
-    album: string // 'Updated Album'
-    artwork_url: string // 'http://example.com/updated_image.jpg'
-    song?: Song
-  }
-  capabilities?: string[] // ['play', 'pause', 'stop', 'next', 'previous', 'seek', 'shuffle', 'loop', 'queue']
+  type?: WsEventType
+  event_type?: WsEventType
+  state?: PlayerState
+  metadata?: WsEventMetadata
+  capabilities?: PlayerCapability[]
   shuffle?: boolean // true | false
   enabled?: boolean // true | false
   mode?: LoopMode // LoopModeLowercase | "No" | "None" | "Song" | "Track" | "Playlist"
   loop_mode?: LoopMode // LoopModeLowercase | "No" | "None" | "Song" | "Track" | "Playlist"
   song?: Song
   percentage?: number // 75
-  position?:
-    | {
-        position: number // 45.5
-        duration: number // 180.0
-      }
-    | number // 45.5
-  source?: {
-    player_id: string // 'mpd:6600'
-    player_name: string // 'mpd'
-    is_active?: boolean // true | false
-    is_active_player?: boolean // true | false
-  }
+  position?: WsEventPosition | number | string
+  source?: WsEventSource
 }
 
-export interface createPlayerWebSocketOptions {
+export interface CreatePlayerWebSocketOptions {
   protocol?: string
   hostname?: string
   port?: string | number
@@ -59,3 +78,6 @@ export interface createPlayerWebSocketOptions {
   onMessage: (data: WsPlayerEvent) => void
   onError: (error: Event) => void
 }
+
+// Backward-compatibility alias for existing imports.
+export type createPlayerWebSocketOptions = CreatePlayerWebSocketOptions

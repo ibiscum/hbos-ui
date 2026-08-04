@@ -1,25 +1,42 @@
+export type PlayerState = 'stopped' | 'playing' | 'paused'
+export type PlayerCapability =
+  | 'play'
+  | 'pause'
+  | 'stop'
+  | 'previous'
+  | 'next'
+  | 'seek'
+  | 'queue'
+  | 'shuffle'
+  | 'random'
+  | 'loop'
+
+export interface PlayerMetadata {
+  capabilities: PlayerCapability[]
+}
+
 export interface Player {
   name: string // 'mpd'
   id: string // 'mpd:6600'
-  state: string // 'stopped', 'playing', 'paused'
+  state: PlayerState
   is_active: boolean
   has_library: boolean
   last_seen: string // '2025-06-25T10:55:42.462145804+00:00'
-  metadata?: {
-    capabilities: string[] // [play, pause, stop, previous, next, seek, queue, shuffle, random, loop]
-  }
-  capabilities?: string[] // [play, pause, stop, previous, next, seek, queue, shuffle, random, loop]
+  metadata?: PlayerMetadata
+  capabilities?: PlayerCapability[]
+}
+
+export interface LyricsMetadata {
+  album?: string
+  artist?: string
+  duration?: number | string
+  title?: string
 }
 
 export interface SongMetadata {
   lyrics_available?: boolean
   lyrics_url?: string
-  lyrics_metadata?: {
-    album?: string
-    artist?: string
-    duration?: number
-    title?: string
-  }
+  lyrics_metadata?: LyricsMetadata
   lyrics_metadata_url?: string
 }
 
@@ -53,8 +70,8 @@ export interface StreamDetails {
 export interface CurrentPlayer {
   player?: Player
   song?: Song | null
-  state?: string // 'stopped', 'playing', 'paused'
-  shuffle: boolean | undefined
+  state?: PlayerState
+  shuffle?: boolean
   loop_mode?: LoopMode
   position?: number | null // 9.561
   volume?: number // 0-100
