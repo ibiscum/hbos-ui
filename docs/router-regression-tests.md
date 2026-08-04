@@ -18,7 +18,13 @@ Primary test suite:
   - `setup` -> `/setup`
   - `playlist` -> `/playlist`
   - `artist-album` -> `/library/albums/artist/:artistId`
-- `/playlist` still loads the queue wrapper and delegates to the playlist view.
+- `/playlist` still loads the queue route wrapper and delegates to the queue view.
+- Sound route hierarchy remains canonical:
+  - `sound` -> `/sound`
+  - `general-sound` -> `/sound/general`
+  - `speaker-equalizer` -> `/sound/speaker-equalizer`
+  - `crossover-design` -> `/sound/crossover-design`
+  - `room-acoustics` -> `/sound/room-acoustics`
 - Unknown routes still fall back to `/` and then resolve to `now-playing`.
 
 ### Setup flow guard behavior
@@ -46,6 +52,11 @@ A path consistency issue in nested library routes was corrected:
 
 This aligns it with sibling nested routes and yields the canonical nested URL:
 - `/library/albums/artist/:artistId`
+
+An additional consistency cleanup was applied to root-child route declarations:
+
+- Child routes under `/` were normalized from absolute child paths (e.g. `/library`) to relative child segments (e.g. `library`).
+- Resolved URLs are unchanged, but declaration style now matches the nested-route pattern used elsewhere.
 
 ## Why consolidation was done
 

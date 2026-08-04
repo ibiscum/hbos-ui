@@ -1,13 +1,11 @@
 <template>
   <PageContent title="Bluetooth Settings" :backrouterLink="{ name: 'services' }">
-      <div class="bluetooth-header">
-        <p>Adjust bluetooth settings</p>
-      </div>
-      <BluetoothSettings>
-      </BluetoothSettings>
-      <BluetoothDevices>
-      </BluetoothDevices>
-
+    <div class="bluetooth-header">
+      <h2>Bluetooth</h2>
+      <p>Adjust Bluetooth settings.</p>
+    </div>
+    <BluetoothSettings />
+    <BluetoothDevices />
   </PageContent>
 </template>
 

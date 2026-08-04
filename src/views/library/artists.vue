@@ -1,32 +1,34 @@
 <template>
   <PageContent title="Artists" :backrouterLink="{ name: 'library' }">
-    <div class="breadcrumbs">
-      <div class="search-bar">
-        <CustomSearchField
-          v-model="search"
-          :debounce="300"
-          placeholder="Search artists..."
-          @change="onSearch"
+    <div class="artists">
+      <div class="breadcrumbs">
+        <div class="search-bar">
+          <CustomSearchField
+            v-model="search"
+            :debounce="300"
+            placeholder="Search artists..."
+            @change="onSearch"
+          />
+        </div>
+      </div>
+
+      <div class="card">
+        <PosterGrid
+          :loading="loading"
+          :loaded="loaded"
+          :items="sortedArtists"
+          :show-all="true"
+          poster-form="circle"
+          @click="handleArtistClick"
         />
       </div>
-    </div>
-    <div class="card">
-      <PosterGrid
-        ref="posterGrid"
-        :loading="loading"
-        :loaded="loaded"
+
+      <!-- Alphabet Index -->
+      <AlphabetIndex
         :items="sortedArtists"
-        :show-all="true"
-        poster-form="circle"
-        @click="(artist) => router.push({ name: 'artist-album', params: { artistId: artist.id } })"
+        @letter-click="scrollToLetter"
       />
     </div>
-
-    <!-- Alphabet Index -->
-    <AlphabetIndex
-      :items="sortedArtists"
-      @letter-click="scrollToLetter"
-    />
   </PageContent>
 </template>
 
@@ -49,6 +51,55 @@ const { getArtists, setSearchQuery, clearSearch } = artistStore
 
 const search = ref<string>('')
 
+type ArtistListItem = {
+  id?: string
+  $id?: string
+  name: string
+}
+
+const findPosterElement = (artist: ArtistListItem): HTMLElement | null => {
+  const dataId = artist.$id || artist.id
+  if (!dataId) {
+    return null
+  }
+
+  const wrapperElement = document.querySelector(`[data-id="${dataId}"]`) as HTMLElement | null
+  if (!wrapperElement) {
+    return null
+  }
+
+  return (
+    (wrapperElement.querySelector('.app-poster') as HTMLElement | null) ||
+    (wrapperElement.querySelector('[class*="poster"]') as HTMLElement | null) ||
+    wrapperElement
+  )
+}
+
+const scrollToArtist = (artist: ArtistListItem): boolean => {
+  const targetElement = findPosterElement(artist)
+
+  if (!targetElement) {
+    return false
+  }
+
+  targetElement.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start',
+    inline: 'nearest',
+  })
+
+  return true
+}
+
+const handleArtistClick = (artist: ArtistListItem) => {
+  const artistId = artist.id || artist.$id
+  if (!artistId) {
+    return
+  }
+
+  router.push({ name: 'artist-album', params: { artistId } })
+}
+
 const onSearch = (searchValue: string) => {
   search.value = searchValue
   setSearchQuery(searchValue)
@@ -63,40 +114,16 @@ const scrollToLetter = (letter: string) => {
     })
 
     if (targetArtist) {
-      // Find the wrapper element with data-id
-      const wrapperElement = document.querySelector(`[data-id="${targetArtist.$id}"]`)
-
-      if (wrapperElement) {
-        // Find the poster element inside the wrapper (has actual dimensions)
-        let posterElement = wrapperElement.querySelector('.app-poster') as HTMLElement
-
-        if (!posterElement) {
-          // Fallback: try finding any element with "poster" in the class name
-          posterElement = wrapperElement.querySelector('[class*="poster"]') as HTMLElement
-        }
-
-        if (posterElement) {
-          // Scroll to the poster element
-          posterElement.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start',
-            inline: 'nearest'
-          })
-        } else {
-          // Last resort: scroll to the wrapper itself
-          wrapperElement.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start'
-          })
-        }
+      if (scrollToArtist(targetArtist)) {
+        return
       }
-    } else {
-      // If no artists with numbers, scroll to top
-      window.scrollTo({
-        top: 0,
-        behavior: 'smooth'
-      })
     }
+
+    // If no artists with numbers, or target element was not found, scroll to top
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    })
     return
   }
 
@@ -106,33 +133,7 @@ const scrollToLetter = (letter: string) => {
   )
 
   if (targetArtist) {
-    // Find the wrapper element with data-id
-    const wrapperElement = document.querySelector(`[data-id="${targetArtist.$id}"]`)
-
-    if (wrapperElement) {
-      // Find the poster element inside the wrapper (has actual dimensions)
-      let posterElement = wrapperElement.querySelector('.app-poster') as HTMLElement
-
-      if (!posterElement) {
-        // Fallback: try finding any element with "poster" in the class name
-        posterElement = wrapperElement.querySelector('[class*="poster"]') as HTMLElement
-      }
-
-      if (posterElement) {
-        // Scroll to the poster element
-        posterElement.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-          inline: 'nearest'
-        })
-      } else {
-        // Last resort: scroll to the wrapper itself
-        wrapperElement.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start'
-        })
-      }
-    }
+    scrollToArtist(targetArtist)
   }
 }
 

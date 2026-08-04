@@ -1,6 +1,6 @@
 <template>
-  <div class="pipewire-filter-chain">
-    <h1>Pipewire Filter Chain</h1>
+  <PageContent title="PipeWire Filter Chain" :backrouterLink="{ name: 'services' }">
+    <div class="pipewire-filter-chain">
 
     <div v-if="loading" class="loading-section">
       <p>Loading filter chain...</p>
@@ -39,6 +39,12 @@
         </div>
 
         <div v-if="activeView === 'graph'" class="graph-container">
+          <div
+            ref="graphContainer"
+            class="graph-svg-container"
+            :class="{ hidden: graphLoading || !!graphError }"
+          ></div>
+
           <div v-if="graphLoading" class="graph-loading">
             <p>Rendering graph...</p>
           </div>
@@ -47,9 +53,6 @@
             <button @click="renderGraph" class="retry-button">
               Retry Render
             </button>
-          </div>
-          <div v-else>
-            <div ref="graphContainer" class="graph-svg-container"></div>
           </div>
         </div>
 
@@ -62,13 +65,15 @@
     <div v-else class="empty-section">
       <p>No filter chain configuration found.</p>
     </div>
-  </div>
+    </div>
+  </PageContent>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { getFilterChain } from '@/api/filterchain'
 import { graphviz } from 'd3-graphviz'
+import PageContent from '@/components/PageContent.vue'
 
 // State
 const loading = ref(true)
@@ -89,18 +94,18 @@ const fetchFilterChain = async () => {
 
     const response = await getFilterChain()
 
-    if (response.status === 'success' && response.data) {
+    if (response.status === 'success') {
       filterChain.value = response.data
-      // Auto-render graph when data is loaded
-      if (activeView.value === 'graph') {
-        await nextTick()
-        renderGraph()
-      }
+      graphError.value = null
     } else {
+      filterChain.value = null
+      graphError.value = null
       error.value = response.message || 'Failed to load filtergraph'
     }
   } catch (err) {
     console.error('Error fetching filtergraph:', err)
+    filterChain.value = null
+    graphError.value = null
     error.value = err instanceof Error ? err.message : 'Failed to load filtergraph'
   } finally {
     loading.value = false
@@ -137,9 +142,9 @@ const renderGraph = async () => {
   }
 }
 
-// Watch for view changes to trigger graph rendering
-watch(activeView, async (newView) => {
-  if (newView === 'graph' && filterChain.value && !graphLoading.value) {
+// Render when graph view is active and the container is present.
+watch([activeView, filterChain, loading], async ([newView, dot, isLoading]) => {
+  if (newView === 'graph' && dot && !isLoading && !graphLoading.value) {
     await nextTick()
     renderGraph()
   }
@@ -319,6 +324,10 @@ onMounted(() => {
           border-radius: 6px;
           background: white;
           overflow: hidden;
+
+          &.hidden {
+            display: none;
+          }
 
           // Ensure SVG content is responsive
           :deep(svg) {

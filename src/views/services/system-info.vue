@@ -1738,9 +1738,10 @@ const refreshData = async () => {
     fetchVolumeInfo(),
     fetchDSPProgramInfo(),
     fetchBackgroundServices(),
-    fetchPipewireDevices()
+    fetchPipewireDevices(),
+    fetchLibraryStats()
   ]).then(results => {
-    const names = ['system info', 'favourites', 'cover art', 'cache stats', 'background jobs', 'network', 'I2C devices', 'input devices', 'system files', 'volume info', 'DSP program info', 'background services', 'Pipewire devices']
+    const names = ['system info', 'favourites', 'cover art', 'cache stats', 'background jobs', 'network', 'I2C devices', 'input devices', 'system files', 'volume info', 'DSP program info', 'background services', 'Pipewire devices', 'library stats']
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
         console.error(`Auto-refresh failed for ${names[index]}:`, result.reason)

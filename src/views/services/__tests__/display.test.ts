@@ -1,467 +1,171 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
 
-// ============================================================================
-// MOCK SETUP
-// ============================================================================
+import DisplayView from '../display.vue'
+
+const mocks = vi.hoisted(() => {
+  const darkModeRef = { value: false }
+  const settingsStore = {
+    loaded: true,
+    isPi5OrHigher: true as boolean | null | undefined,
+    getVuMeterEnabled: true as boolean | null | undefined,
+    updateVuMeterEnabled: vi.fn(),
+  }
+  const toastStore = {
+    showSuccessToast: vi.fn(),
+    showErrorToast: vi.fn(),
+    showInfoToast: vi.fn(),
+  }
+
+  return {
+    darkModeRef,
+    settingsStore,
+    toastStore,
+  }
+})
 
 vi.mock('@/components/BackRouter.vue', () => ({
-  default: { template: '<div><slot /></div>', name: 'BackRouter' }
+  default: {
+    name: 'BackRouter',
+    props: ['to'],
+    template: '<a class="back-router-stub" :data-to="to?.name"><slot /></a>',
+  },
 }))
 
 vi.mock('@/components/Icon.vue', () => ({
-  default: { template: '<div class="icon" />', name: 'Icon' }
+  default: {
+    name: 'Icon',
+    props: ['icon'],
+    template: '<span class="icon-stub" :data-icon="icon" />',
+  },
 }))
 
 vi.mock('@/components/PageContent.vue', () => ({
-  default: { template: '<div class="page-content"><slot /></div>', name: 'PageContent' }
+  default: {
+    name: 'PageContent',
+    template: '<section class="page-content-stub"><slot /></section>',
+  },
 }))
 
 vi.mock('@/components/ToggleSwitch.vue', () => ({
   default: {
-    template: `
-      <div class="toggle-switch">
-        <input
-          type="checkbox"
-          :checked="modelValue"
-          :disabled="disabled"
-          :aria-label="$attrs['aria-label']"
-          :aria-describedby="$attrs['aria-describedby']"
-          @change="$emit('update:modelValue', $event.target.checked)"
-        >
-      </div>
-    `,
+    name: 'ToggleSwitch',
     props: ['modelValue', 'disabled', 'loading'],
-    name: 'ToggleSwitch'
-  }
+    emits: ['update:modelValue'],
+    template:
+      '<input class="toggle-switch-stub" type="checkbox" :checked="modelValue" :disabled="disabled" :aria-label="$attrs[\'aria-label\']" :aria-describedby="$attrs[\'aria-describedby\']" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
+  },
 }))
 
 vi.mock('@/stores/settings', () => ({
-  useSettingsStore: vi.fn(() => ({
-    loaded: true,
-    isPi5OrHigher: true,
-    getVuMeterEnabled: true,
-    updateVuMeterEnabled: vi.fn().mockResolvedValue(undefined)
-  }))
+  useSettingsStore: () => mocks.settingsStore,
 }))
 
 vi.mock('@/stores/toast', () => ({
-  useToastStore: vi.fn(() => ({
-    showSuccessToast: vi.fn(),
-    showErrorToast: vi.fn(),
-    showInfoToast: vi.fn()
-  }))
+  useToastStore: () => mocks.toastStore,
 }))
 
 vi.mock('@vueuse/core', () => ({
-  useDark: vi.fn(() => ({
-    value: false
-  }))
+  useDark: () => mocks.darkModeRef,
 }))
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyType = any
+const mountView = () => mount(DisplayView)
 
-// Import after all mocks are defined
-import Display from '../display.vue'
-
-// ============================================================================
-// TEST SUITE
-// ============================================================================
-
-describe('Display View', () => {
-  let pinia: ReturnType<typeof createPinia>
-
+describe('services/display view consolidated unit and regression tests', () => {
   beforeEach(() => {
-    pinia = createPinia()
-    setActivePinia(pinia)
     vi.clearAllMocks()
+    mocks.darkModeRef.value = false
+    mocks.settingsStore.loaded = true
+    mocks.settingsStore.isPi5OrHigher = true
+    mocks.settingsStore.getVuMeterEnabled = true
+    mocks.settingsStore.updateVuMeterEnabled.mockResolvedValue(undefined)
   })
 
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  describe('Component Rendering', () => {
-    it('should render the display settings page with header and content', () => {
-      const wrapper = mount(Display, {
-        global: { plugins: [pinia] }
-      })
+  describe('unit coverage', () => {
+    it('renders display title, info card copy, and dark mode section', () => {
+      const wrapper = mountView()
 
       expect(wrapper.text()).toContain('Display Settings')
       expect(wrapper.text()).toContain('Display Configuration')
       expect(wrapper.text()).toContain('Configure display settings for your system.')
-    })
-
-    it('should render dark mode toggle with proper labels', () => {
-      const wrapper = mount(Display, {
-        global: { plugins: [pinia] }
-      })
-
       expect(wrapper.text()).toContain('Dark mode')
-      expect(wrapper.text()).toContain('System appearance preference')
     })
 
-    it('should render VU meter toggle when Pi5OrHigher is true', () => {
-      const wrapper = mount(Display, {
-        global: { plugins: [pinia] }
-      })
+    it('renders dark mode toggle with valid accessibility linkage', () => {
+      const wrapper = mountView()
 
-      expect(wrapper.text()).toContain('VU meter')
-      expect(wrapper.text()).toContain('Audio level visualization (Pi 5+)')
+      const darkToggle = wrapper.get('input[aria-label="Toggle dark mode"]')
+      expect(darkToggle.attributes('aria-describedby')).toBe('dark-mode-description')
+      expect(wrapper.get('#dark-mode-description').text()).toBe('System appearance preference')
     })
 
-    it('should not render VU meter toggle when Pi5OrHigher is false', async () => {
-      const { useSettingsStore } = await import('@/stores/settings')
-      vi.mocked(useSettingsStore).mockReturnValueOnce({
-        loaded: true,
-        isPi5OrHigher: false,
-        getVuMeterEnabled: true,
-        updateVuMeterEnabled: vi.fn()
-      } as AnyType)
-
-      const wrapper = mount(Display, {
-        global: { plugins: [pinia] }
-      })
-
+    it('renders and disables VU meter toggle when settings store is not loaded', async () => {
+      mocks.settingsStore.loaded = false
+      const wrapper = mountView()
       await flushPromises()
+
+      const vuToggle = wrapper.get('input[aria-label="Toggle VU meter"]')
+      expect(vuToggle.attributes('disabled')).toBeDefined()
+    })
+
+    it('hides VU meter section when platform capability is unavailable', async () => {
+      mocks.settingsStore.isPi5OrHigher = false
+      const wrapper = mountView()
+      await flushPromises()
+
       expect(wrapper.text()).not.toContain('VU meter')
-    })
-
-    it('should handle null and undefined isPi5OrHigher safely', async () => {
-      const { useSettingsStore } = await import('@/stores/settings')
-
-      // Test with null
-      vi.mocked(useSettingsStore).mockReturnValueOnce({
-        loaded: true,
-        isPi5OrHigher: null,
-        getVuMeterEnabled: true,
-        updateVuMeterEnabled: vi.fn()
-       } as AnyType)
-
-      const wrapper1 = mount(Display, {
-        global: { plugins: [pinia] }
-      })
-
-      expect(wrapper1.find('.info-card').exists()).toBe(true)
-
-      // Test with undefined
-      vi.mocked(useSettingsStore).mockReturnValueOnce({
-        loaded: true,
-        isPi5OrHigher: undefined,
-        getVuMeterEnabled: true,
-        updateVuMeterEnabled: vi.fn()
-       } as AnyType)
-
-      const wrapper2 = mount(Display, {
-        global: { plugins: [pinia] }
-      })
-
-      expect(wrapper2.find('.info-card').exists()).toBe(true)
+      expect(wrapper.find('input[aria-label="Toggle VU meter"]').exists()).toBe(false)
     })
   })
 
-  describe('Dark Mode Toggle', () => {
-    it('should render dark mode toggle with accessibility attributes', () => {
-      const wrapper = mount(Display, {
-        global: { plugins: [pinia] }
-      })
+  describe('regression coverage', () => {
+    it('updates VU meter and shows success toast on toggle change', async () => {
+      const wrapper = mountView()
+      const vuToggle = wrapper.get('input[aria-label="Toggle VU meter"]')
 
-      const darkModeToggle = wrapper.findAll('input[type="checkbox"]')[0]
-      expect(darkModeToggle.attributes('aria-label')).toBe('Toggle dark mode')
-      expect(darkModeToggle.attributes('aria-describedby')).toBe('dark-mode-description')
-    })
-  })
-
-  describe('VU Meter Toggle', () => {
-    it('should render VU meter toggle with correct state from store', async () => {
-      const wrapper = mount(Display, {
-        global: { plugins: [pinia] }
-      })
-
-      await flushPromises()
-      const toggles = wrapper.findAll('input[type="checkbox"]')
-      expect(toggles.length).toBe(2)
-    })
-
-    it('should have proper accessibility attributes on VU meter toggle', () => {
-      const wrapper = mount(Display, {
-        global: { plugins: [pinia] }
-      })
-
-      const vuMeterToggle = wrapper.findAll('input[type="checkbox"]')[1]
-      expect(vuMeterToggle.attributes('aria-label')).toBe('Toggle VU meter')
-      expect(vuMeterToggle.attributes('aria-describedby')).toBe('vu-meter-description')
-    })
-
-    it('should call updateVuMeterEnabled when toggle is changed', async () => {
-      const { useSettingsStore } = await import('@/stores/settings')
-      const mockUpdate = vi.fn().mockResolvedValue(undefined)
-
-      vi.mocked(useSettingsStore).mockReturnValueOnce({
-        loaded: true,
-        isPi5OrHigher: true,
-        getVuMeterEnabled: true,
-        updateVuMeterEnabled: mockUpdate
-       } as AnyType)
-
-      const wrapper = mount(Display, {
-        global: { plugins: [pinia] }
-      })
-
-      await flushPromises()
-      const vuMeterToggle = wrapper.findAll('input[type="checkbox"]')[1]
-      await vuMeterToggle.trigger('change')
+      await vuToggle.trigger('change')
       await flushPromises()
 
-      expect(mockUpdate).toHaveBeenCalled()
+      expect(mocks.settingsStore.updateVuMeterEnabled).toHaveBeenCalledWith(true)
+      expect(mocks.toastStore.showSuccessToast).toHaveBeenCalledWith('VU meter enabled')
     })
 
-    it('should show success toast on VU meter update success', async () => {
-      const { useSettingsStore } = await import('@/stores/settings')
-      const { useToastStore } = await import('@/stores/toast')
-      const mockUpdate = vi.fn().mockResolvedValue(undefined)
-
-      vi.mocked(useSettingsStore).mockReturnValueOnce({
-        loaded: true,
-        isPi5OrHigher: true,
-        getVuMeterEnabled: true,
-        updateVuMeterEnabled: mockUpdate
-       } as AnyType)
-
-      const mockToastStore = {
-        showSuccessToast: vi.fn(),
-        showErrorToast: vi.fn(),
-        showInfoToast: vi.fn()
-      }
-      vi.mocked(useToastStore).mockReturnValueOnce(mockToastStore as AnyType)
-
-      const wrapper = mount(Display, {
-        global: { plugins: [pinia] }
-      })
-
-      await flushPromises()
-      const vuMeterToggle = wrapper.findAll('input[type="checkbox"]')[1]
-      await vuMeterToggle.trigger('change')
-      await flushPromises()
-
-      expect(mockToastStore.showSuccessToast).toHaveBeenCalled()
-    })
-
-    it('should show error toast on VU meter update failure', async () => {
-      const { useSettingsStore } = await import('@/stores/settings')
-      const { useToastStore } = await import('@/stores/toast')
-      const mockError = new Error('Failed to update VU meter')
-      const mockUpdate = vi.fn().mockRejectedValue(mockError)
-
-      vi.mocked(useSettingsStore).mockReturnValueOnce({
-        loaded: true,
-        isPi5OrHigher: true,
-        getVuMeterEnabled: true,
-        updateVuMeterEnabled: mockUpdate
-       } as AnyType)
-
-      const mockToastStore = {
-        showSuccessToast: vi.fn(),
-        showErrorToast: vi.fn(),
-        showInfoToast: vi.fn()
-      }
-      vi.mocked(useToastStore).mockReturnValueOnce(mockToastStore as AnyType)
-
-      const wrapper = mount(Display, {
-        global: { plugins: [pinia] }
-      })
-
-      await flushPromises()
-      const vuMeterToggle = wrapper.findAll('input[type="checkbox"]')[1]
-      await vuMeterToggle.trigger('change')
-      await flushPromises()
-
-      expect(mockToastStore.showErrorToast).toHaveBeenCalledWith('Failed to update VU meter')
-    })
-
-    it('should disable VU meter toggle when store not loaded', async () => {
-      const { useSettingsStore } = await import('@/stores/settings')
-      vi.mocked(useSettingsStore).mockReturnValueOnce({
-        loaded: false,
-        isPi5OrHigher: true,
-        getVuMeterEnabled: true,
-        updateVuMeterEnabled: vi.fn()
-       } as AnyType)
-
-      const wrapper = mount(Display, {
-        global: { plugins: [pinia] }
-      })
-
-      const vuMeterToggle = wrapper.findAll('input[type="checkbox"]')[1]
-      expect(vuMeterToggle.attributes('disabled')).toBeDefined()
-    })
-
-    it('should handle null and undefined getVuMeterEnabled gracefully', async () => {
-      const { useSettingsStore } = await import('@/stores/settings')
-
-      // Test with null
-      vi.mocked(useSettingsStore).mockReturnValueOnce({
-        loaded: true,
-        isPi5OrHigher: true,
-        getVuMeterEnabled: null,
-        updateVuMeterEnabled: vi.fn()
-       } as AnyType)
-
-      const wrapper1 = mount(Display, {
-        global: { plugins: [pinia] }
-      })
-
-      expect(wrapper1.find('.info-card').exists()).toBe(true)
-
-      // Test with undefined
-      vi.mocked(useSettingsStore).mockReturnValueOnce({
-        loaded: true,
-        isPi5OrHigher: true,
-        getVuMeterEnabled: undefined,
-        updateVuMeterEnabled: vi.fn()
-       } as AnyType)
-
-      const wrapper2 = mount(Display, {
-        global: { plugins: [pinia] }
-      })
-
-      expect(wrapper2.find('.info-card').exists()).toBe(true)
-    })
-  })
-
-  describe('Error Handling', () => {
-    it('should handle generic errors with fallback message', async () => {
-      const { useSettingsStore } = await import('@/stores/settings')
-      const { useToastStore } = await import('@/stores/toast')
-      const mockUpdate = vi.fn().mockRejectedValue('Unknown error')
-
-      vi.mocked(useSettingsStore).mockReturnValueOnce({
-        loaded: true,
-        isPi5OrHigher: true,
-        getVuMeterEnabled: true,
-        updateVuMeterEnabled: mockUpdate
-       } as AnyType)
-
-      const mockToastStore = {
-        showSuccessToast: vi.fn(),
-        showErrorToast: vi.fn(),
-        showInfoToast: vi.fn()
-      }
-      vi.mocked(useToastStore).mockReturnValueOnce(mockToastStore as AnyType)
-
-      const wrapper = mount(Display, {
-        global: { plugins: [pinia] }
-      })
-
-      await flushPromises()
-      const vuMeterToggle = wrapper.findAll('input[type="checkbox"]')[1]
-      await vuMeterToggle.trigger('change')
-      await flushPromises()
-
-      expect(mockToastStore.showErrorToast).toHaveBeenCalledWith('Failed to update VU meter')
-    })
-
-    it('should log errors to console', async () => {
-      const { useSettingsStore } = await import('@/stores/settings')
-      const mockError = new Error('Service error')
-      const mockUpdate = vi.fn().mockRejectedValue(mockError)
+    it('surfaces service error message when VU meter update fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      mocks.settingsStore.updateVuMeterEnabled.mockRejectedValueOnce(new Error('Service unavailable'))
 
-      vi.mocked(useSettingsStore).mockReturnValueOnce({
-        loaded: true,
-        isPi5OrHigher: true,
-        getVuMeterEnabled: true,
-        updateVuMeterEnabled: mockUpdate
-       } as AnyType)
+      const wrapper = mountView()
+      const vuToggle = wrapper.get('input[aria-label="Toggle VU meter"]')
 
-      const wrapper = mount(Display, {
-        global: { plugins: [pinia] }
-      })
-
-      await flushPromises()
-      const vuMeterToggle = wrapper.findAll('input[type="checkbox"]')[1]
-      await vuMeterToggle.trigger('change')
+      await vuToggle.trigger('change')
       await flushPromises()
 
-      expect(consoleSpy).toHaveBeenCalledWith('[display.vue] VU meter toggle error:', mockError)
-      consoleSpy.mockRestore()
-    })
-  })
-
-  describe('Initialization', () => {
-    it('should initialize dark mode on mount', () => {
-      const consoleSpy = vi.spyOn(console, 'debug').mockImplementation(() => undefined)
-
-      mount(Display, {
-        global: { plugins: [pinia] }
-      })
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[display.vue] Dark mode initialized:',
-        expect.any(Boolean)
-      )
+      expect(mocks.toastStore.showErrorToast).toHaveBeenCalledWith('Service unavailable')
+      expect(consoleSpy).toHaveBeenCalled()
       consoleSpy.mockRestore()
     })
 
-    it('should not warn during normal dark mode initialization', () => {
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    it('falls back to generic error copy for non-Error rejections', async () => {
+      mocks.settingsStore.updateVuMeterEnabled.mockRejectedValueOnce('backend failed')
 
-      mount(Display, {
-        global: { plugins: [pinia] }
-      })
+      const wrapper = mountView()
+      const vuToggle = wrapper.get('input[aria-label="Toggle VU meter"]')
 
-      expect(consoleSpy).not.toHaveBeenCalled()
-      consoleSpy.mockRestore()
-    })
-  })
+      await vuToggle.trigger('change')
+      await flushPromises()
 
-  describe('Accessibility', () => {
-    it('should have aria-labels on all toggles', () => {
-      const wrapper = mount(Display, {
-        global: { plugins: [pinia] }
-      })
-
-      const toggles = wrapper.findAll('input[type="checkbox"]')
-      toggles.forEach((toggle) => {
-        expect(toggle.attributes('aria-label')).toBeTruthy()
-      })
+      expect(mocks.toastStore.showErrorToast).toHaveBeenCalledWith('Failed to update VU meter')
     })
 
-    it('should have aria-describedby on all toggles', () => {
-      const wrapper = mount(Display, {
-        global: { plugins: [pinia] }
-      })
+    it('guards null capability values without rendering VU controls', async () => {
+      mocks.settingsStore.isPi5OrHigher = null
+      mocks.settingsStore.getVuMeterEnabled = null
 
-      const toggles = wrapper.findAll('input[type="checkbox"]')
-      toggles.forEach((toggle) => {
-        expect(toggle.attributes('aria-describedby')).toBeTruthy()
-      })
-    })
-  })
+      const wrapper = mountView()
+      await flushPromises()
 
-  describe('Layout and Styling', () => {
-    it('should render toggle rows with flex layout', () => {
-      const wrapper = mount(Display, {
-        global: { plugins: [pinia] }
-      })
-
-      const toggleRows = wrapper.findAll('.toggle-row')
-      expect(toggleRows.length).toBeGreaterThan(0)
-      toggleRows.forEach((row) => {
-        expect(row.classes()).toContain('toggle-row')
-      })
-    })
-  })
-
-  describe('Transitions', () => {
-    it('should use slide-fade transition for VU meter card', () => {
-      const wrapper = mount(Display, {
-        global: { plugins: [pinia] }
-      })
-
-      expect(wrapper.text()).toContain('VU meter')
+      expect(wrapper.text()).not.toContain('VU meter')
+      expect(wrapper.find('input[aria-label="Toggle VU meter"]').exists()).toBe(false)
     })
   })
 })

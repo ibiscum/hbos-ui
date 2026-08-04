@@ -1,23 +1,24 @@
 <template>
   <PageContent title="Web Services" :backrouterLink="{ name: 'services' }">
-      <div class="services-header">
-        <p>Connect and manage web-based music streaming services</p>
-      </div>
+    <div class="services-header">
+      <h2>Web Services</h2>
+      <p>Connect and manage web-based music services</p>
+    </div>
 
-      <!-- Last.FM Integration -->
-      <LastFMIntegration />
+    <!-- Last.fm Integration -->
+    <LastFMIntegration />
 
-      <!-- Spotify Integration -->
-      <SpotifyIntegration />
+    <!-- Spotify Integration -->
+    <SpotifyIntegration />
 
-      <!-- MusicBrainz Integration -->
-      <MusicBrainzIntegration />
+    <!-- MusicBrainz Integration -->
+    <MusicBrainzIntegration />
 
-      <!-- TheAudioDB Integration -->
-      <TheAudioDBIntegration />
+    <!-- TheAudioDB Integration -->
+    <TheAudioDBIntegration />
 
-      <!-- Fanart.tv Integration -->
-      <FanartTvIntegration />
+    <!-- Fanart.tv Integration -->
+    <FanartTvIntegration />
   </PageContent>
 </template>
 

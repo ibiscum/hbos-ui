@@ -26,7 +26,9 @@ const form = ref({ id: '', uri: '', suite: 'trixie', components: 'main', key: ''
 const githubSources = ref<GithubSource[]>([])
 const ghShowForm = ref(false)
 const ghSaving = ref(false)
+const ghLoading = ref(false)
 const ghRepo = ref('')
+const githubRepoPattern = /^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9._-]+$/
 
 async function load() {
   loading.value = true
@@ -69,19 +71,28 @@ async function onRemove(id: string) {
 }
 
 async function loadGithub() {
+  ghLoading.value = true
   try {
     const response = await listGithubSources()
     githubSources.value = response.data.sources
   } catch (e) {
     toast.showErrorToast(e instanceof Error ? e.message : String(e))
+  } finally {
+    ghLoading.value = false
   }
 }
 
 async function onAddGithub() {
+  const repo = ghRepo.value.trim()
+  if (!githubRepoPattern.test(repo)) {
+    toast.showErrorToast('Repository must be in owner/name format.')
+    return
+  }
+
   ghSaving.value = true
   try {
-    await addGithubSource(ghRepo.value.trim())
-    toast.showSuccessToast(`Added GitHub source ${ghRepo.value.trim()}`)
+    await addGithubSource(repo)
+    toast.showSuccessToast(`Added GitHub source ${repo}`)
     ghRepo.value = ''
     ghShowForm.value = false
     await loadGithub()
@@ -183,7 +194,8 @@ onMounted(() => {
       <code>owner/name</code>; its latest release provides the extension.
     </p>
 
-    <ul class="sources__list">
+    <p v-if="ghLoading">Loading GitHub sources&hellip;</p>
+    <ul v-else class="sources__list">
       <li v-for="source in githubSources" :key="source.id" class="sources__item">
         <div>
           <strong>{{ source.repo }}</strong>

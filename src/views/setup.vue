@@ -740,18 +740,19 @@ function sleep(ms: number) {
 async function pingServer(timeoutMs: number): Promise<boolean> {
   // Treat any HTTP response (including 5xx) as "server reachable" — we only care
   // about the TCP/HTTP layer being up, not the API being healthy.
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), timeoutMs)
   try {
-    const ctrl = new AbortController()
-    const t = setTimeout(() => ctrl.abort(), timeoutMs)
     await fetch(`${import.meta.env.BASE_URL}index.html?t=${Date.now()}`, {
       method: 'HEAD',
       cache: 'no-store',
       signal: ctrl.signal,
     })
-    clearTimeout(t)
     return true
   } catch {
     return false
+  } finally {
+    clearTimeout(t)
   }
 }
 

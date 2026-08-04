@@ -2023,11 +2023,14 @@ export const performRoomMeasurement = async (
     const maxWaitTime = (measurementDuration + 5) * 1000 // Add 5 seconds buffer
     const startWait = Date.now()
 
+    let recordingCompleted = false
+
     while (Date.now() - startWait < maxWaitTime) {
       const statusResult = await getRoomEQRecordingStatus(recordingId)
       if (statusResult.success && statusResult.data) {
         if (statusResult.data.state === 'completed') {
           console.log('Recording completed successfully')
+          recordingCompleted = true
           break
         } else if (statusResult.data.state === 'error') {
           throw new Error('Recording failed with error state')
@@ -2036,6 +2039,10 @@ export const performRoomMeasurement = async (
 
       // Wait 1 second before checking again
       await new Promise(resolve => setTimeout(resolve, 1000))
+    }
+
+    if (!recordingCompleted) {
+      throw new Error(`Recording did not complete within ${measurementDuration + 5} seconds`)
     }
 
     // Step 4: Complete the measurement with FFT difference analysis

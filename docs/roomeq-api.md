@@ -15,7 +15,12 @@ The RoomEQ API (`src/api/roomeq.ts`) provides comprehensive TypeScript functions
 **Type Support**: Full TypeScript with strict type checking  
 **State Management**: Pinia (`useAppConfigStore`)  
 **HTTP Client**: `apiFetch` wrapper with Content-Type application/json  
-**Test Coverage**: `src/api/__tests__/roomeq.test.ts`, `src/api/__tests__/roomeq-comprehensive.test.ts`
+**Test Coverage**: `src/api/__tests__/roomeq-comprehensive.test.ts` (consolidated unit and regression suite)
+
+Recent regression coverage focuses on:
+- streaming optimization event parsing and completion callbacks
+- timeout handling in comprehensive room measurement orchestration
+- detailed HTTP error propagation for usable range detection
 
 ---
 
@@ -943,7 +948,7 @@ if (!versionCheck.success) {
 ## Testing
 
 ### Unit Test Coverage
-The comprehensive test suite (`roomeq-comprehensive.test.ts`) covers:
+The consolidated test suite (`src/api/__tests__/roomeq-comprehensive.test.ts`) covers:
 - All API functions with successful responses
 - Error handling and fallback strategies
 - Parameter encoding and special characters
@@ -952,10 +957,12 @@ The comprehensive test suite (`roomeq-comprehensive.test.ts`) covers:
 - Response envelope validation
 
 ### Regression Test Coverage
-The regression tests (`roomeq.test.ts` extended section) cover:
+Regression-focused cases in the same consolidated suite cover:
 - Multi-step measurement workflows
+- Recording timeout behavior in comprehensive measurement orchestration
 - FFT analysis edge cases
 - Optimization API compatibility
+- Streaming SSE parsing behavior, including malformed event resilience
 - Parameter constraint validation
 - Complex measurement scenarios
 - Filter and curve validation
@@ -963,13 +970,13 @@ The regression tests (`roomeq.test.ts` extended section) cover:
 ### Running Tests
 ```bash
 # Run all RoomEQ tests
-pnpm test src/api/__tests__/roomeq*.test.ts
+pnpm vitest run src/api/__tests__/roomeq-comprehensive.test.ts
 
 # Run with coverage
-pnpm test --coverage src/api/__tests__/roomeq*.test.ts
+pnpm vitest run src/api/__tests__/roomeq-comprehensive.test.ts --coverage
 
 # Watch mode
-pnpm test --watch src/api/__tests__/roomeq*.test.ts
+pnpm vitest src/api/__tests__/roomeq-comprehensive.test.ts
 ```
 
 ---

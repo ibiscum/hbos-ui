@@ -2,7 +2,7 @@
 <PageContent
   :title="`Speaker Equalizer ${channelMode === 'both' ? 'Both' : (activeChannel === channelNames[0] ? 'Left' : 'Right')}`"
   :backrouterLink="{ name: 'sound' }"
-  :headerHasContentBelow=true
+  :headerHasContentBelow="true"
 >
   <div class="sound">
     <div class="page-header">
@@ -249,7 +249,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 };
 
 const handleKeyup = (e: KeyboardEvent) => {
-  if (e.code === 'Space' && !showAddFilterModal.value && !showBackendInfoModal.value) {
+  if (e.code === 'Space' && !showAddFilterModal.value && !showBackendInfoModal.value && !showRoomEQModal.value) {
     e.preventDefault();
     endBypass();
   }

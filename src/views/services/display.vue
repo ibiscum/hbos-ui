@@ -18,7 +18,7 @@
         <div class="toggle-row">
           <div class="toggle-label">
             <h2>Dark mode</h2>
-            <p class="toggle-description">System appearance preference</p>
+            <p id="dark-mode-description" class="toggle-description">System appearance preference</p>
           </div>
           <ToggleSwitch
             v-model="isDark"
@@ -34,7 +34,7 @@
           <div class="toggle-row">
             <div class="toggle-label">
               <h2>VU meter</h2>
-              <p class="toggle-description">Audio level visualization (Pi 5+)</p>
+              <p id="vu-meter-description" class="toggle-description">Audio level visualization (Pi 5+)</p>
             </div>
             <ToggleSwitch
               :modelValue="vuMeterState"
@@ -53,7 +53,7 @@
 
 <script setup lang="ts">
 import { useDark } from '@vueuse/core'
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import BackRouter from '@/components/BackRouter.vue'
 import Icon from '@/components/Icon.vue'
 import PageContent from '@/components/PageContent.vue'
@@ -87,17 +87,6 @@ const showVuMeterToggle = computed(() => {
   return Boolean(settingsStore.isPi5OrHigher)
 })
 
-// Initialize dark mode with sync check
-onMounted(() => {
-  // Verify isDark is properly synced with system theme
-  if (typeof isDark.value === 'boolean') {
-    // Dark mode is properly initialized
-    console.debug('[display.vue] Dark mode initialized:', isDark.value)
-  } else {
-    console.warn('[display.vue] Dark mode initialization may have issues')
-  }
-})
-
 /**
  * Handle VU meter toggle with error handling and user feedback
  * @param value - The new toggle state
@@ -109,8 +98,6 @@ const handleVuMeterToggle = async (value: boolean) => {
     await settingsStore.updateVuMeterEnabled(value)
     toastStore.showSuccessToast(`VU meter ${value ? 'enabled' : 'disabled'}`)
   } catch (error) {
-    // Revert UI state on error
-    isLoadingVuMeter.value = false
     const errorMessage = error instanceof Error ? error.message : 'Failed to update VU meter'
     console.error('[display.vue] VU meter toggle error:', error)
     toastStore.showErrorToast(errorMessage)

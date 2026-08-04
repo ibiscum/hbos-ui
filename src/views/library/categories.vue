@@ -26,7 +26,7 @@
       </div>
 
       <div v-if="!loading && categories.length === 0" class="no-items">
-        No categories found. Add genre mappings to create categories.
+        No categories found. Add category mappings to create categories.
       </div>
     </div>
   </PageContent>
@@ -53,19 +53,27 @@ const loading = ref(false)
 
 const loadCategories = async () => {
   loading.value = true
-  await libraryStore.getAvailableLibrary()
+  categories.value = []
 
-  const { error, data } = await libraryFetch<{ categories: string[] }>(
-    '/library/:activeLibrary/categories',
-  ).json()
+  try {
+    await libraryStore.getAvailableLibrary()
 
-  if (error.value) {
-    toastStore.showErrorToast(`Failed to load categories: ${error.value}`)
-  } else if (data.value?.categories) {
-    categories.value = data.value.categories
+    const { error, data } = await libraryFetch<{ categories: string[] }>(
+      '/library/:activeLibrary/categories',
+    ).json()
+
+    if (error.value) {
+      const errorMessage = typeof error.value === 'string' ? error.value : 'Unknown error'
+      toastStore.showErrorToast(`Failed to load categories: ${errorMessage}`)
+    } else if (data.value?.categories) {
+      categories.value = data.value.categories
+    }
+  } catch {
+    console.error('Error loading categories')
+    toastStore.showErrorToast('An error occurred while loading categories')
+  } finally {
+    loading.value = false
   }
-
-  loading.value = false
 }
 
 onMounted(loadCategories)

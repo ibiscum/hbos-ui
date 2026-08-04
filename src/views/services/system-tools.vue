@@ -87,7 +87,7 @@
 
       <!-- Stop All Music Players Tool -->
       <div class="tool-section">
-        <div class="tool-card reset-tool">
+        <div class="tool-card stop-players-tool">
           <div class="tool-info">
             <Icon icon="tabler/player-pause" class="tool-icon" />
             <div class="tool-details">
@@ -251,6 +251,12 @@ const loadSoundCards = async () => {
         console.error('Error loading detection status:', detectionErr)
         // Don't fail the whole operation if detection status fails
       }
+    } else {
+      const apiMessage =
+        'message' in response && typeof response.message === 'string'
+          ? response.message
+          : 'Failed to load available sound cards.'
+      toastStore.showErrorToast(apiMessage)
     }
   } catch (err) {
     console.error('Error loading sound cards:', err)
@@ -643,8 +649,6 @@ const stopAllMusicPlayers = async () => {
       }
     }
 
-    .expert-toggle {
-    }
   }
 }
 

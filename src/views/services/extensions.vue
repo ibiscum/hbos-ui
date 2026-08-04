@@ -84,6 +84,8 @@ async function onInstall(pkg: string) {
     job.track(response.data.job.id)
   } catch (e) {
     dialogOpen.value = false
+    dialogExtension.value = null
+    showLog.value = false
     toast.showErrorToast(e instanceof Error ? e.message : String(e))
   }
 }
@@ -97,6 +99,8 @@ async function onUninstall(pkg: string) {
     job.track(response.data.job.id)
   } catch (e) {
     dialogOpen.value = false
+    dialogExtension.value = null
+    showLog.value = false
     toast.showErrorToast(e instanceof Error ? e.message : String(e))
   }
 }
@@ -104,6 +108,7 @@ async function onUninstall(pkg: string) {
 function closeDialog() {
   dialogOpen.value = false
   dialogExtension.value = null
+  showLog.value = false
 }
 
 // Refresh the catalog whenever a job finishes, so state flips to installed.

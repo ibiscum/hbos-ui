@@ -53,29 +53,28 @@ import PageContent from '@/components/PageContent.vue'
 import { useRouter } from 'vue-router'
 import { useSettingsStore } from '@/stores/settings'
 import { storeToRefs } from 'pinia'
-
-const router = useRouter()
-const settingsStore = useSettingsStore()
-const { getExpertMode } = storeToRefs(settingsStore)
-
-const goToBluetoothSettings = () => {
-  router.push('/services/bluetooth-settings')
-}
-
 import {
   getMultipleServiceStatus,
   enableNowService,
   disableNowService,
   checkSystemdServiceExists,
   getExternalPlayers,
-  saveExternalPlayerSettings
+  saveExternalPlayerSettings,
 } from '@/api/config'
 import {
   getTOSLinkStatus,
   enableTOSLink,
   disableTOSLink,
-  setTOSLinkSensitivity
+  setTOSLinkSensitivity,
 } from '@/services/toslink'
+
+const router = useRouter()
+const settingsStore = useSettingsStore()
+const { getExpertMode } = storeToRefs(settingsStore)
+
+const goToBluetoothSettings = () => {
+  router.push({ name: 'bluetooth-settings' })
+}
 
 interface Player {
   name: string
@@ -523,16 +522,14 @@ const saveConfig = async (playerName: string) => {
     for (const s of player.settings) values[s.key] = s.value
     try {
       await saveExternalPlayerSettings(player.systemdService, values)
+      toggleConfigExpanded(playerName)
     } catch (e) {
       player.error = e instanceof Error ? e.message : 'Failed to save settings'
     }
-    toggleConfigExpanded(playerName)
     return
   }
 
-  // Save the configuration and close the section
-  expandedConfigs.value.delete(playerIndex)
-  console.log(`Configuration saved for ${player.name}`)
+  player.error = undefined
 
   try {
     // Handle TOSLink sensitivity configuration
@@ -543,9 +540,13 @@ const saveConfig = async (playerName: string) => {
       console.log(`TOSLink sensitivity saved successfully: ${sensitivity}`);
     }
     // Here you would add other configuration saving logic for other services
+
+    // Save succeeded - close the configuration section.
+    expandedConfigs.value.delete(playerIndex)
+    console.log(`Configuration saved for ${player.name}`)
   } catch (error) {
     console.error(`Failed to save configuration for ${player.name}:`, error);
-    // You might want to show an error message to the user here
+    player.error = error instanceof Error ? error.message : 'Failed to save configuration'
   }
 }
 </script>

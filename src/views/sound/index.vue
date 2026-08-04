@@ -1,7 +1,7 @@
 <template>
   <PageContent title="Sound">
     <div class="soundOverview">
-      <ContentBoxLink :to="{ name: 'general-sound' }"  :height="150">
+      <ContentBoxLink :to="{ name: 'general-sound' }" :height="150">
         <div class="soundCardHeader">
           <Icon icon="tabler/adjustments" class="soundCardHeaderIcon" />
           <h2>General sound settings</h2>
@@ -11,7 +11,7 @@
         </p>
       </ContentBoxLink>
 
-      <ContentBoxLink :to="{ name: 'speaker-equalizer' }"  :height="150">
+      <ContentBoxLink :to="{ name: 'speaker-equalizer' }" :height="150">
         <div class="soundCardHeader">
           <Icon icon="tabler/speaker" class="soundCardHeaderIcon" />
           <h2>Speaker Equalizer</h2>
@@ -21,7 +21,7 @@
         </p>
       </ContentBoxLink>
 
-      <ContentBoxLink :to="{ name: 'crossover-design' }"  :height="150">
+      <ContentBoxLink :to="{ name: 'crossover-design' }" :height="150">
         <div class="soundCardHeader">
           <Icon icon="tabler/crossover" class="soundCardHeaderIcon" />
           <h2>Crossover Design</h2>
@@ -42,23 +42,23 @@
 
 <script setup lang="ts">
 import Icon from '@/components/Icon.vue'
-import ContentBoxLink from "@/components/ContentBoxLink.vue"
-import PageContent from "@/components/PageContent.vue"
+import ContentBoxLink from '@/components/ContentBoxLink.vue'
+import PageContent from '@/components/PageContent.vue'
 </script>
 
 <style scoped lang="scss">
-.soundOverview{
+.soundOverview {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 25px;
 
-  .soundCardHeader{
+  .soundCardHeader {
     display: flex;
     flex-direction: row;
     align-items: center;
     margin-bottom: 10px;
 
-    .soundCardHeaderIcon{
+    .soundCardHeaderIcon {
       margin-right: 10px;
     }
   }

@@ -1,7 +1,11 @@
 <template>
-  <div class="poster-skeleton" v-for="(_, index) in 8" :key="`skeleton-item-${index}`">
+  <div
+    v-for="(_, index) in SKELETON_ITEMS_COUNT"
+    :key="`skeleton-item-${index}`"
+    class="poster-skeleton"
+  >
     <div class="poster-skeleton__img">
-      <AppSkeleton :shape="posterForm === 'circle' ? 'circle' : 'square'" />
+      <AppSkeleton :shape="skeletonShape" />
     </div>
     <AppSkeleton width="100%" height="12px" class="poster-skeleton__row" />
     <AppSkeleton width="100%" height="12px" class="poster-skeleton__row" />
@@ -10,14 +14,21 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+
 import AppSkeleton from '@/components/skeletons/AppSkeleton.vue'
 
-type posterForm = 'square' | 'circle'
+type PosterForm = 'square' | 'circle'
+
 interface PosterProps {
-  posterForm?: posterForm
+  posterForm?: PosterForm
   isNote?: boolean
 }
+
 const { posterForm = 'square', isNote = false } = defineProps<PosterProps>()
+
+const SKELETON_ITEMS_COUNT = 8
+const skeletonShape = computed<PosterForm>(() => (posterForm === 'circle' ? 'circle' : 'square'))
 </script>
 
 <style scoped lang="scss">

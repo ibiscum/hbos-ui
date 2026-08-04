@@ -274,6 +274,7 @@ export function useCrossoverFilters() {
 
   // Channel operations
   function setActiveChannel(channel: string) {
+    if (!channelNames.value.includes(channel)) return;
     activeChannel.value = channel;
     const currentFilters = channelFilters.value[channel] ?? [];
     activeFilterId.value = currentFilters[0]?.id ?? null;
@@ -297,6 +298,7 @@ export function useCrossoverFilters() {
       ? (getPairKey(pairKey) ?? pairKey)
       : getPairKey(activeChannel.value);
     if (!key) return;
+    if (!channelNames.value.includes(key)) return;
 
     const wasLinked = linkedPairs.value[key] ?? false;
     linkedPairs.value[key] = !wasLinked;

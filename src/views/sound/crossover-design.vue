@@ -2,7 +2,7 @@
 <PageContent
   :title="`Crossover Design — Channel ${activeChannel.replace(/^iir_/i, '').toUpperCase()}`"
   :backrouterLink="{ name: 'sound' }"
-  :headerHasContentBelow=true
+  :headerHasContentBelow="true"
 >
   <div class="sound">
     <div class="page-header">

@@ -6,9 +6,9 @@ vi.mock('@/api/system', () => ({
   resetSetup: vi.fn(),
 }))
 
-vi.mock('@/views/playlist.vue', () => ({
+vi.mock('@/views/queue.vue', () => ({
   default: {
-    template: '<div class="playlist-view-stub">playlist-view</div>',
+    template: '<div class="queue-view-stub">queue-view</div>',
   },
 }))
 
@@ -85,6 +85,22 @@ describe('router index', () => {
     expect(artistAlbumRoute?.path).toBe('/library/albums/artist/:artistId')
   })
 
+  it('declares sound route hierarchy with canonical child paths', async () => {
+    const { router } = await loadRouter()
+
+    const soundRoute = router.getRoutes().find((route) => route.name === 'sound')
+    const generalSoundRoute = router.getRoutes().find((route) => route.name === 'general-sound')
+    const speakerEqRoute = router.getRoutes().find((route) => route.name === 'speaker-equalizer')
+    const crossoverRoute = router.getRoutes().find((route) => route.name === 'crossover-design')
+    const roomAcousticsRoute = router.getRoutes().find((route) => route.name === 'room-acoustics')
+
+    expect(soundRoute?.path).toBe('/sound')
+    expect(generalSoundRoute?.path).toBe('/sound/general')
+    expect(speakerEqRoute?.path).toBe('/sound/speaker-equalizer')
+    expect(crossoverRoute?.path).toBe('/sound/crossover-design')
+    expect(roomAcousticsRoute?.path).toBe('/sound/room-acoustics')
+  })
+
   it('resolves artist-album named route to canonical nested URL shape', async () => {
     const { router } = await loadRouter()
 
@@ -98,7 +114,7 @@ describe('router index', () => {
     expect(resolved.href).toContain('/library/albums/artist/artist-42')
   })
 
-  it('resolves /playlist to queue wrapper and renders playlist view', async () => {
+  it('resolves /playlist to queue wrapper and renders queue view', async () => {
     const { router } = await loadRouter()
 
     const playlistRoute = router.getRoutes().find((route) => route.name === 'playlist')
@@ -110,7 +126,7 @@ describe('router index', () => {
     const loadedComponent = await (componentLoader as () => Promise<{ default: unknown }>)()
     const wrapper = mount(loadedComponent.default as object)
 
-    expect(wrapper.find('.playlist-view-stub').exists()).toBe(true)
+    expect(wrapper.find('.queue-view-stub').exists()).toBe(true)
   })
 
   it('setup-restart guard calls resetSetup and redirects to setup', async () => {
