@@ -1,4 +1,4 @@
-hifiberry-webui (0.20.6) trixie; urgency=medium
+hifiberry-webui (0.20.6) stable; urgency=medium
 
   * Debian/Trixie compliance updates:
     - Update Standards-Version to 4.7.0 (Trixie standard)
