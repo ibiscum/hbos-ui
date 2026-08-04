@@ -22,6 +22,8 @@ override_dh_auto_install:
 	# Install the built web application to /usr/share/hifiberry/webui
 	mkdir -p debian/hifiberry-webui/usr/share/hifiberry/webui
 	cp -r dist/* debian/hifiberry-webui/usr/share/hifiberry/webui/
+	# Strip upstream markdown docs from runtime asset payload.
+	find debian/hifiberry-webui/usr/share/hifiberry/webui -type f -name "*.md" -delete
 
 override_dh_install:
 	dh_install

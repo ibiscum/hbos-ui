@@ -1,4 +1,9 @@
-# No overrides needed - all issues have been addressed:
-# 1. Changelog day-of-week fixed to match actual date
-# 2. Maintainer scripts now use invoke-rc.d instead of direct systemctl calls
+# Web UI bundles application fonts under its static asset root so they are
+# served with the rest of the frontend files. This package is not a reusable
+# system font package.
+font-in-non-font-package
+font-outside-font-dir
+
+# Runtime SPA entrypoint is intentionally installed in the web root.
+package-contains-documentation-outside-usr-share-doc [usr/share/hifiberry/webui/index.html]
 
