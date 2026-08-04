@@ -270,10 +270,10 @@ const connectToSpotify = async () => {
 
       // Clean up the URL
       const spotifyUrl = loginData.message
-        .replace(/&amp;/g, '&')
         .replace(/&quot;/g, '"')
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&')
 
       // Open Spotify authorization page
       window.open(spotifyUrl, 'spotify_auth_window', 'width=800,height=600')
