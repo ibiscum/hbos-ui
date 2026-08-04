@@ -13,7 +13,7 @@
 </template>
 
 <script setup lang="ts">
-import { type BackendCapabilities } from '@/stores/filter_connector';
+import { type BackendCapabilities } from '@/stores/filter-connector';
 
 defineProps<{
   open: boolean

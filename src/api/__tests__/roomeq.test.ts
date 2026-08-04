@@ -87,7 +87,7 @@ describe('roomeq.ts - Regression Tests', () => {
       }
 
       expect(legacyFilter.coefficients).toBeDefined()
-      expect(newFilter.coefficients).not.toBeDefined()
+      expect('coefficients' in newFilter).toBe(false)
     })
   })
 
@@ -259,6 +259,7 @@ describe('roomeq.ts - Regression Tests', () => {
           peak_frequency: 100,
           peak_magnitude: 0,
           spectral_centroid: 500,
+          normalization: { applied: false },
           frequency_bands: {
             sub_bass: { range: '20-60', avg_magnitude: 0, peak_frequency: 40 },
             bass: { range: '60-250', avg_magnitude: 0, peak_frequency: 100 },
@@ -612,7 +613,7 @@ describe('roomeq.ts - Regression Tests', () => {
         max_frequency: 18000
       }
 
-      expect(result.usable_freq_low).toBeLessThan(result.usable_freq_high)
+      expect(result.usable_freq_low).toBeLessThan(result.usable_freq_high ?? 0)
       expect(typeof result.usable_freq_low).toBe('number')
       expect(typeof result.usable_freq_high).toBe('number')
     })
@@ -627,7 +628,7 @@ describe('roomeq.ts - Regression Tests', () => {
       }
 
       expect(request.measured_curve.frequencies.length).toBe(request.measured_curve.magnitudes_db.length)
-      expect(request.sample_rate).toBeGreaterThan(0)
+      expect((request.sample_rate as number)).toBeGreaterThan(0)
     })
   })
 
@@ -640,6 +641,330 @@ describe('roomeq.ts - Regression Tests', () => {
     it('should have valid minimum version constant', () => {
       expect(roomeq.ROOMEQ_MINIMUM_VERSION).toBeDefined()
       expect(roomeq.ROOMEQ_MINIMUM_VERSION).toMatch(/^\d+\.\d+\.\d+$/)
+    })
+  })
+
+  describe('Regression Tests - Complex Scenarios', () => {
+    describe('Multi-step Measurement Workflows', () => {
+      it('should handle complete measurement workflow without errors', () => {
+        // Test that all measurement-related functions work in sequence
+        const startNoise: roomeq.RoomEQSignalResponse = {
+          message: 'Started',
+          status: 'playing',
+          filename: 'noise.wav'
+        }
+
+        const startRecording: roomeq.RoomEQRecordingStartResponse = {
+          status: 'recording',
+          recording_id: 'rec-1',
+          filename: 'rec-1.wav',
+          duration: 10
+        }
+
+        const recordingStatus: roomeq.RoomEQRecordingStatusResponse = {
+          status: 'completed',
+          recording_id: 'rec-1',
+          state: 'completed',
+          filename: 'rec-1.wav'
+        }
+
+        expect(startNoise.status).toBeDefined()
+        expect(startRecording.recording_id).toBeDefined()
+        expect(recordingStatus.state).toBe('completed')
+      })
+
+      it('should validate measurement session response format', () => {
+        const sessionData: Awaited<ReturnType<typeof roomeq.startRoomMeasurementSession>> = {
+          success: true,
+          data: {
+            noiseFilename: 'noise.wav',
+            recordingId: 'rec-1'
+          }
+        }
+
+        expect(sessionData.success).toBe(true)
+        expect(sessionData.data?.noiseFilename).toBeDefined()
+        expect(sessionData.data?.recordingId).toBeDefined()
+      })
+    })
+
+    describe('FFT Analysis Edge Cases', () => {
+      it('should handle FFT response with all frequency bands', () => {
+        const fftBands: Partial<roomeq.RoomEQFFTResponse['fft_analysis']['frequency_bands']> = {
+          sub_bass: { range: '20-60', avg_magnitude: -35, peak_frequency: 40 },
+          bass: { range: '60-250', avg_magnitude: -30, peak_frequency: 100 },
+          low_midrange: { range: '250-500', avg_magnitude: -25, peak_frequency: 400 },
+          midrange: { range: '500-2000', avg_magnitude: -15, peak_frequency: 1000 },
+          upper_midrange: { range: '2000-4000', avg_magnitude: -20, peak_frequency: 3000 },
+          presence: { range: '4000-6000', avg_magnitude: -25, peak_frequency: 5000 },
+          brilliance: { range: '6000-22000', avg_magnitude: -30, peak_frequency: 10000 }
+        }
+
+        expect(Object.keys(fftBands)).toHaveLength(7)
+        Object.values(fftBands).forEach(band => {
+          expect(band?.avg_magnitude).toBeDefined()
+          expect(band?.peak_frequency).toBeGreaterThan(0)
+        })
+      })
+
+      it('should handle FFT difference with various source types', () => {
+        const sourceTypes: Array<'recording_id' | 'filename' | 'filepath'> = ['recording_id', 'filename', 'filepath']
+
+        sourceTypes.forEach(type1 => {
+          sourceTypes.forEach(type2 => {
+            // Verify all combinations are theoretically valid
+            expect(['recording_id', 'filename', 'filepath']).toContain(type1)
+            expect(['recording_id', 'filename', 'filepath']).toContain(type2)
+          })
+        })
+      })
+    })
+
+    describe('Optimization API Compatibility', () => {
+      it('should distinguish between legacy and new optimization APIs', () => {
+        const legacyRequest = {
+          recording_id: 'rec-123',
+          target_curve: 'flat',
+          optimizer_preset: 'default',
+          filter_count: 10
+        }
+
+        const newRequest: roomeq.NewRoomEQOptimizationRequest = {
+          measured_curve: {
+            frequencies: [20, 100],
+            magnitudes_db: [0, -3]
+          },
+          target_curve: {
+            curve: [
+              { frequency: 20, target_db: 0, weight: null },
+              { frequency: 100, target_db: 0, weight: null }
+            ]
+          },
+          optimizer_params: {
+            qmax: 10,
+            mindb: -10,
+            maxdb: 3,
+            add_highpass: true,
+            acceptable_error: 0.1
+          },
+          sample_rate: 48000,
+          filter_count: 10
+        }
+
+        expect('recording_id' in legacyRequest).toBe(true)
+        expect('recording_id' in newRequest).toBe(false)
+        expect('measured_curve' in newRequest).toBe(true)
+        expect('measured_curve' in legacyRequest).toBe(false)
+      })
+
+      it('should validate optimizer preset constraints', () => {
+        const presets: roomeq.RoomEQOptimizerPreset[] = [
+          {
+            key: 'mild',
+            preset: 'mild',
+            name: 'Mild',
+            description: 'Gentle',
+            qmax: 5,
+            mindb: -5,
+            maxdb: 1,
+            add_highpass: false
+          },
+          {
+            key: 'default',
+            preset: 'default',
+            name: 'Default',
+            description: 'Balanced',
+            qmax: 10,
+            mindb: -10,
+            maxdb: 3,
+            add_highpass: true
+          },
+          {
+            key: 'aggressive',
+            preset: 'aggressive',
+            name: 'Aggressive',
+            description: 'Strong',
+            qmax: 20,
+            mindb: -15,
+            maxdb: 6,
+            add_highpass: true
+          }
+        ]
+
+        presets.forEach(preset => {
+          expect(preset.qmax).toBeGreaterThan(0)
+          expect(preset.mindb).toBeLessThan(preset.maxdb)
+          expect(typeof preset.add_highpass).toBe('boolean')
+        })
+      })
+    })
+
+    describe('Response Envelope Consistency', () => {
+      it('should maintain consistent success/failure pattern across all APIs', () => {
+        const successEnvelopes: roomeq.RoomEQApiEnvelope[] = [
+          { success: true, data: { version: '1.0.0' } },
+          { success: true, data: { count: 2, cards: ['a', 'b'] } },
+          { success: true, data: null }
+        ]
+
+        const failureEnvelopes: roomeq.RoomEQApiEnvelope[] = [
+          { success: false, detail: 'Error message' },
+          { success: false, detail: 'Another error' }
+        ]
+
+        successEnvelopes.forEach(env => {
+          expect(env.success).toBe(true)
+        })
+
+        failureEnvelopes.forEach(env => {
+          expect(env.success).toBe(false)
+          expect(env.detail).toBeDefined()
+        })
+      })
+
+      it('should handle fallback data in error responses', () => {
+        // Some functions return fallback data even on error
+        const presetError: roomeq.RoomEQApiEnvelope<roomeq.RoomEQOptimizerPresets> = {
+          success: false,
+          data: {
+            count: 1,
+            optimizer_presets: [{
+              key: 'default',
+              preset: 'default',
+              name: 'Default',
+              description: 'Default preset',
+              qmax: 10,
+              mindb: -10,
+              maxdb: 3,
+              add_highpass: true
+            }],
+            success: true
+          },
+          detail: 'API error'
+        }
+
+        expect(presetError.success).toBe(false)
+        expect(presetError.data?.optimizer_presets).toBeDefined()
+        expect(presetError.data?.optimizer_presets.length).toBeGreaterThan(0)
+      })
+    })
+
+    describe('Version and Capability Checks', () => {
+      it('should validate version comparison edge cases', () => {
+        const testCases = [
+          { v1: '0.6.0', v2: '0.6.0', expected: true },
+          { v1: '0.6.1', v2: '0.6.0', expected: true },
+          { v1: '0.7.0', v2: '0.6.9', expected: true },
+          { v1: '1.0.0', v2: '0.9.9', expected: true },
+          { v1: '0.5.9', v2: '0.6.0', expected: false },
+          { v1: '0.6.0', v2: '0.6.1', expected: false },
+          { v1: '1.0.0', v2: '1.0.1', expected: false }
+        ]
+
+        testCases.forEach(({ v1, v2, expected }) => {
+          expect(roomeq.isVersionAtLeast(v1, v2)).toBe(expected)
+        })
+      })
+    })
+
+    describe('Parameter Encoding Edge Cases', () => {
+      it('should handle special characters in optimization IDs', () => {
+        const testIds = [
+          'opt-123',
+          'opt_456',
+          'opt.789',
+          'opt/special-chars'
+        ]
+
+        testIds.forEach(id => {
+          const encoded = encodeURIComponent(id)
+          expect(encoded).toBeDefined()
+          expect(encoded.length).toBeGreaterThan(0)
+        })
+      })
+
+      it('should handle numeric and string recording IDs interchangeably', () => {
+        const stringId = '12345'
+        const numericId = 12345
+
+        expect(String(stringId)).toBe(String(numericId))
+        expect(Number(stringId)).toBe(numericId)
+      })
+    })
+
+    describe('Measurement Response Structure', () => {
+      it('should validate complete RoomMeasureResponse structure', () => {
+        const response: roomeq.RoomMeasureResponse = {
+          status: 'success',
+          device: 'hw:0',
+          channel: 'both',
+          count: 3,
+          fft_points: 128,
+          csv_path: '/data/measurement.csv',
+          fft: {
+            frequencies: [20, 50, 100, 500, 1000, 5000, 10000, 20000],
+            magnitudes_db: [-30, -25, -20, -15, -10, -12, -18, -35],
+            phase: [0, 10, 20, 30, 40, 50, 60, 70],
+            points: 8
+          },
+          normalization: {
+            applied: true,
+            requested_frequency: 1000,
+            actual_frequency: 1000,
+            reference_level_db: -3
+          },
+          message: 'Measurement completed'
+        }
+
+        expect(response.status).toBe('success')
+        expect(response.fft.frequencies).toHaveLength(response.fft.points)
+        expect(response.fft.magnitudes_db).toHaveLength(response.fft.points)
+        expect(response.normalization?.applied).toBe(true)
+      })
+    })
+
+    describe('Filter and Curve Validation', () => {
+      it('should validate target curve point definitions', () => {
+        const curvePoints: roomeq.RoomEQTargetPoint[] = [
+          { frequency: 20, target_db: 0, weight: null },
+          { frequency: 100, target_db: -2, weight: 0.5 },
+          { frequency: 1000, target_db: 0, weight: [0.3, 0.7] },
+          { frequency: 20000, target_db: -1, weight: null }
+        ]
+
+        curvePoints.forEach((point, i) => {
+          expect(point.frequency).toBeGreaterThan(0)
+          if (i > 0) {
+            expect(point.frequency).toBeGreaterThan(curvePoints[i - 1].frequency)
+          }
+          expect(typeof point.target_db).toBe('number')
+        })
+      })
+
+      it('should validate filter definitions across APIs', () => {
+        const legacyFilter: roomeq.RoomEQFilter = {
+          index: 0,
+          filter_type: 'hp',
+          frequency: 30,
+          q: 0.707,
+          gain_db: 0,
+          description: 'High-pass filter',
+          text_format: '[HP] f=30Hz q=0.707',
+          coefficients: { b: [1, -2, 1], a: [1, -1.5, 0.5] }
+        }
+
+        const newFilter: roomeq.NewRoomEQOptimizedFilter = {
+          filter_type: 'hp',
+          frequency: 30,
+          q: 0.707,
+          gain_db: 0,
+          description: 'High-pass filter'
+        }
+
+        expect(legacyFilter.filter_type).toBe(newFilter.filter_type)
+        expect(legacyFilter.coefficients).toBeDefined()
+        expect('coefficients' in newFilter).toBe(false)
+      })
     })
   })
 })

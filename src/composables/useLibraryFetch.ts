@@ -1,5 +1,5 @@
 import { createFetch } from '@vueuse/core'
-import { useLibraryStore } from '@/stores/library.ts'
+import { useLibraryStore } from '@/stores/library'
 
 import { useAppConfigStore } from '@/stores/appconfig'
 
@@ -16,9 +16,17 @@ export const useLibraryFetch = () => {
             await libraryStore.getAvailableLibrary()
           }
         } catch (error) {
-          console.error('Active player name failed:', error)
+          console.error('Active library resolution failed:', error)
           cancel()
+          return { options, url }
         }
+
+        if (!libraryStore.activeLibrary) {
+          console.error('Active library is not available for request URL replacement')
+          cancel()
+          return { options, url }
+        }
+
         url = url.replace(/:activeLibrary(\/|\?|$)/gi, `${libraryStore.activeLibrary}$1`)
         return { options, url }
       },

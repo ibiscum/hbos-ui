@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { convertUIFilterToStore, convertStoreFilterToUI } from '../filter-conversions'
 import type { Filter as UIFilter } from '../filtercalc'
-import type { Filter as StoreFilter } from '@/stores/filter_backend_interface'
+import type { Filter as StoreFilter } from '@/stores/filter-backend-interface'
 
 describe('convertUIFilterToStore', () => {
   const baseUIFilter: UIFilter = {

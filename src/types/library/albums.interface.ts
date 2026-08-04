@@ -1,6 +1,6 @@
-import type { Artist } from '@/types/library'
-import type { Track } from '@/types/library'
-import type { PosterItem } from '@/types/library'
+import type { Artist } from './artist.interface.ts'
+import type { PosterItem } from './poster.interface.ts'
+import type { Track } from './track.interface.ts'
 
 export interface Album extends PosterItem {
   id: string

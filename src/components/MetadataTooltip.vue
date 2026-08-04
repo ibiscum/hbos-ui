@@ -101,22 +101,30 @@ const sampleRateText = computed(() => {
 
 // Check if any meaningful metadata is available
 const hasAnyMetadata = computed(() => {
-  if (!props.song) return false
+  const song = props.song
 
-  return !!(
-    props.song.title ||
-    props.song.artist ||
-    props.song.album ||
-    props.song.album_artist ||
-    (props.song.track_number !== undefined && props.song.track_number !== null && props.song.track_number > 0) ||
-    props.song.duration ||
-    props.song.source ||
-    props.song.uri ||
-    props.song.stream_url ||
-    props.song.metadata?.lyrics_available !== undefined ||
-    currentStreamDetails.value?.codec ||
-    currentStreamDetails.value?.sample_rate
+  const hasSongMetadata = !!(
+    song?.title ||
+    song?.artist ||
+    song?.album ||
+    song?.album_artist ||
+    (song?.track_number !== undefined && song.track_number !== null && song.track_number > 0) ||
+    song?.duration ||
+    song?.source ||
+    song?.uri ||
+    song?.stream_url ||
+    song?.metadata?.lyrics_available !== undefined ||
+    song?.metadata?.lyrics_url
   )
+
+  const hasStreamMetadata = !!(
+    currentStreamDetails.value?.codec ||
+    currentStreamDetails.value?.sample_rate ||
+    currentStreamDetails.value?.bits_per_sample ||
+    currentStreamDetails.value?.channels
+  )
+
+  return hasSongMetadata || hasStreamMetadata
 })
 </script>
 
@@ -205,16 +213,6 @@ const hasAnyMetadata = computed(() => {
       font-size: 0.8rem;
       opacity: 0.8;
       word-break: break-all;
-    }
-
-    &.status-available {
-      color: #22c55e;
-      font-weight: 500;
-    }
-
-    &.status-unavailable {
-      color: #6b7280;
-      font-weight: 500;
     }
   }
 }

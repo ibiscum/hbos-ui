@@ -12,7 +12,7 @@ vi.mock('@vueuse/core', () => ({
 
 vi.mock('vue', () => ({
   createApp: vi.fn(() => ({
-    use: vi.fn(function () { return this }),
+    use: vi.fn().mockReturnThis(),
     mount: vi.fn(),
   })),
   onMounted: vi.fn(),
@@ -60,7 +60,7 @@ describe('main.ts initialization', () => {
       const mockSettingsStore = useSettingsStore()
 
       // Simulate error
-      mockSettingsStore.loadSettings.mockRejectedValueOnce(new Error('Load failed'))
+      ;(mockSettingsStore.loadSettings as any).mockRejectedValueOnce(new Error('Load failed'))
 
       try {
         await mockSettingsStore.loadSettings()

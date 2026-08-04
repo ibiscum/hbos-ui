@@ -9,6 +9,10 @@ export interface ChartConfig {
   offsetY: number      // top margin / y-offset where the plot starts
 }
 
+const isFiniteNumber = (value: unknown): value is number => (
+  typeof value === 'number' && Number.isFinite(value)
+)
+
 /** Standard chart configs used across the wizards */
 export const CHART_CONFIGS = {
   /** Steps 1/3 in EQ wizard, step 5 in Measurement wizard: 800×300, ±30 dB, 20–25 kHz */
@@ -64,9 +68,12 @@ export function generateFrequencyPath(
   if (!frequencies?.length || !magnitudes?.length) return ''
 
   let path = ''
-  for (let i = 0; i < frequencies.length; i++) {
+  const limit = Math.min(frequencies.length, magnitudes.length)
+
+  for (let i = 0; i < limit; i++) {
     const f = frequencies[i]
     const mag = magnitudes[i]
+    if (!isFiniteNumber(f) || !isFiniteNumber(mag)) continue
     if (f >= config.minFreq && f <= config.maxFreq) {
       const x = frequencyToX(f, config)
       const y = magnitudeToY(mag, config)
@@ -98,17 +105,22 @@ export function generateTargetCurvePath(
   if (!pts?.length) return ''
 
   // Determine the effective frequency bounds
-  const lo = clipMinFreq != null
-    ? Math.max(config.minFreq, Math.max(20, Math.floor(clipMinFreq)))
+  const lo = isFiniteNumber(clipMinFreq)
+    ? Math.max(config.minFreq, Math.floor(clipMinFreq))
     : config.minFreq
-  const hi = clipMaxFreq != null
-    ? Math.min(config.maxFreq, Math.min(25000, Math.ceil(clipMaxFreq)))
+  const hi = isFiniteNumber(clipMaxFreq)
+    ? Math.min(config.maxFreq, Math.ceil(clipMaxFreq))
     : config.maxFreq
   if (lo >= hi) return ''
 
   // Sort by frequency
   const points = [...pts]
-    .filter(p => p && typeof p === 'object')
+    .filter((p): p is TargetPoint => (
+      !!p
+      && typeof p === 'object'
+      && isFiniteNumber(p.frequency)
+      && isFiniteNumber(p.target_db)
+    ))
     .sort((a, b) => a.frequency - b.frequency)
 
   if (points.length === 0) return ''

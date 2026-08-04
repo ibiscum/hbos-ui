@@ -70,10 +70,12 @@ describe('AlbumsByCategory.vue', () => {
         {
           path: '/album/:albumId',
           name: 'album',
+          component: { template: '<div></div>' },
         },
         {
           path: '/categories',
           name: 'categories',
+          component: { template: '<div></div>' },
         },
       ],
     })
@@ -92,7 +94,7 @@ describe('AlbumsByCategory.vue', () => {
       },
     })
     await flushPromises()
-    return wrapper
+    return wrapper as any
   }
 
   it('renders component with PageContent and PosterGrid', async () => {

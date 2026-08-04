@@ -121,10 +121,10 @@
                 <div class="noise-button-container">
                   <button
                     @click="toggleNoise"
-                    :class="['nav-button', isNoiseePlaying ? 'danger' : 'primary']"
+                    :class="['nav-button', isNoisePlaying ? 'danger' : 'primary']"
                   >
-                    <Icon :icon="isNoiseePlaying ? 'tabler/player-stop' : 'tabler/player-play'" />
-                    {{ isNoiseePlaying ? 'Stop Noise' : 'Play Noise' }}
+                    <Icon :icon="isNoisePlaying ? 'tabler/player-stop' : 'tabler/player-play'" />
+                    {{ isNoisePlaying ? 'Stop Noise' : 'Play Noise' }}
                   </button>
                 </div>
 
@@ -253,6 +253,11 @@
             </button>
           </div>
 
+          <div v-if="step4Error" class="fft-error">
+            <Icon icon="tabler/alert-circle" />
+            <span>Error: {{ step4Error }}</span>
+          </div>
+
           <div v-if="isMeasuringRoom" class="progress-info">
             <div class="progress-text">
               Running room measurement... ({{ measurementCount }} sweeps)
@@ -366,7 +371,7 @@ const selectedMicrophone = ref<RoomEQMicrophone | null>(null)
 
 // Audio level step state
 const noiseAmplitude = ref(1.0) // Maximum amplitude for noise
-const isNoiseePlaying = ref(false)
+const isNoisePlaying = ref(false)
 const keepAliveInterval = ref<number | null>(null)
 
 // Computed
@@ -381,8 +386,8 @@ const canProceedToNextStep = computed(() => {
     return true // User can proceed after reading audio level instructions
   }
   if (currentStep.value === 4) {
-    // Disable navigation while measuring or if no measurement has been completed
-    return !isMeasuringRoom.value && recordingFilename.value !== ''
+    // Disable navigation while measuring and only allow proceeding after a measurement has produced data
+    return !isMeasuringRoom.value && (recordingFilename.value !== '' || fftData.value !== null)
   }
   if (currentStep.value === 5) {
     return true // User can proceed after viewing measurement results
@@ -514,7 +519,7 @@ const startRoomMeasurement = async () => {
     isMeasuringRoom.value = true
 
     // Ensure no noise is playing
-    if (isNoiseePlaying.value) {
+    if (isNoisePlaying.value) {
       await stopNoise()
     }
 
@@ -764,7 +769,7 @@ const resetWizard = () => {
   smoothingType.value = '1/3_octave'
 
   // Stop noise if playing
-  if (isNoiseePlaying.value) {
+  if (isNoisePlaying.value) {
     stopNoise()
   }
 
@@ -839,7 +844,7 @@ const nextStep = () => {
     }
     // Stop noise and SPL measurements when leaving step 3
     if (currentStep.value === 3) {
-      if (isNoiseePlaying.value) {
+      if (isNoisePlaying.value) {
         stopNoise()
       }
       if (isMeasuring.value) {
@@ -854,7 +859,7 @@ const previousStep = () => {
   if (currentStep.value > 1) {
     // Stop noise and SPL measurements when leaving step 3
     if (currentStep.value === 3) {
-      if (isNoiseePlaying.value) {
+      if (isNoisePlaying.value) {
         stopNoise()
       }
       if (isMeasuring.value) {
@@ -875,7 +880,7 @@ const pausePlayers = async () => {
 }
 
 const toggleNoise = async () => {
-  if (isNoiseePlaying.value) {
+  if (isNoisePlaying.value) {
     await stopNoise()
   } else {
     await startNoise()
@@ -887,7 +892,7 @@ const startNoise = async () => {
     console.log('Starting white noise for room measurement')
     const response = await startRoomEQNoise(noiseAmplitude.value, 3.0)
     if (response.success) {
-      isNoiseePlaying.value = true
+      isNoisePlaying.value = true
 
       // Start keep-alive mechanism - send request every 2 seconds
       keepAliveInterval.value = window.setInterval(async () => {
@@ -897,7 +902,7 @@ const startNoise = async () => {
         } catch (error) {
           console.error('Keep-alive failed:', error)
           // If keep-alive fails, stop the noise
-          isNoiseePlaying.value = false
+          isNoisePlaying.value = false
           if (keepAliveInterval.value) {
             clearInterval(keepAliveInterval.value)
             keepAliveInterval.value = null
@@ -924,16 +929,16 @@ const stopNoise = async () => {
 
     const response = await stopRoomEQNoise()
     if (response.success) {
-      isNoiseePlaying.value = false
+      isNoisePlaying.value = false
     } else {
       console.error('Failed to stop noise:', response.detail)
       // Still set to false even if API call failed
-      isNoiseePlaying.value = false
+      isNoisePlaying.value = false
     }
   } catch (error) {
     console.error('Error stopping noise:', error)
     // Still set to false even if there's an error
-    isNoiseePlaying.value = false
+    isNoisePlaying.value = false
   }
 }
 
@@ -1067,8 +1072,6 @@ const saveMeasurement = async () => {
   }
 
   try {
-    const settingsStore = useSettingsStore()
-
     // Prefer logarithmic frequency summary if available (this matches what's displayed in step 5)
     let frequencies: number[]
     let magnitudes: number[]

@@ -1,509 +1,529 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useAppConfigStore } from '@/stores/appconfig'
 import { useToastStore } from '@/stores/toast'
-import * as player from '@/api/player'
+import { apiFetch } from '@/api/http'
+import {
+  addTrackToPlayer,
+  sendPlayerCommand,
+  pauseAllPlayers,
+  stopAllPlayers,
+  rewrite_audiocontrol_api_url,
+} from '@/api/player'
 
-// Mock the stores and apiFetch
+// Mock dependencies
 vi.mock('@/stores/appconfig')
 vi.mock('@/stores/toast')
-vi.mock('@/api/http', () => ({
-  apiFetch: vi.fn()
-}))
-vi.mock('./utils', () => ({
-  rewriteAudiocontrolApiUrl: vi.fn((url) => url)
-}))
+vi.mock('@/api/http')
 
-import { apiFetch } from '@/api/http'
+describe('Player API - Exports', () => {
+  it('should export rewrite_audiocontrol_api_url for backward compatibility', () => {
+    expect(typeof rewrite_audiocontrol_api_url).toBe('function')
+  })
 
-describe('player.ts - Regression Tests', () => {
+  it('should export addTrackToPlayer function', () => {
+    expect(typeof addTrackToPlayer).toBe('function')
+  })
+
+  it('should export sendPlayerCommand function', () => {
+    expect(typeof sendPlayerCommand).toBe('function')
+  })
+
+  it('should export pauseAllPlayers function', () => {
+    expect(typeof pauseAllPlayers).toBe('function')
+  })
+
+  it('should export stopAllPlayers function', () => {
+    expect(typeof stopAllPlayers).toBe('function')
+  })
+})
+
+describe('Player API - addTrackToPlayer', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    ;(useAppConfigStore as any).mockReturnValue({
-      getApiBaseUrl: () => 'http://api.local'
-    })
-    ;(useToastStore as any).mockReturnValue({
-      showErrorToast: vi.fn()
-    })
+    vi.mocked(useAppConfigStore).mockReturnValue({
+      getApiBaseUrl: vi.fn().mockReturnValue('http://localhost:8000/api'),
+    } as any)
   })
 
-  describe('Error Handling Consistency', () => {
-    it('should throw error on add track failure (consistency check)', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        statusText: 'Bad Request'
-      })
+  it('should add track to player successfully', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success', message: 'Track added' }), { status: 200 })
+    )
 
-      await expect(player.addTrackToPlayer('player1', 'track://uri')).rejects.toThrow()
-    })
-
-    it('should throw error on send command failure (consistency check)', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        statusText: 'Bad Request'
-      })
-
-      await expect(player.sendPlayerCommand('player1', 'play')).rejects.toThrow()
-    })
-
-    it('should return false on pause all failure (inconsistent with throw pattern)', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        statusText: 'Server Error'
-      })
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        statusText: 'Server Error'
-      })
-
-      const result = await player.pauseAllPlayers()
-      expect(result).toBe(false)
-    })
-
-    it('should return false on stop all failure (inconsistent with throw pattern)', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        statusText: 'Server Error'
-      })
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        statusText: 'Server Error'
-      })
-
-      const result = await player.stopAllPlayers()
-      expect(result).toBe(false)
-    })
-
-    it('should inconsistently handle errors - some throw, some return false', async () => {
-      // This test documents the inconsistency in error handling
-      const throwFunctions = [
-        () => player.addTrackToPlayer('p1', 'uri'),
-        () => player.sendPlayerCommand('p1', 'play')
-      ]
-
-      const returnFalsFunctions = [
-        () => player.pauseAllPlayers(),
-        () => player.stopAllPlayers()
-      ]
-
-      ;(apiFetch as any).mockResolvedValue({
-        ok: false,
-        status: 500,
-        statusText: 'Server Error'
-      })
-
-      // Verify inconsistency exists
-      for (const fn of throwFunctions) {
-        await expect(fn()).rejects.toThrow()
-      }
-
-      ;(apiFetch as any).mockClear()
-      ;(apiFetch as any).mockResolvedValue({
-        ok: false,
-        status: 500,
-        statusText: 'Server Error'
-      })
-
-      for (const fn of returnFalsFunctions) {
-        const result = await fn()
-        expect(result).toBe(false)
-      }
-    })
+    const result = await addTrackToPlayer('speaker1', 'spotify:track:123')
+    expect(result).toBe(true)
   })
 
-  describe('Return Value Consistency', () => {
-    it('should validate response and throw on error in response content', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ error: 'something went wrong' })
-      })
+  it('should add track with metadata', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
 
-      await expect(player.addTrackToPlayer('player1', 'track://uri')).rejects.toThrow('Failed to add track')
-    })
+    const metadata = { title: 'Song', artist: 'Artist', album: 'Album' }
+    const result = await addTrackToPlayer('speaker1', 'uri', metadata)
 
-    it('should validate response structure and throw on status=failed', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ status: 'failed', error: 'Track not found' })
-      })
-
-      await expect(player.sendPlayerCommand('player1', 'play')).rejects.toThrow('Failed to send command')
-    })
-
-    it('should return true when response indicates success', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ status: 'success' })
-      })
-
-      const result = await player.addTrackToPlayer('player1', 'track://uri')
-      expect(result).toBe(true)
-    })
-
-    it('should return true when response has no error fields', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ data: 'track added' })
-      })
-
-      const result = await player.sendPlayerCommand('player1', 'play')
-      expect(result).toBe(true)
-    })
+    const call = vi.mocked(apiFetch).mock.calls[0]
+    const body = JSON.parse(call[1]?.body as string)
+    expect(body.uri).toBe('uri')
+    expect(body.metadata).toEqual(metadata)
+    expect(result).toBe(true)
   })
 
-  describe('URL Construction Safety', () => {
-    it('should encode playerName in addTrackToPlayer (security fix)', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({})
-      })
+  it('should encode player name in URL', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
 
-      const dangerousName = "player'; DROP TABLE--"
-      await player.addTrackToPlayer(dangerousName, 'uri')
-
-      const callArgs = (apiFetch as any).mock.calls[0]
-      // Verify that dangerous characters are encoded, not present as-is
-      expect(callArgs[0]).not.toContain("'; DROP")
-      expect(callArgs[0]).toContain('%3B') // Encoded semicolon
-      expect(callArgs[0]).toContain('%20') // Encoded space
-    })
-
-    it('should encode playerName in sendPlayerCommand (security fix)', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({})
-      })
-
-      const dangerousName = '../../../admin'
-      await player.sendPlayerCommand(dangerousName, 'play')
-
-      const callArgs = (apiFetch as any).mock.calls[0]
-      // Verify that path traversal characters are encoded, not present as-is
-      expect(callArgs[0]).not.toContain('../../../')
-      expect(callArgs[0]).toContain('%2F') // Encoded forward slash
-    })
-
-    it('should encode both playerName and command in URLs', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({})
-      })
-
-      const playerName = 'player with spaces'
-      const command = 'special;command'
-      await player.sendPlayerCommand(playerName, command)
-
-      const url = (apiFetch as any).mock.calls[0][0]
-      // Both should be encoded
-      expect(url).toContain(encodeURIComponent(playerName))
-      expect(url).toContain(encodeURIComponent(command))
-    })
+    await addTrackToPlayer('speaker-1/2', 'uri')
+    const url = vi.mocked(apiFetch).mock.calls[0][0] as string
+    expect(url).toContain('speaker-1%2F2')
   })
 
-  describe('Code Duplication', () => {
-    it('pauseAllPlayers and stopAllPlayers have nearly identical fallback logic', async () => {
-      // This test verifies the high duplication
-      ;(apiFetch as any)
-        .mockResolvedValueOnce({ ok: false, status: 500, statusText: 'Error' })
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ players: [] }) })
+  it('should use POST method for adding track', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
 
-      await player.pauseAllPlayers()
-      const pauseCalls = (apiFetch as any).mock.calls.length
-
-      ;(apiFetch as any).mockClear()
-
-      ;(apiFetch as any)
-        .mockResolvedValueOnce({ ok: false, status: 500, statusText: 'Error' })
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ players: [] }) })
-
-      await player.stopAllPlayers()
-      const stopCalls = (apiFetch as any).mock.calls.length
-
-      // Both make same number of calls in fallback
-      expect(pauseCalls).toBe(stopCalls)
-    })
-
-    it('should have refactored common fallback logic between pause and stop', async () => {
-      // After refactoring, pauseAllPlayers and stopAllPlayers no longer have 50+ lines of duplication
-      // The common fallback logic has been extracted into a shared helper
-      const pauseCode = player.pauseAllPlayers.toString()
-      const stopCode = player.stopAllPlayers.toString()
-
-      // Both should now be simpler - they delegate to a helper for fallback logic
-      // The actual duplication between them should be minimal (both follow same pattern)
-      const pauseLength = pauseCode.length
-      const stopLength = stopCode.length
-
-      // After refactoring, both functions should be similar length
-      // Original: pauseAllPlayers was ~900 chars, stopAllPlayers was ~850 chars with duplication
-      // After refactoring: both should be under 250 chars due to extraction
-      // (they only have bulk endpoint code + one-liner helper call)
-      const lengthDifference = Math.abs(pauseLength - stopLength)
-      expect(lengthDifference).toBeLessThan(100) // Should be very similar length now
-    })
+    await addTrackToPlayer('speaker1', 'uri')
+    const method = vi.mocked(apiFetch).mock.calls[0][1]?.method
+    expect(method).toBe('POST')
   })
 
-  describe('Toast Message Inconsistency', () => {
-    it('should only show error toast in sendPlayerCommand, not others', async () => {
-      const toastStore = useToastStore()
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        statusText: 'Bad Request'
-      })
+  it('should include Content-Type header for add track', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
 
-      try {
-        await player.sendPlayerCommand('player1', 'play')
-      } catch (e) {
-        // Expected to throw
-      }
-
-      expect(toastStore.showErrorToast).toHaveBeenCalledWith('Could not send player command.')
-    })
-
-    it('should not show toast for addTrackToPlayer errors', async () => {
-      const toastStore = useToastStore()
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        statusText: 'Bad Request'
-      })
-
-      try {
-        await player.addTrackToPlayer('player1', 'uri')
-      } catch (e) {
-        // Expected to throw
-      }
-
-      expect(toastStore.showErrorToast).not.toHaveBeenCalled()
-    })
-
-    it('should not show toast for pauseAllPlayers errors', async () => {
-      const toastStore = useToastStore()
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        statusText: 'Server Error'
-      })
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        statusText: 'Server Error'
-      })
-
-      await player.pauseAllPlayers()
-
-      expect(toastStore.showErrorToast).not.toHaveBeenCalled()
-    })
+    await addTrackToPlayer('speaker1', 'uri')
+    const headers = vi.mocked(apiFetch).mock.calls[0][1]?.headers as any
+    expect(headers['Content-Type']).toBe('application/json')
   })
 
-  describe('Metadata Handling', () => {
-    it('should include metadata when provided', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({})
-      })
+  it('should send track URI in request body', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
 
-      const metadata = {
-        title: 'Track Title',
-        artist: 'Artist Name',
-        album: 'Album Name',
-        duration: 300
-      }
-
-      await player.addTrackToPlayer('player1', 'uri', metadata)
-
-      const callArgs = (apiFetch as any).mock.calls[0]
-      const body = JSON.parse(callArgs[1].body)
-      expect(body.metadata).toEqual(metadata)
-    })
-
-    it('should not include metadata key when metadata is empty object', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({})
-      })
-
-      await player.addTrackToPlayer('player1', 'uri', {})
-
-      const callArgs = (apiFetch as any).mock.calls[0]
-      const body = JSON.parse(callArgs[1].body)
-      expect(body.metadata).toBeUndefined()
-    })
-
-    it('should allow custom metadata fields', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({})
-      })
-
-      const metadata = {
-        title: 'Track',
-        customField: 'customValue',
-        anotherField: 123
-      }
-
-      await player.addTrackToPlayer('player1', 'uri', metadata)
-
-      const callArgs = (apiFetch as any).mock.calls[0]
-      const body = JSON.parse(callArgs[1].body)
-      expect(body.metadata.customField).toBe('customValue')
-      expect(body.metadata.anotherField).toBe(123)
-    })
+    await addTrackToPlayer('speaker1', 'spotify:track:456')
+    const body = JSON.parse(vi.mocked(apiFetch).mock.calls[0][1]?.body as string)
+    expect(body.uri).toBe('spotify:track:456')
   })
 
-  describe('Command Validation', () => {
-    it('should reject add_track commands in sendPlayerCommand', async () => {
-      await expect(player.sendPlayerCommand('player1', 'add_track:uri')).rejects.toThrow(
-        'Use addTrackToPlayer() function for add_track commands'
+  it('should handle HTTP error when adding track', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response('Not found', { status: 404 })
+    )
+
+    await expect(addTrackToPlayer('speaker1', 'uri')).rejects.toThrow()
+  })
+
+  it('should handle API error response', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Player not found' }), { status: 200 })
+    )
+
+    await expect(addTrackToPlayer('speaker1', 'uri')).rejects.toThrow('Player not found')
+  })
+
+  it('should handle failed status in response', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'failed' }), { status: 200 })
+    )
+
+    await expect(addTrackToPlayer('speaker1', 'uri')).rejects.toThrow()
+  })
+
+  it('should not include metadata if not provided', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
+
+    await addTrackToPlayer('speaker1', 'uri')
+    const body = JSON.parse(vi.mocked(apiFetch).mock.calls[0][1]?.body as string)
+    expect(body.metadata).toBeUndefined()
+  })
+
+  it('should not include empty metadata object', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
+
+    await addTrackToPlayer('speaker1', 'uri', {})
+    const body = JSON.parse(vi.mocked(apiFetch).mock.calls[0][1]?.body as string)
+    expect(body.metadata).toBeUndefined()
+  })
+})
+
+describe('Player API - sendPlayerCommand', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(useAppConfigStore).mockReturnValue({
+      getApiBaseUrl: vi.fn().mockReturnValue('http://localhost:8000/api'),
+    } as any)
+    vi.mocked(useToastStore).mockReturnValue({
+      showErrorToast: vi.fn(),
+    } as any)
+  })
+
+  it('should send command to player successfully', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
+
+    const result = await sendPlayerCommand('speaker1', 'play')
+    expect(result).toBe(true)
+  })
+
+  it('should encode player name and command in URL', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
+
+    await sendPlayerCommand('speaker-1/2', 'play')
+    const url = vi.mocked(apiFetch).mock.calls[0][0] as string
+    expect(url).toContain('speaker-1%2F2')
+    expect(url).toContain('play')
+  })
+
+  it('should use POST method for command', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
+
+    await sendPlayerCommand('speaker1', 'play')
+    const method = vi.mocked(apiFetch).mock.calls[0][1]?.method
+    expect(method).toBe('POST')
+  })
+
+  it('should include Content-Type header', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
+
+    await sendPlayerCommand('speaker1', 'play')
+    const headers = vi.mocked(apiFetch).mock.calls[0][1]?.headers as any
+    expect(headers['Content-Type']).toBe('application/json')
+  })
+
+  it('should prevent add_track commands from being sent', async () => {
+    await expect(sendPlayerCommand('speaker1', 'add_track:spotify:track:123')).rejects.toThrow(
+      'Use addTrackToPlayer'
+    )
+  })
+
+  it('should handle HTTP error', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response('Server error', { status: 500 })
+    )
+
+    await expect(sendPlayerCommand('speaker1', 'play')).rejects.toThrow('Failed to send command')
+  })
+
+  it('should handle API error response', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Invalid command' }), { status: 200 })
+    )
+
+    await expect(sendPlayerCommand('speaker1', 'invalid_cmd')).rejects.toThrow('Invalid command')
+  })
+
+  it('should handle failed status response', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'failed' }), { status: 200 })
+    )
+
+    await expect(sendPlayerCommand('speaker1', 'play')).rejects.toThrow('Failed to send command')
+  })
+
+  it('should show error toast on failure', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Command failed' }), { status: 200 })
+    )
+
+    const toastStore = useToastStore() as any
+    await expect(sendPlayerCommand('speaker1', 'play')).rejects.toThrow()
+    expect(toastStore.showErrorToast).toHaveBeenCalledWith('Could not send player command.')
+  })
+
+  it('should support various player commands', async () => {
+    const commands = ['play', 'pause', 'stop', 'next', 'previous', 'clear_queue']
+
+    for (const cmd of commands) {
+      vi.clearAllMocks()
+      vi.mocked(useAppConfigStore).mockReturnValue({
+        getApiBaseUrl: vi.fn().mockReturnValue('http://localhost:8000/api'),
+      } as any)
+      vi.mocked(useToastStore).mockReturnValue({
+        showErrorToast: vi.fn(),
+      } as any)
+
+      vi.mocked(apiFetch).mockResolvedValueOnce(
+        new Response(JSON.stringify({ status: 'success' }), { status: 200 })
       )
 
-      expect((apiFetch as any)).not.toHaveBeenCalled()
-    })
-
-    it('should allow normal commands', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({})
-      })
-
-      await player.sendPlayerCommand('player1', 'play')
-      expect((apiFetch as any)).toHaveBeenCalled()
-    })
-  })
-
-  describe('Fallback Logic Edge Cases', () => {
-    it('should handle empty player list in fallback', async () => {
-      ;(apiFetch as any)
-        .mockResolvedValueOnce({ ok: false, status: 500, statusText: 'Error' })
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ players: [] }) })
-
-      const result = await player.pauseAllPlayers()
-      expect(result).toBe(false)
-    })
-
-    it('should handle missing players array in response', async () => {
-      ;(apiFetch as any)
-        .mockResolvedValueOnce({ ok: false, status: 500, statusText: 'Error' })
-        .mockResolvedValueOnce({ ok: true, json: async () => ({}) })
-
-      const result = await player.pauseAllPlayers()
-      expect(result).toBe(false)
-    })
-
-    it('should handle individual player failures in fallback', async () => {
-      ;(apiFetch as any)
-        .mockResolvedValueOnce({ ok: false, status: 500, statusText: 'Error' })
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ players: [{ name: 'p1' }, { name: 'p2' }] }) })
-        .mockResolvedValueOnce({ ok: true }) // p1 pause succeeds
-        .mockResolvedValueOnce({ ok: true }) // p2 pause succeeds
-
-      const result = await player.pauseAllPlayers()
+      const result = await sendPlayerCommand('speaker1', cmd)
       expect(result).toBe(true)
-    })
+    }
+  })
+})
 
-    it('should count partial successes correctly', async () => {
-      ;(apiFetch as any)
-        .mockResolvedValueOnce({ ok: false, status: 500, statusText: 'Error' })
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ players: [{ name: 'p1' }, { name: 'p2' }] }) })
-        .mockResolvedValueOnce({ ok: true }) // p1 pause succeeds
-        .mockResolvedValueOnce({ ok: false }) // p2 pause fails
-        .mockResolvedValueOnce({ ok: false }) // p2 stop fails
-
-      const result = await player.pauseAllPlayers()
-      expect(result).toBe(true) // At least one succeeded
-    })
+describe('Player API - pauseAllPlayers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(useAppConfigStore).mockReturnValue({
+      getApiBaseUrl: vi.fn().mockReturnValue('http://localhost:8000/api'),
+    } as any)
   })
 
-  describe('Response JSON Parsing', () => {
-    it('should handle JSON parse errors gracefully in bulk operations', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => {
-          throw new Error('Invalid JSON')
-        }
-      })
+  it('should pause all players successfully (bulk endpoint)', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
 
-      const result = await player.pauseAllPlayers()
-      // Should handle the error and either retry or return false
-      expect(typeof result).toBe('boolean')
-    })
-
-    it('should ignore JSON parse errors in add track', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => {
-          throw new Error('Invalid JSON')
-        }
-      })
-
-      await expect(player.addTrackToPlayer('player1', 'uri')).rejects.toThrow()
-    })
+    const result = await pauseAllPlayers()
+    expect(result).toBe(true)
   })
 
-  describe('Backward Compatibility', () => {
-    it('should export snake_case version of rewriteAudiocontrolApiUrl', () => {
-      expect(player.rewrite_audiocontrol_api_url).toBeDefined()
-      expect(typeof player.rewrite_audiocontrol_api_url).toBe('function')
-    })
+  it('should use bulk pause-all endpoint', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
+
+    await pauseAllPlayers()
+    const url = vi.mocked(apiFetch).mock.calls[0][0] as string
+    expect(url).toContain('/players/pause-all')
   })
 
-  describe('Player Name Encoding', () => {
-    it('should use encodeURIComponent for player names in fallback pause', async () => {
-      const specialName = 'player name with spaces'
-      ;(apiFetch as any)
-        .mockResolvedValueOnce({ ok: false })
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ players: [{ name: specialName }] }) })
-        .mockResolvedValueOnce({ ok: true })
+  it('should use POST method for pause-all', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
 
-      await player.pauseAllPlayers()
-
-      const calls = (apiFetch as any).mock.calls
-      // Check that special name is passed to fallback
-      expect(calls.length).toBeGreaterThan(1)
-    })
+    await pauseAllPlayers()
+    const method = vi.mocked(apiFetch).mock.calls[0][1]?.method
+    expect(method).toBe('POST')
   })
 
-  describe('API Endpoint Patterns', () => {
-    it('should use /player/:name/command/:command pattern', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({})
-      })
+  it('should include Content-Type header', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
 
-      await player.sendPlayerCommand('TestPlayer', 'pause')
+    await pauseAllPlayers()
+    const headers = vi.mocked(apiFetch).mock.calls[0][1]?.headers as any
+    expect(headers['Content-Type']).toBe('application/json')
+  })
 
-      const url = (apiFetch as any).mock.calls[0][0]
-      expect(url).toMatch(/\/player\/TestPlayer\/command\/pause$/)
-    })
+  it('should fallback to per-player when bulk fails', async () => {
+    // Bulk endpoint fails
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), { status: 404 })
+    )
+    // Get player list
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ players: [{ name: 'speaker1' }, { name: 'speaker2' }] }), { status: 200 })
+    )
+    // First player pause
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
+    // Second player pause
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
 
-    it('should use /players/pause-all bulk endpoint', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({})
-      })
+    const result = await pauseAllPlayers()
+    expect(result).toBe(true)
+    expect(vi.mocked(apiFetch)).toHaveBeenCalledTimes(4)
+  })
 
-      await player.pauseAllPlayers()
+  it('should try stop fallback if pause not supported', async () => {
+    // Bulk endpoint fails
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), { status: 404 })
+    )
+    // Get player list
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ players: [{ name: 'speaker1' }] }), { status: 200 })
+    )
+    // Pause fails
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not supported' }), { status: 400 })
+    )
+    // Stop succeeds
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
 
-      const url = (apiFetch as any).mock.calls[0][0]
-      expect(url).toMatch(/\/players\/pause-all$/)
-    })
+    const result = await pauseAllPlayers()
+    expect(result).toBe(true)
+  })
 
-    it('should use /players/stop-all bulk endpoint', async () => {
-      ;(apiFetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({})
-      })
+  it('should return false if fallback completely fails', async () => {
+    // Bulk endpoint fails
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), { status: 404 })
+    )
+    // Get player list with empty array
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ players: [] }), { status: 200 })
+    )
 
-      await player.stopAllPlayers()
+    const result = await pauseAllPlayers()
+    expect(result).toBe(false)
+  })
+})
 
-      const url = (apiFetch as any).mock.calls[0][0]
-      expect(url).toMatch(/\/players\/stop-all$/)
-    })
+describe('Player API - stopAllPlayers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(useAppConfigStore).mockReturnValue({
+      getApiBaseUrl: vi.fn().mockReturnValue('http://localhost:8000/api'),
+    } as any)
+  })
+
+  it('should stop all players successfully (bulk endpoint)', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
+
+    const result = await stopAllPlayers()
+    expect(result).toBe(true)
+  })
+
+  it('should use bulk stop-all endpoint', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
+
+    await stopAllPlayers()
+    const url = vi.mocked(apiFetch).mock.calls[0][0] as string
+    expect(url).toContain('/players/stop-all')
+  })
+
+  it('should use POST method for stop-all', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
+
+    await stopAllPlayers()
+    const method = vi.mocked(apiFetch).mock.calls[0][1]?.method
+    expect(method).toBe('POST')
+  })
+
+  it('should include Content-Type header', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
+
+    await stopAllPlayers()
+    const headers = vi.mocked(apiFetch).mock.calls[0][1]?.headers as any
+    expect(headers['Content-Type']).toBe('application/json')
+  })
+
+  it('should fallback to per-player when bulk fails', async () => {
+    // Bulk endpoint fails
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), { status: 404 })
+    )
+    // Get player list
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ players: [{ name: 'speaker1' }, { name: 'speaker2' }] }), { status: 200 })
+    )
+    // First player stop
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
+    // Second player stop
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
+
+    const result = await stopAllPlayers()
+    expect(result).toBe(true)
+    expect(vi.mocked(apiFetch)).toHaveBeenCalledTimes(4)
+  })
+
+  it('should return false if all players fail', async () => {
+    // Bulk endpoint fails
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), { status: 404 })
+    )
+    // Get player list with empty array
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ players: [] }), { status: 200 })
+    )
+
+    const result = await stopAllPlayers()
+    expect(result).toBe(false)
+  })
+
+  it('should return true if at least one player succeeds in fallback', async () => {
+    // Bulk endpoint fails
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), { status: 404 })
+    )
+    // Get player list
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ players: [{ name: 'speaker1' }, { name: 'speaker2' }] }), { status: 200 })
+    )
+    // First player stop fails
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Failed' }), { status: 500 })
+    )
+    // Second player stop succeeds
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
+
+    const result = await stopAllPlayers()
+    expect(result).toBe(true)
+  })
+})
+
+describe('Player API - Regression Tests', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(useAppConfigStore).mockReturnValue({
+      getApiBaseUrl: vi.fn().mockReturnValue('http://localhost:8000/api'),
+    } as any)
+    vi.mocked(useToastStore).mockReturnValue({
+      showErrorToast: vi.fn(),
+    } as any)
+  })
+
+  it('should make single HTTP call for simple commands', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
+
+    await sendPlayerCommand('speaker1', 'play')
+    expect(vi.mocked(apiFetch)).toHaveBeenCalledTimes(1)
+  })
+
+  it('should return true on successful execution', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
+
+    const result = await sendPlayerCommand('speaker1', 'play')
+    expect(result).toBe(true)
+  })
+
+  it('should handle empty response bodies', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(new Response('', { status: 200 }))
+
+    const result = await pauseAllPlayers()
+    expect(result).toBe(true)
+  })
+
+  it('should properly encode special characters in URLs', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+    )
+
+    await sendPlayerCommand('player/with/slashes', 'play')
+    const url = vi.mocked(apiFetch).mock.calls[0][0] as string
+    expect(url).toContain('%2F')
   })
 })

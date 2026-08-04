@@ -1,0 +1,446 @@
+/**
+ * Filter Store for HiFiBerry OS UI
+ *
+ * This store manages audio filter configurations for different filter banks (e.g., left/right channels).
+ * It provides functionality to add, remove, update, and manage filters with support for future
+ * backend communication.
+ *
+ * Key Features:
+ * - Multiple filter banks (left, right, or custom names like A-H, C1-C4, etc.)
+ * - Position-based filter management with automatic shifting
+ * - Unique filter IDs for internal tracking
+ * - Import/Export functionality for backend communication
+ * - Support for various filter types (highpass, lowpass, peak, etc.)
+ * - Bulk operations for multi-channel setups
+ * - Pluggable backend implementations (console logging, HTTP API, etc.)
+ *
+ * Backend Implementations:
+ * - ConsoleFilterBackend: Logs all operations to console (for development/demo)
+ * - Future: HTTPFilterBackend, WebSocketFilterBackend, etc.
+ *
+ * Usage:
+ * ```typescript
+ * const filterStore = useFilterStore()
+ *
+ * // Create filter banks (current: left/right, future: A-H, C1-C4, etc.)
+ * filterStore.createMultipleFilterBanks(['left', 'right'])
+ * // Or for future expansion:
+ * // filterStore.createMultipleFilterBanks(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'])
+ * // filterStore.createMultipleFilterBanks(['C1', 'C2', 'C3', 'C4'])
+ *
+ * // Add filters
+ * const filterId = filterStore.addFilter('left', 0, {
+ *   type: 'highpass',
+ *   frequency: 80,
+ *   q: 0.7,
+ *   enabled: true
+ * })
+ *
+ * // Update filters across multiple channels
+ * filterStore.bulkUpdateFilter(['left', 'right'], 0, { frequency: 100 })
+ *
+ * // Export for backend
+ * const config = filterStore.exportFilterConfig()
+ * ```
+ */
+
+import { ref, computed } from 'vue'
+import { defineStore } from 'pinia'
+import { ConsoleFilterBackend } from './console-filter-backend'
+import { DSPToolkitFilterBackend } from './dsp-toolkit-filter-backend'
+import type {
+  Filter,
+  FilterBank,
+  FilterBanks,
+  FilterBackend,
+  BackendCapabilities,
+  NewFilter,
+  FilterUpdate,
+} from './filter-backend-interface'
+import { getConfigValue, setConfigValue } from '@/api/config'
+import { useDSPToolkitStore } from './dsp-toolkit'
+
+// Re-export types for convenience
+export type { Filter, FilterBank, FilterBanks, BackendCapabilities }
+
+export const useFilterStore = defineStore('filter', () => {
+  // State
+  const filterBanks = ref<FilterBanks>({})
+
+  // Available backend implementations
+  const availableBackends = {
+    console: new ConsoleFilterBackend(),
+    dspToolkit: new DSPToolkitFilterBackend()
+  }
+
+  // Storage key for persisting backend selection
+  const BACKEND_CONFIG_KEY = 'dsp.filter.backend'
+
+  // Load backend selection from settingsDB, returning null if no preference stored
+  const getStoredBackendType = async (): Promise<keyof typeof availableBackends | null> => {
+    try {
+      const response = await getConfigValue(BACKEND_CONFIG_KEY)
+      if (response.data?.value && response.data.value in availableBackends) {
+        return response.data.value as keyof typeof availableBackends
+      }
+    } catch {
+      // Key doesn't exist or request failed — no preference stored
+    }
+    return null
+  }
+
+  // Save backend selection to settingsDB
+  const saveBackendType = async (backendType: keyof typeof availableBackends): Promise<void> => {
+    try {
+      await setConfigValue(BACKEND_CONFIG_KEY, backendType)
+    } catch (error) {
+      console.warn('Failed to save backend selection to settingsDB:', error)
+    }
+  }
+
+  // Current backend - starts with console, then loads from settingsDB
+  const currentBackendType = ref<keyof typeof availableBackends>('console')
+
+  // Initialize backend from settingsDB, auto-detecting DSP if no preference stored
+  const initializeBackend = async (): Promise<void> => {
+    try {
+      const storedType = await getStoredBackendType()
+      if (storedType !== null) {
+        // User has an explicit preference — use it
+        currentBackendType.value = storedType
+        return
+      }
+      // No preference stored — auto-detect: use DSP backend if hardware is available
+      const dspStore = useDSPToolkitStore()
+      if (await dspStore.canUseDSP()) {
+        currentBackendType.value = 'dspToolkit'
+        await saveBackendType('dspToolkit')
+      } else {
+        currentBackendType.value = 'console'
+      }
+    } catch (error) {
+      console.warn('Failed to initialize backend, using console:', error)
+      currentBackendType.value = 'console'
+    }
+  }
+
+  // Get current backend instance
+  const getCurrentBackend = (): FilterBackend => availableBackends[currentBackendType.value]
+
+  // Function to switch backends
+  const switchBackend = async (backendType: keyof typeof availableBackends): Promise<void> => {
+    if (backendType === currentBackendType.value) return
+
+    const previousBackendType = currentBackendType.value
+    currentBackendType.value = backendType
+
+    try {
+      await syncFromBackend()
+      await saveBackendType(backendType) // Persist only after successful switch
+    } catch (error) {
+      currentBackendType.value = previousBackendType
+      throw error
+    }
+  }
+
+  // Computed
+  const getAllBanks = computed(() => filterBanks.value)
+  const getBankNames = computed(() => Object.keys(filterBanks.value))
+
+  // Helper function to sync backend state with local state
+  const syncFromBackend = async (): Promise<void> => {
+    filterBanks.value = await getCurrentBackend().getCurrentConfig()
+  }
+
+  // Get backend capabilities (name, filter bank limits, etc.)
+  const getBackendCapabilities = async (): Promise<BackendCapabilities> => {
+    return await getCurrentBackend().getBackendCapabilities()
+  }
+
+  // Check if a filter bank can accept more filters
+  const canAddFilterToBank = async (bankName: string): Promise<boolean> => {
+    const capabilities = await getBackendCapabilities()
+    const bankInfo = capabilities.availableFilterBanks.find(bank => bank.name === bankName)
+
+    if (!bankInfo) {
+      // Some backends support creating dynamic banks on first add.
+      // Defer the final decision to addFilter/backend behavior.
+      return true
+    }
+
+    return bankInfo.currentFilterCount < bankInfo.maxFilters
+  }
+
+  // Actions that delegate to the backend
+
+  /**
+   * Create a new filter bank if it doesn't exist
+   */
+  const createFilterBank = async (bankName: string): Promise<void> => {
+    await getCurrentBackend().createFilterBank(bankName)
+    await syncFromBackend()
+  }
+
+  /**
+   * Get all filters from a specific bank
+   */
+  const getFiltersFromBank = (bankName: string): Filter[] => {
+    return filterBanks.value[bankName]?.filters || []
+  }
+
+  /**
+   * Get a specific filter by bank name and position
+   */
+  const getFilter = (bankName: string, position: number): Filter | null => {
+    const bank = filterBanks.value[bankName]
+    if (!bank || position < 0 || position >= bank.filters.length) {
+      return null
+    }
+    return bank.filters[position]
+  }
+
+  /**
+   * Add a filter at a specific position in a bank
+   * If position is greater than current length, filter is added at the end
+   * Throws an error if the bank has reached its maximum capacity
+   */
+  const addFilter = async (bankName: string, position: number, filter: NewFilter): Promise<string> => {
+    // Pre-check capacity only for banks explicitly surfaced by backend capabilities.
+    // Unknown banks may still be valid for backends that create banks dynamically.
+    const capabilities = await getBackendCapabilities()
+    const bankInfo = capabilities.availableFilterBanks.find(bank => bank.name === bankName)
+    if (bankInfo && bankInfo.currentFilterCount >= bankInfo.maxFilters) {
+      throw new Error(`Cannot add filter: Bank "${bankName}" has reached its maximum capacity of ${bankInfo.maxFilters} filters (currently has ${bankInfo.currentFilterCount})`)
+    }
+
+    const filterId = await getCurrentBackend().addFilter(bankName, position, filter)
+    await syncFromBackend()
+    return filterId
+  }
+
+  /**
+   * Remove a filter at a specific position from a bank
+   * Other filters will shift to fill the gap
+   */
+  const removeFilter = async (bankName: string, position: number): Promise<boolean> => {
+    const result = await getCurrentBackend().removeFilter(bankName, position)
+    if (result) {
+      await syncFromBackend()
+    }
+    return result
+  }
+
+  /**
+   * Update a filter at a specific position in a bank
+   */
+  const updateFilter = async (bankName: string, position: number, updates: FilterUpdate): Promise<boolean> => {
+    const result = await getCurrentBackend().updateFilter(bankName, position, updates)
+    if (result) {
+      await syncFromBackend()
+    }
+    return result
+  }
+
+  /**
+   * Clear all filters from a specific bank
+   */
+  const clearFiltersFromBank = async (bankName: string): Promise<void> => {
+    await getCurrentBackend().clearFiltersFromBank(bankName)
+    await syncFromBackend()
+  }
+
+  /**
+   * Remove an entire filter bank
+   */
+  const removeFilterBank = async (bankName: string): Promise<boolean> => {
+    const result = await getCurrentBackend().removeFilterBank(bankName)
+    if (result) {
+      await syncFromBackend()
+    }
+    return result
+  }
+
+  /**
+   * Move a filter from one position to another within the same bank
+   */
+  const moveFilter = async (bankName: string, fromPosition: number, toPosition: number): Promise<boolean> => {
+    const bank = filterBanks.value[bankName]
+    if (!bank || fromPosition < 0 || fromPosition >= bank.filters.length ||
+        toPosition < 0 || toPosition >= bank.filters.length) {
+      return false
+    }
+
+    // Get the filter to move
+    const filterToMove = getFilter(bankName, fromPosition)
+    if (!filterToMove) return false
+
+    // Remove from original position
+    const removeResult = await removeFilter(bankName, fromPosition)
+    if (!removeResult) return false
+
+    // Adjust target position if necessary (since we removed an item)
+    const adjustedToPosition = fromPosition < toPosition ? toPosition - 1 : toPosition
+
+    // Add at new position (without ID to let backend generate new one)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id: _id, ...filterData } = filterToMove
+    await addFilter(bankName, adjustedToPosition, filterData)
+
+    return true
+  }
+
+  /**
+   * Copy a filter from one position to another (within same bank or different banks)
+   */
+  const copyFilter = async (sourceBankName: string, sourcePosition: number,
+                     targetBankName: string, targetPosition: number): Promise<string | null> => {
+    const sourceFilter = getFilter(sourceBankName, sourcePosition)
+    if (!sourceFilter) {
+      return null
+    }
+
+    // Create a copy without the ID (addFilter will generate a new one)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id: _id, ...filterCopy } = sourceFilter
+
+    return await addFilter(targetBankName, targetPosition, filterCopy)
+  }
+
+  /**
+   * Get the total number of filters in a bank
+   */
+  const getFilterCount = (bankName: string): number => {
+    return filterBanks.value[bankName]?.filters.length || 0
+  }
+
+  /**
+   * Check if a bank exists
+   */
+  const bankExists = (bankName: string): boolean => {
+    return !!filterBanks.value[bankName]
+  }
+
+  /**
+   * Reset all filter banks (useful for initialization or testing)
+   */
+  const resetAllBanks = async (): Promise<void> => {
+    // For console backend, we can call its reset method directly
+    const currentBackend = getCurrentBackend()
+    if (currentBackend instanceof ConsoleFilterBackend) {
+      currentBackend.resetAllBanks()
+    }
+    await syncFromBackend()
+  }
+
+  /**
+   * Export filter configuration for backend communication
+   */
+  const exportFilterConfig = async (): Promise<FilterBanks> => {
+    return await getCurrentBackend().exportFilterConfig()
+  }
+
+  /**
+   * Import filter configuration from backend
+   */
+  const importFilterConfig = async (config: FilterBanks): Promise<void> => {
+    await getCurrentBackend().importFilterConfig(config)
+    await syncFromBackend()
+  }
+
+  /**
+   * Create multiple filter banks at once
+   * Useful for initializing standard channel configurations
+   */
+  const createMultipleFilterBanks = async (bankNames: string[]): Promise<void> => {
+    for (const bankName of bankNames) {
+      await getCurrentBackend().createFilterBank(bankName)
+    }
+    await syncFromBackend()
+  }
+
+  /**
+   * Get filter banks that match a pattern (useful for future multi-channel setups)
+   * Examples: getFilterBanksByPattern(/^[A-H]$/) for channels A-H
+   *          getFilterBanksByPattern(/^C\d+$/) for channels C1, C2, C3, etc.
+   */
+  const getFilterBanksByPattern = (pattern: RegExp): string[] => {
+    return Object.keys(filterBanks.value).filter(bankName => pattern.test(bankName))
+  }
+
+  /**
+   * Get filter banks by backend-defined type
+   * Example: getFilterBanksByType('crossover-designer')
+   */
+  const getFilterBanksByType = async (type: string): Promise<string[]> => {
+    const capabilities = await getBackendCapabilities()
+
+    return capabilities.availableFilterBanks
+      .filter(bank => bank.filterBankType === type)
+      .map(bank => bank.name)
+  }
+
+  /**
+   * Apply an operation to multiple filter banks
+   * Useful for operations that need to affect multiple channels simultaneously
+   */
+  const applyToMultipleBanks = (bankNames: string[], operation: (bankName: string) => void): void => {
+    bankNames.forEach(bankName => {
+      if (bankExists(bankName)) {
+        operation(bankName)
+      }
+    })
+  }
+
+  /**
+   * Bulk update filters across multiple banks
+   * Useful for applying the same filter change to multiple channels
+   */
+  const bulkUpdateFilter = async (bankNames: string[], position: number, updates: FilterUpdate): Promise<boolean[]> => {
+    const results = []
+    for (const bankName of bankNames) {
+      results.push(await updateFilter(bankName, position, updates))
+    }
+    return results
+  }
+
+  return {
+    // State
+    filterBanks,
+
+    // Computed
+    getAllBanks,
+    getBankNames,
+
+    // Actions
+    createFilterBank,
+    createMultipleFilterBanks,
+    getFiltersFromBank,
+    getFilter,
+    addFilter,
+    removeFilter,
+    updateFilter,
+    clearFiltersFromBank,
+    removeFilterBank,
+    moveFilter,
+    copyFilter,
+    getFilterCount,
+    bankExists,
+    getFilterBanksByPattern,
+    getFilterBanksByType,
+    applyToMultipleBanks,
+    bulkUpdateFilter,
+    resetAllBanks,
+    exportFilterConfig,
+    importFilterConfig,
+
+    // Backend management
+    syncFromBackend,
+    getBackendCapabilities,
+    canAddFilterToBank,
+    getCurrentBackend,
+    switchBackend,
+    initializeBackend,
+    currentBackendType: computed(() => currentBackendType.value),
+    availableBackends: computed(() => Object.keys(availableBackends))
+  }
+})

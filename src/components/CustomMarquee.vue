@@ -23,9 +23,12 @@ const marqueeText = ref<HTMLElement | null>(null)
 const shouldAnimate = ref(false)
 
 const onHover = () => {
-  if (marqueeContainer.value && marqueeText.value) {
-    shouldAnimate.value = marqueeText.value.scrollWidth > marqueeContainer.value.offsetWidth
+  if (!marqueeContainer.value || !marqueeText.value) {
+    shouldAnimate.value = false
+    return
   }
+
+  shouldAnimate.value = marqueeText.value.scrollWidth > marqueeContainer.value.offsetWidth
 }
 
 const onLeave = () => {

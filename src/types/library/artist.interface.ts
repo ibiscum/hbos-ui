@@ -1,5 +1,5 @@
 import type { Metadata } from './metadata.interface.ts'
-import type { PosterItem } from '@/types/library'
+import type { PosterItem } from './poster.interface.ts'
 
 export interface ArtistBase {
   id: string

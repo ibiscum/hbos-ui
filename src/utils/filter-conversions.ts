@@ -1,4 +1,4 @@
-import type { Filter as StoreFilter } from '@/stores/filter_backend_interface'
+import type { Filter as StoreFilter } from '@/stores/filter-backend-interface'
 import type { Filter } from '@/utils/filtercalc'
 import type { BiquadFilterType } from '@/utils/biquad'
 

@@ -39,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import Icon from '@/components/Icon.vue'
 import ContentBox from '@/components/ContentBox.vue'
 
@@ -63,7 +63,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   title: 'TheAudioDB',
-  description: 'Artist images and biographies',
+  description: 'TheAudioDB is used to retrieve additional artist images and biographies',
   icon: 'tabler/database',
   serviceKey: 'theaudiodb',
 })
@@ -71,6 +71,30 @@ const props = withDefaults(defineProps<Props>(), {
 const isLoading = ref(false)
 const isAvailable = ref(true)
 const errorMessage = ref<string | null>(null)
+let activeAbortController: AbortController | null = null
+let activeTimeoutId: ReturnType<typeof setTimeout> | null = null
+let currentRequestId = 0
+
+const abortErrorMessage = 'Request timed out'
+
+const cleanupRequest = () => {
+  if (activeTimeoutId) {
+    clearTimeout(activeTimeoutId)
+    activeTimeoutId = null
+  }
+
+  if (activeAbortController) {
+    activeAbortController.abort()
+    activeAbortController = null
+  }
+}
+
+const isAbortError = (error: unknown): boolean => {
+  return (
+    (error instanceof DOMException && error.name === 'AbortError') ||
+    (error instanceof Error && error.name === 'AbortError')
+  )
+}
 
 const statusText = computed(() => {
   if (isLoading.value) return 'Checking...'
@@ -87,11 +111,17 @@ const statusBadgeClass = computed(() => {
  * Uses AbortController to enforce request timeout
  */
 const checkServiceStatus = async () => {
+  const requestId = ++currentRequestId
+
+  // Abort any previous request to prevent stale updates.
+  cleanupRequest()
+
   isLoading.value = true
   errorMessage.value = null
 
   const abortController = new AbortController()
-  const timeoutId = setTimeout(() => abortController.abort(), REQUEST_TIMEOUT_MS)
+  activeAbortController = abortController
+  activeTimeoutId = setTimeout(() => abortController.abort(), REQUEST_TIMEOUT_MS)
 
   try {
     // Test TheAudioDB API availability with a simple artist lookup
@@ -106,21 +136,48 @@ const checkServiceStatus = async () => {
     }
 
     const data = await response.json()
+
+    if (requestId !== currentRequestId) {
+      return
+    }
+
     isAvailable.value = !!(data.artists && Array.isArray(data.artists) && data.artists.length > 0)
   } catch (error) {
+    if (requestId !== currentRequestId) {
+      return
+    }
+
+    if (isAbortError(error)) {
+      errorMessage.value = `Failed to check status: ${abortErrorMessage}`
+      isAvailable.value = false
+      return
+    }
+
     const message = error instanceof Error ? error.message : 'Unknown error'
     errorMessage.value = `Failed to check status: ${message}`
     isAvailable.value = false
     console.error(`[${props.serviceKey}] Service health check failed:`, error)
   } finally {
-    clearTimeout(timeoutId)
-    abortController.abort()
+    if (requestId !== currentRequestId) {
+      return
+    }
+
+    cleanupRequest()
     isLoading.value = false
   }
 }
 
 onMounted(() => {
   checkServiceStatus()
+})
+
+onBeforeUnmount(() => {
+  currentRequestId += 1
+  cleanupRequest()
+})
+
+defineExpose({
+  checkServiceStatus,
 })
 </script>
 

@@ -178,6 +178,16 @@ export interface SmbCapabilitiesResponse {
 
 /**
  * Parse SMB API error response and return user-friendly error message
+ *
+ * Searches for error details in this priority order:
+ * 1. response.data.error_details (most specific backend error)
+ * 2. response.error (generic error field)
+ * 3. response.message (main message field)
+ * 4. defaultMessage (fallback)
+ *
+ * @param response - The API error response object
+ * @param defaultMessage - Fallback message if no error details found
+ * @returns User-friendly error message string
  */
 const parseSmbError = (response: Record<string, unknown>, defaultMessage: string): string => {
   // If the response has a detailed error message, use it
@@ -203,6 +213,14 @@ const parseSmbError = (response: Record<string, unknown>, defaultMessage: string
 
 /**
  * Handle HTTP error responses and return meaningful error messages
+ *
+ * Maps HTTP status codes to user-friendly messages and extracts error details
+ * from the response body. Always throws an error with the constructed message.
+ *
+ * @param response - The failed HTTP response object
+ * @param operation - Description of the operation that failed (used in error message)
+ * @throws Error with formatted error message including status code and details
+ * @returns Never (always throws)
  */
 const handleHttpError = async (response: Response, operation: string): Promise<never> => {
   let errorMessage = `${operation} failed`
@@ -236,7 +254,32 @@ const handleHttpError = async (response: Response, operation: string): Promise<n
 
 /**
  * Create safe mount options for SMB/CIFS mounting
- * This helps avoid capability issues by using appropriate mount options
+ *
+ * Generates mount options that help avoid capability issues by using
+ * appropriate defaults and settings. Returns a comma-separated string
+ * of mount options suitable for CIFS mount command.
+ *
+ * Default options applied:
+ * - rw: Read-write access
+ * - file_mode, dir_mode: Permissions (0644, 0755 default)
+ * - uid, gid: User/group mapping (1000 default)
+ * - nobrl: Disable byte range locking
+ * - cache: loose caching mode
+ * - iocharset: UTF-8 character set
+ * - vers: SMB protocol version (3.0 default, can be 1.0, 2.0, 2.1, 3.0, 3.1.1)
+ *
+ * @param username - Optional SMB username/account for authentication
+ * @param uid - Optional Unix user ID to map SMB files to (default 1000)
+ * @param gid - Optional Unix group ID to map SMB files to (default 1000)
+ * @param fileMode - Optional file permissions in octal (default 0644)
+ * @param dirMode - Optional directory permissions in octal (default 0755)
+ * @param smbVersion - Optional SMB protocol version (default 3.0)
+ * @returns Comma-separated string of mount options for CIFS mount
+ *
+ * @example
+ * // Create options with username for credentials auth
+ * const opts = createSafeMountOptions('domain\\username', 1000, 1000, '0644', '0755', '3.0')
+ * // Result: "rw,file_mode=0644,dir_mode=0755,uid=1000,gid=1000,username=domain\\username,nobrl,cache=loose,iocharset=utf8,vers=3.0"
  */
 export const createSafeMountOptions = (
   username?: string,
@@ -282,6 +325,19 @@ export const createSafeMountOptions = (
 
 /**
  * Discover SMB/CIFS file servers on the local network
+ *
+ * Performs network scanning to find available SMB servers. This is a read-only
+ * operation that doesn't require authentication but should be called through
+ * apiFetch for proper session handling.
+ *
+ * @returns Promise resolving to server discovery response with list of available servers
+ * @throws Error if the HTTP request fails or response parsing fails
+ *
+ * @example
+ * const result = await getSmbServers()
+ * if (result.status === 'success') {
+ *   console.log('Found servers:', result.data.servers)
+ * }
  */
 export const getSmbServers = async (): Promise<SmbServersResponse> => {
   const appConfigStore = useAppConfigStore()
@@ -303,6 +359,25 @@ export const getSmbServers = async (): Promise<SmbServersResponse> => {
 
 /**
  * Test connection to a specific SMB server
+ *
+ * Verifies that a server is reachable and optionally validates credentials.
+ * Note: This function may return HTTP 200 with status='error' in the response
+ * body for graceful error handling of connection failures. This is intentional
+ * design to allow UI to display connection errors without throwing.
+ *
+ * @param server - Server IP address or hostname to test
+ * @param username - Optional username for authentication (SMB username or DOMAIN\username)
+ * @param password - Optional password for authentication
+ * @returns Promise resolving to test response with connection status
+ * @throws Error if HTTP request fails (not if connection fails - see note above)
+ *
+ * @example
+ * const result = await testSmbServer('192.168.1.27', 'user@domain', 'password')
+ * if (result.status === 'success') {
+ *   console.log('Server is reachable')
+ * } else {
+ *   console.log('Connection failed:', result.message)
+ * }
  */
 export const testSmbServer = async (
   server: string,
@@ -353,6 +428,22 @@ export const testSmbServer = async (
 
 /**
  * List available shares on a specific SMB server
+ *
+ * Retrieves the list of shares (volumes) available on a target SMB server.
+ * Requires appropriate credentials if the server requires authentication.
+ *
+ * @param server - Target server IP address or hostname
+ * @param username - Optional username for authentication (required if server has auth)
+ * @param password - Optional password for authentication (required if server has auth)
+ * @param detailed - Optional flag to request detailed share information (not all backends support)
+ * @returns Promise resolving to shares response with available shares list
+ * @throws Error if HTTP request fails or response parsing fails
+ *
+ * @example
+ * const shares = await getSmbShares('192.168.1.27', 'user', 'pass')
+ * shares.data.shares.forEach(share => {
+ *   console.log(`Share: ${share.name} (${share.type})`)
+ * })
  */
 export const getSmbShares = async (
   server: string,
@@ -401,6 +492,19 @@ export const getSmbShares = async (
 
 /**
  * List all configured SMB mount points for music access
+ *
+ * Retrieves all currently configured SMB mount configurations and their
+ * status (mounted/unmounted). Includes summary statistics.
+ *
+ * @returns Promise resolving to mounts response with all configurations and summary
+ * @throws Error if HTTP request fails or response parsing fails
+ *
+ * @example
+ * const result = await getSmbMounts()
+ * console.log(`Total: ${result.data.summary.total}, Mounted: ${result.data.summary.mounted}`)
+ * result.data.mounts.forEach(mount => {
+ *   console.log(`${mount.server}:${mount.share} -> ${mount.mountpoint} (${mount.mounted ? 'mounted' : 'unmounted'})`)
+ * })
  */
 export const getSmbMounts = async (): Promise<SmbMountsResponse> => {
   const appConfigStore = useAppConfigStore()
@@ -422,7 +526,20 @@ export const getSmbMounts = async (): Promise<SmbMountsResponse> => {
 
 /**
  * Add an SMB share configuration (does not mount it)
- * Use mountAllSmbShares() afterward to mount all configured shares
+ *
+ * Creates a configuration entry for an SMB share. This stores the mount
+ * configuration but does NOT immediately mount the share. To actually mount
+ * the configured shares, call mountAllSmbShares() afterward.
+ *
+ * Note: This function adds the action='add' field automatically.
+ * Use mountSmbShareWithRetry() for automatic mounting with retry logic.
+ *
+ * @param mountRequest - Configuration for the share to add
+ * @returns Promise resolving to mount response indicating configuration was added
+ * @throws Error if HTTP request fails
+ *
+ * @see mountSmbShareWithRetry For automatic mounting with retry logic
+ * @see mountAllSmbShares To actually mount the configured shares
  */
 export const mountSmbShare = async (mountRequest: SmbMountRequest): Promise<SmbMountResponse> => {
   const appConfigStore = useAppConfigStore()
@@ -450,8 +567,35 @@ export const mountSmbShare = async (mountRequest: SmbMountRequest): Promise<SmbM
 
 /**
  * Mount SMB share with retry logic and different option sets
- * This function will try multiple mount configurations to handle capability issues
- * and ensures the share is actually mounted after configuration using mount-all
+ *
+ * High-level mount operation that:
+ * 1. Adds the share configuration with safe mount options
+ * 2. Automatically calls mountAllSmbShares() to apply mounting
+ * 3. Retries with minimal options if first attempt fails
+ * 4. Handles capability issues gracefully
+ *
+ * This is the preferred way to mount shares as it handles the complete
+ * workflow automatically. The function will try multiple mount configurations
+ * to handle capability issues and ensures the share is actually mounted.
+ *
+ * @param mountRequest - Configuration for the share to mount
+ * @returns Promise resolving to mount response showing service status
+ * @throws Error if HTTP request fails (not if mounting fails - checks response.status)
+ *
+ * @example
+ * try {
+ *   const result = await mountSmbShareWithRetry({
+ *     server: '192.168.1.27',
+ *     share: 'music',
+ *     user: 'admin',
+ *     password: 'secret'
+ *   })
+ *   if (result.status === 'success') {
+ *     console.log('Share mounted successfully')
+ *   }
+ * } catch (error) {
+ *   console.error('Mount operation failed:', error)
+ * }
  */
 export const mountSmbShareWithRetry = async (mountRequest: SmbMountRequest): Promise<SmbMountResponse> => {
   const appConfigStore = useAppConfigStore()
@@ -545,7 +689,23 @@ export const mountSmbShareWithRetry = async (mountRequest: SmbMountRequest): Pro
 
 /**
  * Remove an SMB share configuration and trigger mount-all to apply changes
- * This will remove the configuration and unmount the share if it's currently mounted
+ *
+ * Removes a share configuration and immediately triggers mountAllSmbShares()
+ * to apply the changes system-wide. This will:
+ * 1. Remove the configuration entry
+ * 2. Unmount the share if it's currently mounted
+ * 3. Update the systemd service
+ *
+ * @param server - SMB server IP or hostname of the share to remove
+ * @param share - Share name to remove
+ * @returns Promise resolving to mount response showing service status
+ * @throws Error if HTTP request fails
+ *
+ * @example
+ * const result = await unmountSmbShare('192.168.1.27', 'music')
+ * if (result.status === 'success') {
+ *   console.log('Share removed and system updated')
+ * }
  */
 export const unmountSmbShare = async (server: string, share: string): Promise<SmbMountResponse> => {
   const appConfigStore = useAppConfigStore()
@@ -589,7 +749,19 @@ export const unmountSmbShare = async (server: string, share: string): Promise<Sm
 
 /**
  * Mount all configured SMB shares using the systemd service
- * This replaces individual mount operations and ensures proper system-wide mounting
+ *
+ * Triggers the SMB mount service to mount all currently configured shares.
+ * This replaces individual mount operations and ensures proper system-wide
+ * mounting via systemd. This should be called after adding/removing share
+ * configurations to apply the changes.
+ *
+ * @returns Promise resolving to mount response with service status
+ * @throws Error if HTTP request fails or response parsing fails
+ *
+ * @example
+ * // After adding a share configuration with mountSmbShare()
+ * const result = await mountAllSmbShares()
+ * console.log(result.data.mpd_reconcile) // Optional MPD status update
  */
 export const mountAllSmbShares = async (): Promise<SmbMountResponse> => {
   const appConfigStore = useAppConfigStore()
@@ -611,6 +783,20 @@ export const mountAllSmbShares = async (): Promise<SmbMountResponse> => {
 
 /**
  * Get detailed mount diagnostics for troubleshooting
+ *
+ * Retrieves comprehensive diagnostic information for a specific mount,
+ * including system capabilities, mount command output, and error details.
+ * Useful for debugging mount failures.
+ *
+ * @param id - Mount configuration ID to get diagnostics for
+ * @returns Promise resolving to diagnostics response with detailed information
+ * @throws Error if HTTP request fails or response parsing fails
+ *
+ * @example
+ * const diags = await getSmbMountDiagnostics(1)
+ * console.log('CIFS available:', diags.data.system_info.cifs_available)
+ * console.log('Mount command:', diags.data.mount_command)
+ * console.log('Mount error:', diags.data.mount_error)
  */
 export const getSmbMountDiagnostics = async (id: number): Promise<SmbDiagnosticsResponse> => {
   const appConfigStore = useAppConfigStore()
@@ -632,6 +818,24 @@ export const getSmbMountDiagnostics = async (id: number): Promise<SmbDiagnostics
 
 /**
  * Check if SMB mount capabilities are available on the system
+ *
+ * Verifies system prerequisites for SMB mounting, including:
+ * - CIFS utilities installation
+ * - mount.cifs availability
+ * - Current user capabilities (uid/gid)
+ * - Supported SMB protocol versions
+ *
+ * Use this before attempting mount operations to check system readiness.
+ *
+ * @returns Promise resolving to capabilities response with system status
+ * @throws Error if HTTP request fails or response parsing fails
+ *
+ * @example
+ * const caps = await checkSmbCapabilities()
+ * if (!caps.data.cifs_utils_installed) {
+ *   console.warn('CIFS utils not installed')
+ * }
+ * console.log('Supported versions:', caps.data.supported_versions)
  */
 export const checkSmbCapabilities = async (): Promise<SmbCapabilitiesResponse> => {
   const appConfigStore = useAppConfigStore()

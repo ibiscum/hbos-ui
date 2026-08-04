@@ -124,8 +124,11 @@ export function useCoverArt() {
    * @returns Promise resolving to the cover art result
    */
   const loadCoverArtByMetadata = async (title: string, artist: string): Promise<CoverArtResult> => {
+    const normalizedTitle = title?.trim() || ''
+    const normalizedArtist = artist?.trim() || ''
+
     // Validate that both title and artist are provided
-    if (!title || !artist) {
+    if (!normalizedTitle || !normalizedArtist) {
       console.log('Cannot load cover art by metadata - missing title or artist:', {
         title,
         artist
@@ -135,8 +138,8 @@ export function useCoverArt() {
     }
 
     const song: Song = {
-      title,
-      artist,
+      title: normalizedTitle,
+      artist: normalizedArtist,
       duration: 0 // Required by Song interface but not needed for cover art
     }
     return loadCoverArt(song)
@@ -207,7 +210,17 @@ export function useCoverArt() {
    */
   const clearCache = (songKey?: string) => {
     if (songKey) {
-      coverArtCache.value.delete(songKey)
+      const normalizedKey = songKey.trim().toLowerCase()
+      if (!normalizedKey) {
+        coverArtCache.value.clear()
+        lastSongKey.value = null
+        return
+      }
+
+      coverArtCache.value.delete(normalizedKey)
+      if (lastSongKey.value === normalizedKey) {
+        lastSongKey.value = null
+      }
     } else {
       coverArtCache.value.clear()
       lastSongKey.value = null

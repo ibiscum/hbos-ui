@@ -125,7 +125,7 @@ const authProgressStep = ref('Waiting for redirection...')
 const isSettingsExpanded = ref(false)
 
 // Polling
-let authPollInterval: number | null = null
+let authPollInterval: ReturnType<typeof setInterval> | null = null
 
 // Computed
 const statusIndicatorClass = computed(() => {

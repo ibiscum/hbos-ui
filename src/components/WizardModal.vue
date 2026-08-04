@@ -3,7 +3,7 @@
     <div class="modal-content" @click.stop>
       <div class="modal-header">
         <h2>{{ title }}</h2>
-        <button @click="$emit('close')" class="close-button" title="Close">
+        <button type="button" @click="$emit('close')" class="close-button" title="Close" aria-label="Close modal">
           <Icon icon="close" />
         </button>
       </div>
@@ -14,27 +14,29 @@
 
       <div class="modal-footer">
         <div class="step-navigation">
-          <button v-if="currentStep > 1" @click="$emit('previous')" class="nav-button secondary">
-            <Icon icon="arrow-left" />
+          <button v-if="currentStep > 1" type="button" @click="$emit('previous')" class="nav-button secondary">
+            <Icon icon="tabler/chevron-left" />
             Previous
           </button>
           <div class="step-indicator">Step {{ currentStep }} of {{ totalSteps }}</div>
           <button
             v-if="currentStep < totalSteps"
+            type="button"
             @click="$emit('next')"
             :disabled="!canProceedNext"
             class="nav-button primary"
           >
             {{ nextLabel || 'Next' }}
-            <Icon icon="arrow-right" />
+            <Icon icon="tabler/chevron-right" />
           </button>
           <button
             v-else
+            type="button"
             @click="$emit('finish')"
             :disabled="savingFinal"
             class="nav-button primary"
           >
-            <Icon v-if="savingFinal" icon="spinner" class="spinning" />
+            <Icon v-if="savingFinal" icon="tabler/loader" class="spinning" />
             <Icon v-else :icon="finalIcon || 'checkmark'" />
             {{ finalLabel || 'Save' }}
           </button>

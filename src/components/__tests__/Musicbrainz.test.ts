@@ -17,14 +17,20 @@ const mountMusicbrainz = (props: Record<string, unknown> = {}) => {
 }
 
 describe('Musicbrainz component', () => {
-  it('renders default service title, description and active status', () => {
+  it('renders default service content and status semantics', () => {
     const wrapper = mountMusicbrainz()
+    const badge = wrapper.find('.status-badge')
 
     expect(wrapper.find('.content-box').exists()).toBe(true)
     expect(wrapper.find('h3').text()).toBe('MusicBrainz')
     expect(wrapper.find('.service-description').text()).toContain('retrieve additional artist, song and album metadata')
-    expect(wrapper.find('.status-badge').text()).toContain('Active')
-    expect(wrapper.find('.status-badge').classes()).toContain('green')
+    expect(wrapper.find('[data-icon]').attributes('data-icon')).toBe('tabler/database')
+    expect(wrapper.find('.service-status').exists()).toBe(true)
+
+    expect(badge.text()).toContain('Active')
+    expect(badge.classes()).toContain('green')
+    expect(badge.attributes('role')).toBe('status')
+    expect(badge.attributes('aria-label')).toBe('MusicBrainz service status: Active')
   })
 
   it('regression: supports custom title, description and icon via props', () => {
@@ -51,5 +57,17 @@ describe('Musicbrainz component', () => {
     expect(badge.attributes('aria-label')).toBe('MusicBrainz service status: Unavailable')
     expect(badge.classes()).toContain('red')
     expect(badge.text()).toContain('Unavailable')
+  })
+
+  it('regression: maps each supported status variant to the badge class', () => {
+    const scenarios = ['green', 'red', 'yellow', 'gray'] as const
+
+    scenarios.forEach((variant) => {
+      const wrapper = mountMusicbrainz({
+        statusVariant: variant,
+      })
+
+      expect(wrapper.find('.status-badge').classes()).toContain(variant)
+    })
   })
 })

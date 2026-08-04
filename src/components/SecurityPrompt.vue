@@ -3,7 +3,7 @@
     <div class="modal-content" @click.stop>
       <div class="modal-header">
         <h2>{{ isSetPassword ? 'Protect your settings' : 'Enter your password' }}</h2>
-        <button class="close-button" title="Close" @click="cancel">
+        <button class="close-button" title="Close" :disabled="busy" @click="cancel">
           <Icon icon="close" />
         </button>
       </div>
@@ -23,14 +23,16 @@
         </p>
 
         <form class="security-form" @submit.prevent="onSubmit">
-          <label for="security-prompt-password" class="security-label">Password</label>
+          <label for="security-prompt-password" class="security-label">
+            {{ isSetPassword ? 'New password' : 'Password' }}
+          </label>
           <input
             id="security-prompt-password"
             ref="passwordInput"
             v-model="password"
             type="password"
             class="security-input"
-            autocomplete="current-password"
+            :autocomplete="isSetPassword ? 'new-password' : 'current-password'"
             :disabled="busy"
           />
 
@@ -121,6 +123,7 @@ async function onSubmit() {
 }
 
 async function onNotNow() {
+  if (busy.value) return
   busy.value = true
   error.value = null
   try {

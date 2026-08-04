@@ -272,61 +272,8 @@ export interface FilterBypassSetResponse {
   successful?: number     // New field for successful bypass operations
 }
 
-// API Functions
-async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const appConfigStore = useAppConfigStore()
-  const baseUrl = appConfigStore.getDSPToolkitApiBaseUrl()
-  const url = `${baseUrl}${endpoint}`
-
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
-
-  try {
-    const response = await apiFetch(url, {
-      ...options,
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-      }
-    })
-
-    clearTimeout(timeoutId)
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-
-    // Check if response is actually JSON by looking at content type
-    const contentType = response.headers.get('content-type')
-    if (!contentType || !contentType.includes('application/json')) {
-      // Try to read as text to check if it's HTML
-      const text = await response.text()
-      if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
-        throw new Error('HiFiBerry DSP software not available')
-      }
-      throw new Error('Invalid response format from DSP service')
-    }
-
-    return await response.json()
-  } catch (error) {
-    clearTimeout(timeoutId)
-
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Request timeout')
-    }
-
-    // Check for JSON parsing errors that might indicate HTML response
-    if (error instanceof SyntaxError && error.message.includes('Unexpected token')) {
-      throw new Error('HiFiBerry DSP software not available')
-    }
-
-    throw error
-  }
-}
-
-// Long-running API request function for operations like DSP profile deployment
-async function longApiRequest<T>(endpoint: string, options: RequestInit = {}, timeout: number = DSP_PROFILE_DEPLOYMENT_TIMEOUT): Promise<T> {
+// API Functions - Unified request handler for JSON responses
+async function jsonRequest<T>(endpoint: string, options: RequestInit = {}, timeout: number = API_TIMEOUT): Promise<T> {
   const appConfigStore = useAppConfigStore()
   const baseUrl = appConfigStore.getDSPToolkitApiBaseUrl()
   const url = `${baseUrl}${endpoint}`
@@ -366,7 +313,8 @@ async function longApiRequest<T>(endpoint: string, options: RequestInit = {}, ti
     clearTimeout(timeoutId)
 
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error(`Request timeout (exceeded ${timeout / 1000} seconds)`)
+      const timeoutSeconds = timeout / 1000
+      throw new Error(`Request timeout${timeout !== API_TIMEOUT ? ` (exceeded ${timeoutSeconds} seconds)` : ''}`)
     }
 
     // Check for JSON parsing errors that might indicate HTML response
@@ -376,6 +324,15 @@ async function longApiRequest<T>(endpoint: string, options: RequestInit = {}, ti
 
     throw error
   }
+}
+
+// Legacy aliases for backwards compatibility
+async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  return jsonRequest<T>(endpoint, options, API_TIMEOUT)
+}
+
+async function longApiRequest<T>(endpoint: string, options: RequestInit = {}, timeout: number = DSP_PROFILE_DEPLOYMENT_TIMEOUT): Promise<T> {
+  return jsonRequest<T>(endpoint, options, timeout)
 }
 
 // Hardware Detection API
@@ -488,6 +445,9 @@ export async function getDSPProfile(): Promise<string> {
   try {
     const response = await apiFetch(`${baseUrl}/dspprofile`, {
       signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json'
+      }
     })
 
     clearTimeout(timeoutId)
@@ -496,7 +456,16 @@ export async function getDSPProfile(): Promise<string> {
       throw new Error(`Failed to get DSP profile: ${response.status} ${response.statusText}`)
     }
 
-    return response.text()
+    // Validate response is not HTML error page
+    const contentType = response.headers?.get?.('content-type')
+    const text = await response.text()
+
+    if (contentType?.includes('text/html') || contentType?.includes('application/html') ||
+        text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+      throw new Error('HiFiBerry DSP software not available')
+    }
+
+    return text
   } catch (error) {
     clearTimeout(timeoutId)
 
@@ -667,7 +636,7 @@ export async function writeChannelSelect(address: number, mode: number): Promise
 // DSP Toolkit Status Check
 export type DSPToolkitStatus = 'yes' | 'no' | 'backend_error'
 
-export async function check_dsp_toolkit(): Promise<DSPToolkitStatus> {
+export async function checkDSPToolkit(): Promise<DSPToolkitStatus> {
   try {
     const result = await getDetectedDSP()
     return result.status === 'detected' ? 'yes' : 'no'
@@ -684,3 +653,6 @@ export async function check_dsp_toolkit(): Promise<DSPToolkitStatus> {
     return 'backend_error'
   }
 }
+
+// Deprecated: Use checkDSPToolkit instead
+export const check_dsp_toolkit = checkDSPToolkit

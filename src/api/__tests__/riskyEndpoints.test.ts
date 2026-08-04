@@ -35,7 +35,7 @@ describe('risky endpoints outside the spotify/lastfm flows', () => {
 
   /** roomeq.json leaves /audio/record/start and /audio/room-measure on the risky
    *  default: a network client must not be able to silently record the room. */
-  const roomeqCalls: Array<[string, () => Promise<{ success: boolean; detail?: string }>]> = [
+  const roomeqCalls: Array<[string, () => Promise<any>]> = [
     ['startRoomEQRecording', () => startRoomEQRecording({ duration: 5 })],
     ['startRoomMeasure', () => startRoomMeasure({})],
   ]

@@ -14,9 +14,13 @@
             <Icon :icon="icon" class="dialog-icon" />
           </div>
           <div class="confirmation-text">
-            <p v-for="line in messageLines" :key="line" class="message-line"
-               :class="{ 'critical-warning': line.includes('CRITICAL WARNINGS:') }"
-               v-html="line">
+            <p
+              v-for="line in messageLines"
+              :key="line.id"
+              class="message-line"
+              :class="{ 'critical-warning': line.isCritical }"
+            >
+              {{ line.text }}
             </p>
           </div>
           <div v-if="requiresTextConfirmation" class="text-confirmation">
@@ -90,7 +94,14 @@ const emit = defineEmits<Emits>()
 const userInput = ref('')
 
 const messageLines = computed(() => {
-  return props.message.split('\n').filter(line => line.trim() !== '')
+  return props.message
+    .split('\n')
+    .filter(line => line.trim() !== '')
+    .map((line, index) => ({
+      id: `${index}-${line}`,
+      text: line,
+      isCritical: line.includes('CRITICAL WARNINGS:')
+    }))
 })
 
 const closeDialog = () => {
@@ -99,6 +110,10 @@ const closeDialog = () => {
 }
 
 const handleConfirm = () => {
+  if (props.disabled) {
+    return
+  }
+
   if (props.requiresTextConfirmation && userInput.value !== props.confirmationText) {
     return
   }

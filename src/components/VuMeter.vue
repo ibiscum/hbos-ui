@@ -96,15 +96,6 @@ onUnmounted(() => {
   gap: 6px;
 }
 
-.vu-meter__label {
-  color: var(--color-body-secondary);
-  font-size: 10px;
-  width: 10px;
-  text-align: right;
-  flex-shrink: 0;
-  opacity: 0.6;
-}
-
 .vu-meter__track {
   position: relative;
   height: 6px;

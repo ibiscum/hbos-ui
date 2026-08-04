@@ -6,9 +6,8 @@
 
     <div class="nav">
       <template v-for="route in routes" :key="route.name">
-        <!-- existing nav code -->
-        <div v-if="route.children && route.children.length" :class="['nav-item__parent']">
-          <router-link :to="{ name: route.name }" :class="['nav-item']">
+        <div v-if="route.children && route.children.length" class="nav-item__parent">
+          <router-link :to="{ name: route.name }" class="nav-item">
             <span class="nav-item__icon">
               <Icon :icon="route.icon" />
             </span>
@@ -33,7 +32,7 @@
           </div>
         </div>
 
-        <router-link v-else :to="{ name: route.name }" :class="['nav-item']">
+        <router-link v-else :to="{ name: route.name }" class="nav-item">
           <span class="nav-item__icon">
             <Icon :icon="route.icon" />
           </span>
@@ -52,7 +51,6 @@
     <div class="sidebar-logo-small">
       <img :src="logoSmallUrl" alt="Logo" />
     </div>
-
   </aside>
 </template>
 
@@ -78,7 +76,7 @@ const settingsStore = useSettingsStore()
 const { playerCapabilities } = storeToRefs(playerStore)
 
 interface Route {
-  name?: string
+  name: string
   title: string
   icon: string
   children?: Route[]

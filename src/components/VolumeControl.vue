@@ -9,14 +9,14 @@
     </svg>
     <div class="volume-slider-container">
       <ProgressSlider
-        :value="displayVolume"
+        :value="sliderVolume"
         :min="0"
         :max="100"
         :step="1"
         :disabled="false"
         :has-thumb="true"
         :is-draggable="true"
-        :is-on-header="true"
+        :is-on-header="isHeaderSlider"
         @click:progress="handleVolumeChange"
       />
     </div>
@@ -47,14 +47,16 @@ const props = withDefaults(defineProps<Props>(), {
 const playerStore = usePlayerStore()
 const { currentVolume } = storeToRefs(playerStore)
 
-// Computed properties
-const displayVolume = computed(() => {
-  return currentVolume.value
+const isHeaderSlider = computed(() => props.size === 'compact')
+
+const sliderVolume = computed(() => {
+  return Math.min(100, Math.max(0, Math.round(currentVolume.value)))
 })
 
 // Methods
 const handleVolumeChange = (newVolume: number) => {
-  playerStore.setVolume(newVolume)
+  const safeVolume = Math.min(100, Math.max(0, Math.round(newVolume)))
+  void playerStore.setVolume(safeVolume)
 }
 </script>
 
@@ -78,6 +80,12 @@ const handleVolumeChange = (newVolume: number) => {
       min-width: 100px;
       display: flex;
       align-items: center;
+      // Counter the margin-top from is-on-header to center properly
+      margin-top: -4px;
+
+      @include media-down(md) {
+        margin-top: -3px;
+      }
     }
 
     // In the simple header layout, allow wider volume control
@@ -136,15 +144,6 @@ const handleVolumeChange = (newVolume: number) => {
       min-width: 200px;
       display: flex;
       align-items: center;
-    }
-  }
-
-  .volume-slider-container {
-    // Counter the margin-top from is-on-header to center properly
-    margin-top: -4px;
-
-    @include media-down(md) {
-      margin-top: -3px;
     }
   }
 

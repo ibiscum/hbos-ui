@@ -155,10 +155,15 @@ export const rewriteAudiocontrolApiUrl = (url: string): string => {
     return correctedUrl // Fallback if API base URL unavailable
   }
 
-  // Safely replace /api/ prefix with full API base URL
-  // Only replace if correctedUrl still starts with /api/
-  if (correctedUrl.startsWith('/api/')) {
-    const rewrittenUrl = correctedUrl.replace('/api/', `${apiBaseUrl}/`)
+  // Safely replace /api/audiocontrol prefix with full API base URL
+  // correctedUrl is like: /api/audiocontrol/library/test
+  // apiBaseUrl is like: http://192.168.1.67/api/audiocontrol
+  // We need to replace /api/audiocontrol with the full base URL to get:
+  // http://192.168.1.67/api/audiocontrol/library/test
+  if (correctedUrl.startsWith('/api/audiocontrol/')) {
+    // Extract the path after /api/audiocontrol/
+    const pathAfterPrefix = correctedUrl.substring('/api/audiocontrol'.length)
+    const rewrittenUrl = `${apiBaseUrl}${pathAfterPrefix}`
     // Normalize double slashes that could occur if apiBaseUrl has trailing slash
     return rewrittenUrl.replace(/([^:]\/)\/+/g, '$1')
   }

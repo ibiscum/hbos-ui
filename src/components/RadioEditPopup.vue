@@ -3,7 +3,7 @@
     <div class="radio-edit-popup" @click.stop>
       <div class="popup-header">
         <h3>Edit Radio Station</h3>
-        <button class="close-btn" @click="closePopup">
+        <button type="button" class="close-btn" aria-label="Close edit popup" @click="closePopup">
           <Icon icon="clear" />
         </button>
       </div>
@@ -114,9 +114,9 @@ interface Emits {
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
-const fileInput = ref<HTMLInputElement>()
+const fileInput = ref<HTMLInputElement | null>(null)
 
-const editData = ref({
+const createEmptyEditData = () => ({
   id: '',
   title: '',
   country: '',
@@ -125,21 +125,37 @@ const editData = ref({
   img: ''
 })
 
-// Watch for station changes to populate the form
-watch(() => props.station, (newStation) => {
-  if (newStation) {
-    editData.value = {
-      id: newStation.id,
-      title: newStation.title || '',
-      // Try to get values from metadata first, then fall back to legacy fields
-      country: newStation.metadata?.country || newStation.country || '',
-      tags: newStation.metadata?.tags || newStation.tags || '',
-      url: newStation.url || '',
-      img: (typeof newStation.metadata?.logo_url === 'string' ? newStation.metadata.logo_url : '') ||
-           (typeof newStation.metadata?.coverart_url === 'string' ? newStation.metadata.coverart_url : '') ||
-           newStation.img || ''
-    }
+const getStationImage = (station: RadioFavorite) => {
+  if (typeof station.metadata?.logo_url === 'string' && station.metadata.logo_url.trim()) {
+    return station.metadata.logo_url
   }
+
+  if (typeof station.metadata?.coverart_url === 'string' && station.metadata.coverart_url.trim()) {
+    return station.metadata.coverart_url
+  }
+
+  return station.img || ''
+}
+
+const toEditData = (station: RadioFavorite) => ({
+  id: station.id,
+  title: station.title || '',
+  country: station.metadata?.country || station.country || '',
+  tags: station.metadata?.tags || station.tags || '',
+  url: station.url || '',
+  img: getStationImage(station)
+})
+
+const editData = ref(createEmptyEditData())
+
+// Watch for station changes to populate the form
+watch([() => props.station, () => props.isVisible], ([newStation, isVisible]) => {
+  if (!isVisible || !newStation) {
+    editData.value = createEmptyEditData()
+    return
+  }
+
+  editData.value = toEditData(newStation)
 }, { immediate: true })
 
 const closePopup = () => {
@@ -147,12 +163,21 @@ const closePopup = () => {
 }
 
 const saveChanges = () => {
+  const trimmedTitle = editData.value.title.trim()
+  const trimmedUrl = editData.value.url.trim()
+
+  if (!trimmedTitle || !trimmedUrl) {
+    toastStore.showErrorToast('Station name and stream URL are required.')
+    return
+  }
+
   const editedStation: RadioFavorite = {
     id: editData.value.id,
-    title: editData.value.title.trim(),
-    url: editData.value.url.trim(),
+    title: trimmedTitle,
+    url: trimmedUrl,
     metadata: {
-      title: editData.value.title.trim(),
+      title: trimmedTitle,
+      logo_url: editData.value.img || undefined,
       coverart_url: editData.value.img || undefined,
       country: editData.value.country.trim() || undefined,
       tags: editData.value.tags.trim() || undefined
@@ -170,25 +195,29 @@ const handleImageUpload = (event: Event) => {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
 
-  if (file) {
-    // Check file size (limit to 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toastStore.showErrorToast("Image size must be less than 5MB.")
-      return
-    }
-
-    // Check file type
-    if (!file.type.startsWith('image/')) {
-      toastStore.showErrorToast("Please select a valid image file")
-      return
-    }
-
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      editData.value.img = e.target?.result as string
-    }
-    reader.readAsDataURL(file)
+  if (!file) {
+    return
   }
+
+  // Check file size (limit to 5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    target.value = ''
+    toastStore.showErrorToast('Image size must be less than 5MB.')
+    return
+  }
+
+  // Check file type
+  if (!file.type.startsWith('image/')) {
+    target.value = ''
+    toastStore.showErrorToast('Please select a valid image file.')
+    return
+  }
+
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    editData.value.img = e.target?.result as string
+  }
+  reader.readAsDataURL(file)
 }
 </script>
 

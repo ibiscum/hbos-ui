@@ -182,6 +182,9 @@ export const useRadioStore = defineStore('radio', () => {
         /* Save item in storage */
         localStorage.setItem('radioBrowserBaseUrl', radioBrowserBaseUrl.value)
         console.log('Using Radio-Browser API base URL:', radioBrowserBaseUrl.value)
+      } else {
+        console.warn('Radio-Browser server list was empty, using fallback server')
+        radioBrowserBaseUrl.value = 'https://de2.api.radio-browser.info'
       }
     } catch (error) {
       console.error('Failed to get Radio-Browser servers:', error)
@@ -198,7 +201,10 @@ export const useRadioStore = defineStore('radio', () => {
     */
   const search = async (query: string) => {
     /* Return if the query string is empty after being trimmed. */
-    if (!query.trim()) return
+    if (!query.trim()) {
+      clearSearchResults()
+      return
+    }
 
     loading.value = true
     try {
@@ -437,8 +443,14 @@ export const useRadioStore = defineStore('radio', () => {
   const loadFavoritesFromConfig = async () => {
     try {
       const response = await getConfigValue('ui.radiostations')
-      if (response.status === 'success' && response.data) {
-        const loadedFavorites = JSON.parse(response.data.value)
+      if (response.status === 'success' && response.data?.value) {
+        const parsed = JSON.parse(response.data.value)
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          console.warn('Invalid radio favorites payload, resetting favorites')
+          favorites.value = {}
+          return
+        }
+        const loadedFavorites = parsed as Record<string, RadioFavorite>
 
         /* Migrate old favorites to new metadata structure while maintaining backward compatibility */
         for (const favorite of Object.values(loadedFavorites)) {

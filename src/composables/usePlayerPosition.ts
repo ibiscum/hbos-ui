@@ -49,10 +49,10 @@ export function usePlayerPosition() {
 
     // If player state or position changed, update our sync point
     if (playerData.state !== lastPlayerState.value ||
-        Math.abs((playerData.position || 0) - lastPlayerPosition.value) > 0.5) { // Allow 0.5s tolerance
+        Math.abs((playerData.position ?? 0) - lastPlayerPosition.value) > 0.5) { // Allow 0.5s tolerance
       lastSyncTime.value = performance.now()
-      lastPlayerPosition.value = playerData.position || 0
-      lastPlayerState.value = playerData.state || 'stopped'
+      lastPlayerPosition.value = playerData.position ?? 0
+      lastPlayerState.value = playerData.state ?? 'stopped'
     }
 
     // If playing, calculate position based on elapsed time
@@ -75,7 +75,7 @@ export function usePlayerPosition() {
 
   // Start automatic position updates
   const startAutoUpdate = () => {
-    if (intervalId.value) {
+    if (intervalId.value !== null) {
       clearInterval(intervalId.value)
     }
     intervalId.value = window.setInterval(updatePosition, 500)
@@ -83,7 +83,7 @@ export function usePlayerPosition() {
 
   // Stop automatic position updates
   const stopAutoUpdate = () => {
-    if (intervalId.value) {
+    if (intervalId.value !== null) {
       clearInterval(intervalId.value)
       intervalId.value = null
     }
@@ -120,9 +120,12 @@ export function usePlayerPosition() {
   const duration = computed(() => {
     const songDuration = playerStore.currentData?.song?.metadata?.lyrics_metadata?.duration
     if (typeof songDuration === 'string') {
-      return parseFloat(songDuration)
+      const parsed = Number.parseFloat(songDuration)
+      return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
     }
-    return songDuration || 0
+    return typeof songDuration === 'number' && Number.isFinite(songDuration) && songDuration >= 0
+      ? songDuration
+      : 0
   })
 
   return {

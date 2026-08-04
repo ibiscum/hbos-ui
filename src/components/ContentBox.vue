@@ -1,13 +1,11 @@
 <template>
-  <div class="contentBox">
+  <div class="content-box contentBox">
     <slot></slot>
   </div>
 </template>
 
-<script setup lang="ts">
-</script>
-
 <style scoped lang="scss">
+.content-box,
 .contentBox {
   background: var(--background-card);
   border-radius: 10px;

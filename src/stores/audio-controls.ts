@@ -11,9 +11,10 @@ import { formatTime } from '@/helpers/formatTime'
 import type { LoopMode } from '@/types/player'
 
 const PLAYBACK_SKIP_COMMANDS = ['next', 'previous'] as const
+type PlaybackSkipCommand = (typeof PLAYBACK_SKIP_COMMANDS)[number]
 
-function isPlaybackSkipCommand(value: string): value is (typeof PLAYBACK_SKIP_COMMANDS)[number] {
-  return PLAYBACK_SKIP_COMMANDS.includes(value as (typeof PLAYBACK_SKIP_COMMANDS)[number])
+function isPlaybackSkipCommand(value: string): value is PlaybackSkipCommand {
+  return PLAYBACK_SKIP_COMMANDS.includes(value as PlaybackSkipCommand)
 }
 
 function isLoopMode(value: string): value is Exclude<LoopMode, undefined> {
@@ -29,7 +30,9 @@ export const useAudioControls = defineStore('audio-controls', () => {
   const { position: currentPosition } = usePlayerPosition()
 
   // State
-  const progressIntervalID = ref<number | undefined>(undefined)
+  const progressIntervalID = ref<ReturnType<typeof setInterval> | undefined>(undefined)
+
+  const getSongDuration = () => currentSong.value?.duration ?? currentData.value?.song?.duration
 
   // Computed seek position as percentage
   const seekPosition = computed(() => {
@@ -51,13 +54,18 @@ export const useAudioControls = defineStore('audio-controls', () => {
     return isLoopMode(mode) ? mode : 'none'
   })
 
-  const iscurrentLoopModeNone = computed(
+  const isCurrentLoopModeNone = computed(
     () => currentLoopMode.value === 'none' || currentLoopMode.value === 'no',
   )
-  const iscurrentLoopModeTrack = computed(
+  const isCurrentLoopModeTrack = computed(
     () => currentLoopMode.value === 'track' || currentLoopMode.value === 'song',
   )
-  const iscurrentLoopModePlaylist = computed(() => currentLoopMode.value === 'playlist')
+  const isCurrentLoopModePlaylist = computed(() => currentLoopMode.value === 'playlist')
+
+  // Backward-compatible aliases kept for existing component bindings.
+  const iscurrentLoopModeNone = isCurrentLoopModeNone
+  const iscurrentLoopModeTrack = isCurrentLoopModeTrack
+  const iscurrentLoopModePlaylist = isCurrentLoopModePlaylist
 
   const songDurationTime = computed(() => formatTime(currentSong.value?.duration))
   const seekPositionTime = computed(() =>
@@ -68,11 +76,9 @@ export const useAudioControls = defineStore('audio-controls', () => {
   watch(
     () => currentData.value?.state,
     (newState) => {
-      console.log('Player state changed to:', newState)
-
-      if (newState === 'playing' && !progressIntervalID.value) {
+      if (newState === 'playing' && progressIntervalID.value == null) {
         startAutoProgress()
-      } else if (newState !== 'playing' && progressIntervalID.value) {
+      } else if (newState !== 'playing' && progressIntervalID.value != null) {
         stopAutoProgress()
       }
     },
@@ -108,8 +114,6 @@ export const useAudioControls = defineStore('audio-controls', () => {
   }
 
   const toggleShuffle = () => {
-    console.log('toggleShuffle')
-
     if (isShuffle.value !== undefined) {
       // can be undefined if can't Shuffle
       // Playback state commands go to active player
@@ -117,9 +121,7 @@ export const useAudioControls = defineStore('audio-controls', () => {
     }
   }
 
-  async function cycleLoopMode() {
-    console.log('cycleLoopMode currentLoopMode', currentLoopMode.value)
-
+  function cycleLoopMode() {
     if (!currentData.value) return
 
     let nextMode: string | undefined
@@ -139,8 +141,6 @@ export const useAudioControls = defineStore('audio-controls', () => {
         break
     }
 
-    console.log(`Setting new loop mode: ${nextMode}`)
-
     // Playback state commands go to active player
     sendCommand(`set_loop:${nextMode}`)
   }
@@ -154,16 +154,16 @@ export const useAudioControls = defineStore('audio-controls', () => {
     try {
       stopAutoProgress()
 
-      if (!currentData.value?.song?.duration) {
+      const duration = getSongDuration()
+
+      if (!duration) {
         console.error('Error seeking to position: No Song duration')
 
         return
       }
 
       const normalizedPosition = Math.max(0, Math.min(100, position))
-      const seekToPosition = (currentData.value.song.duration * normalizedPosition) / 100
-
-      console.log('seekToPosition', seekToPosition)
+      const seekToPosition = (duration * normalizedPosition) / 100
 
       const seekCommand = `seek:${Math.floor(seekToPosition)}`
 
@@ -178,16 +178,13 @@ export const useAudioControls = defineStore('audio-controls', () => {
   }
 
   function startAutoProgress() {
-    console.log('startAutoProgress')
-
     stopAutoProgress()
 
-    if (isPlaying.value && currentSong.value?.duration) {
+    if (isPlaying.value && getSongDuration()) {
       progressIntervalID.value = setInterval(() => {
         // Check if we've reached the end (composable handles position updates automatically)
         if (seekPosition.value >= 100) {
           stopAutoProgress()
-          console.log('Track reached the end, fetching current player state from server')
           fetchCurrentPlayer()
         }
       }, 500) // 500ms interval to check for track end
@@ -197,9 +194,7 @@ export const useAudioControls = defineStore('audio-controls', () => {
   }
 
   function stopAutoProgress() {
-    if (progressIntervalID.value) {
-      console.log('clearInterval')
-
+    if (progressIntervalID.value != null) {
       clearInterval(progressIntervalID.value)
       progressIntervalID.value = undefined
     }
@@ -215,6 +210,9 @@ export const useAudioControls = defineStore('audio-controls', () => {
     isPlayingOrPaused,
     isShuffle,
     currentLoopMode,
+    isCurrentLoopModeNone,
+    isCurrentLoopModeTrack,
+    isCurrentLoopModePlaylist,
     iscurrentLoopModeNone,
     iscurrentLoopModeTrack,
     iscurrentLoopModePlaylist,

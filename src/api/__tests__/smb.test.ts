@@ -413,3 +413,381 @@ describe('smb api capability and diagnostic tests', () => {
     expect(fetchMock.mock.calls[0][0]).toContain('/smb/servers')
   })
 })
+
+describe('smb api request body construction', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.restoreAllMocks()
+  })
+
+  it('testSmbServer omits username/password when not provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, success))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await testSmbServer('192.168.1.27')
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body).toEqual({ server: '192.168.1.27' })
+    expect('username' in body).toBe(false)
+    expect('password' in body).toBe(false)
+  })
+
+  it('getSmbShares omits optional parameters when not provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, success))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await getSmbShares('192.168.1.27')
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body).toEqual({ server: '192.168.1.27' })
+    expect('username' in body).toBe(false)
+    expect('password' in body).toBe(false)
+    expect('detailed' in body).toBe(false)
+  })
+
+  it('getSmbShares includes all optional parameters when provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, success))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await getSmbShares('192.168.1.27', 'user1', 'pass123', true)
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body).toEqual({
+      server: '192.168.1.27',
+      username: 'user1',
+      password: 'pass123',
+      detailed: true,
+    })
+  })
+
+  it('testSmbServer URL encodes server IP in path', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, success))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await testSmbServer('192.168.1.27')
+
+    const url = fetchMock.mock.calls[0][0]
+    expect(url).toContain('/smb/test/192.168.1.27')
+  })
+
+  it('mountSmbShare includes action field set to add', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, success))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await mountSmbShare({
+      server: '192.168.1.27',
+      share: 'music',
+    })
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.action).toBe('add')
+    expect(body.server).toBe('192.168.1.27')
+    expect(body.share).toBe('music')
+  })
+
+  it('unmountSmbShare includes action field set to remove', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, success))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await unmountSmbShare('192.168.1.27', 'music')
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.action).toBe('remove')
+    expect(body.server).toBe('192.168.1.27')
+    expect(body.share).toBe('music')
+  })
+})
+
+describe('smb api mount options edge cases', () => {
+  it('createSafeMountOptions with zero uid', () => {
+    const options = createSafeMountOptions('user', 0, 0)
+    expect(options).toContain('uid=0')
+    expect(options).toContain('gid=0')
+  })
+
+  it('createSafeMountOptions with special characters in username', () => {
+    const options = createSafeMountOptions('user@domain.com')
+    expect(options).toContain('username=user@domain.com')
+  })
+
+  it('createSafeMountOptions with various SMB versions', () => {
+    const versions = ['1.0', '2.0', '2.1', '3.0', '3.1.1']
+    versions.forEach((ver) => {
+      const options = createSafeMountOptions(undefined, undefined, undefined, undefined, undefined, ver)
+      expect(options).toContain(`vers=${ver}`)
+    })
+  })
+
+  it('createSafeMountOptions with custom file modes', () => {
+    const options = createSafeMountOptions(undefined, 1000, 1000, '0777', '0777')
+    expect(options).toContain('file_mode=0777')
+    expect(options).toContain('dir_mode=0777')
+  })
+
+  it('createSafeMountOptions always includes cache and iocharset', () => {
+    const options1 = createSafeMountOptions()
+    const options2 = createSafeMountOptions('admin', 1000, 1000, '0755', '0755', '3.0')
+
+    expect(options1).toContain('cache=loose')
+    expect(options1).toContain('iocharset=utf8')
+    expect(options2).toContain('cache=loose')
+    expect(options2).toContain('iocharset=utf8')
+  })
+})
+
+describe('smb api response validation', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.restoreAllMocks()
+  })
+
+  it('getSmbServers returns response with servers array', async () => {
+    const response = {
+      status: 'success',
+      data: {
+        servers: [
+          {
+            ip: '192.168.1.27',
+            name: 'NAS',
+            hostname: 'nas.local',
+            is_file_server: true,
+            services: ['SMB'],
+            local_network: '192.168.1.0/24',
+            interface: 'eth0',
+          },
+        ],
+        count: 1,
+      },
+    }
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, response))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await getSmbServers()
+
+    expect(result.status).toBe('success')
+    expect(result.data.servers).toHaveLength(1)
+    expect(result.data.count).toBe(1)
+  })
+
+  it('getSmbMounts returns response with summary', async () => {
+    const response = {
+      status: 'success',
+      data: {
+        mounts: [
+          {
+            id: 1,
+            server: '192.168.1.27',
+            share: 'music',
+            mountpoint: '/mnt/music',
+            user: 'user1',
+            version: '3.0',
+            options: 'rw,uid=1000',
+            mounted: true,
+          },
+        ],
+        count: 1,
+        summary: {
+          total: 1,
+          mounted: 1,
+          unmounted: 0,
+        },
+      },
+    }
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, response))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await getSmbMounts()
+
+    expect(result.data.summary.total).toBe(1)
+    expect(result.data.summary.mounted).toBe(1)
+    expect(result.data.summary.unmounted).toBe(0)
+  })
+
+  it('handles empty servers list', async () => {
+    const response = {
+      status: 'success',
+      data: {
+        servers: [],
+        count: 0,
+      },
+    }
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, response))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await getSmbServers()
+
+    expect(result.data.servers).toHaveLength(0)
+    expect(result.data.count).toBe(0)
+  })
+
+  it('handles empty shares list', async () => {
+    const response = {
+      status: 'success',
+      data: {
+        server: '192.168.1.27',
+        shares: [],
+        count: 0,
+      },
+    }
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, response))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await getSmbShares('192.168.1.27')
+
+    expect(result.data.shares).toHaveLength(0)
+    expect(result.data.count).toBe(0)
+  })
+})
+
+describe('smb api error handling edge cases', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.restoreAllMocks()
+  })
+
+  it('handles error with nested error_details in data object', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(400, {
+        status: 'error',
+        data: {
+          error_details: 'Very specific error about share validation',
+        },
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(getSmbShares('192.168.1.27')).rejects.toThrow(
+      /Very specific error about share validation/
+    )
+  })
+
+  it('prefers error_details over other error fields', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(500, {
+        status: 'error',
+        message: 'Generic error',
+        error: 'Specific error',
+        data: {
+          error_details: 'Most specific error',
+        },
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(getSmbMounts()).rejects.toThrow(/Most specific error/)
+  })
+
+  it('uses message field if error_details not available', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(403, {
+        status: 'error',
+        message: 'Access denied for this user',
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(getSmbShares('192.168.1.27')).rejects.toThrow(
+      /Access denied.*Access denied for this user/
+    )
+  })
+
+  it('handles HTTP 429 with generic error message', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(429, {}))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(getSmbMounts()).rejects.toThrow(/failed.*HTTP 429/)
+  })
+
+  it('handles unparseable JSON error response', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      headers: new Headers(),
+      json: async () => {
+        throw new Error('Invalid JSON')
+      },
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(getSmbMounts()).rejects.toThrow(/failed with HTTP 500/)
+  })
+})
+
+describe('smb api retry logic edge cases', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.restoreAllMocks()
+  })
+
+  it('mountSmbShareWithRetry with all optional parameters', async () => {
+    const successResponse = { status: 'success', data: { id: 1 }, message: 'Added' }
+    const mountAllResponse = { status: 'success', data: {}, message: 'Mounted' }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, successResponse))
+      .mockResolvedValueOnce(jsonResponse(200, mountAllResponse))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await mountSmbShareWithRetry({
+      server: '192.168.1.27',
+      share: 'music',
+      mountpoint: '/custom/music',
+      user: 'admin',
+      password: 'secret',
+      version: '2.1',
+      uid: 1001,
+      gid: 1001,
+      file_mode: '0755',
+      dir_mode: '0755',
+    })
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.server).toBe('192.168.1.27')
+    expect(body.share).toBe('music')
+    expect(body.mountpoint).toBe('/custom/music')
+    expect(body.user).toBe('admin')
+    expect(body.password).toBe('secret')
+    expect(body.version).toBe('2.1')
+    expect(body.options).toContain('vers=2.1')
+    expect(body.options).toContain('uid=1001')
+    expect(body.options).toContain('gid=1001')
+  })
+
+  it('mountSmbShareWithRetry logs warning on first failure', async () => {
+    const failResponse = { status: 'error', message: 'Capability issue' }
+    const retrySuccessResponse = { status: 'success', data: { id: 1 }, message: 'Added' }
+    const mountAllResponse = { status: 'success', data: {}, message: 'Mounted' }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, failResponse))
+      .mockResolvedValueOnce(jsonResponse(200, retrySuccessResponse))
+      .mockResolvedValueOnce(jsonResponse(200, mountAllResponse))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await mountSmbShareWithRetry({ server: '192.168.1.27', share: 'music' })
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('First mount attempt failed'),
+      expect.stringContaining('Capability issue')
+    )
+    warnSpy.mockRestore()
+  })
+
+  it('mountSmbShareWithRetry with both failures returns last error', async () => {
+    const failResponse1 = { status: 'error', message: 'First failure' }
+    const failResponse2 = { status: 'error', message: 'Second failure' }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, failResponse1))
+      .mockResolvedValueOnce(jsonResponse(200, failResponse2))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await mountSmbShareWithRetry({ server: '192.168.1.27', share: 'music' })
+
+    expect(result.status).toBe('error')
+    expect(result.message).toBe('Second failure')
+  })
+})

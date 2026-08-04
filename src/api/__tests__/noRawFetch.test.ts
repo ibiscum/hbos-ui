@@ -49,7 +49,7 @@ describe('gated API calls go through apiFetch', () => {
     const offenders: string[] = []
 
     for (const file of collect(SRC)) {
-      const rel = relative(SRC, file).replaceAll('\\', '/')
+      const rel = relative(SRC, file).replace(/\\/g, '/')
       if (ALLOWED.has(rel)) continue
 
       const source = readFileSync(file, 'utf8')

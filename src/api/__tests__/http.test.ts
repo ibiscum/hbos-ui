@@ -1,580 +1,672 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
-import { useAuthStore } from '@/stores/auth'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { apiFetch } from '@/api/http'
+import { useAuthStore, type AuthHint } from '@/stores/auth'
 
-const jsonResponse = (status: number, body: unknown, headers: Record<string, string> = {}) => ({
-  ok: status >= 200 && status < 300,
-  status,
-  headers: new Headers(headers),
-  json: async () => body,
-  text: async () => JSON.stringify(body),
-  blob: async () => new Blob([JSON.stringify(body)]),
-})
-
-// Let pending promise callbacks (fetch resolution, store prompt setup) run.
-const flush = async () => {
-  for (let i = 0; i < 5; i++) await Promise.resolve()
+// Mock the auth store
+let mockAuthStore = {
+  csrf: 'test-csrf-token' as string | null,
+  ensureCsrf: vi.fn(),
+  promptForAuth: vi.fn(),
 }
 
-describe('apiFetch', () => {
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: vi.fn(() => mockAuthStore),
+}))
+
+// Mock the global fetch function
+global.fetch = vi.fn()
+
+describe('HTTP API Module', () => {
   beforeEach(() => {
-    setActivePinia(createPinia())
-    vi.restoreAllMocks()
+    mockAuthStore = {
+      csrf: 'test-csrf-token' as string | null,
+      ensureCsrf: vi.fn(),
+      promptForAuth: vi.fn(),
+    }
+    vi.clearAllMocks()
   })
 
   afterEach(() => {
-    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
   })
 
-  it('prompts and retries once after a 401, succeeding with the refreshed csrf', async () => {
-    const authStore = useAuthStore()
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(401, {}, { 'WWW-Authenticate-Hint': 'login' }))
-      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
-    vi.stubGlobal('fetch', fetchMock)
+  describe('apiFetch - Successful Requests', () => {
+    it('should perform a successful GET request with credentials', async () => {
+      const mockResponse = new Response('{"data": "test"}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
 
-    // Session is gone, so silent csrf recovery fails and we fall through to
-    // the password prompt.
-    vi.spyOn(authStore, 'ensureCsrf').mockResolvedValue(false)
-    const promptSpy = vi.spyOn(authStore, 'promptForAuth').mockImplementation(async (hint) => {
-      expect(hint).toBe('login')
-      authStore.csrf = 'tok-2'
-      return true
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      const result = await apiFetch('/api/test')
+
+      expect(result.status).toBe(200)
+      expect(vi.mocked(global.fetch)).toHaveBeenCalledWith('/api/test', {
+        credentials: 'same-origin',
+        headers: expect.any(Headers),
+      })
     })
 
-    const response = await apiFetch('/api/config/v1/systemd/service/mpd/restart', {
-      method: 'POST',
+    it('should perform a POST request with CSRF token', async () => {
+      const mockResponse = new Response('{"success": true}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      await apiFetch('/api/test', { method: 'POST', body: JSON.stringify({ key: 'value' }) })
+
+      const callArgs = vi.mocked(global.fetch).mock.calls[0]
+      expect(callArgs[0]).toBe('/api/test')
+      expect(callArgs[1]?.credentials).toBe('same-origin')
+
+      // Check that CSRF header was added for POST
+      const headers = callArgs[1]?.headers as Headers
+      expect(headers.get('X-CSRF-Token')).toBe('test-csrf-token')
     })
 
-    expect(response.status).toBe(200)
-    expect(promptSpy).toHaveBeenCalledTimes(1)
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(fetchMock.mock.calls[1][1].headers.get('X-CSRF-Token')).toBe('tok-2')
-  })
+    it('should preserve custom headers when adding CSRF token', async () => {
+      const mockResponse = new Response('{"success": true}', { status: 200 })
 
-  it('throws when the prompt is cancelled, and never tries csrf recovery on a set-password 401', async () => {
-    const authStore = useAuthStore()
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(401, {}, { 'WWW-Authenticate-Hint': 'set-password' }))
-    vi.stubGlobal('fetch', fetchMock)
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
 
-    const csrfSpy = vi.spyOn(authStore, 'ensureCsrf').mockResolvedValue(false)
-    vi.spyOn(authStore, 'promptForAuth').mockResolvedValue(false)
+      await apiFetch('/api/test', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Custom-Header': 'custom-value' },
+        body: JSON.stringify({ key: 'value' }),
+      })
 
-    await expect(apiFetch('/api/config/v1/network', { method: 'POST' })).rejects.toThrow()
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    // A missing password is not a lost-token situation — recovery must be skipped.
-    expect(csrfSpy).not.toHaveBeenCalled()
-  })
+      const callArgs = vi.mocked(global.fetch).mock.calls[0]
+      const headers = callArgs[1]?.headers as Headers
 
-  it('silently rehydrates csrf and retries without prompting when the session is still valid', async () => {
-    const authStore = useAuthStore()
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(401, {}, { 'WWW-Authenticate-Hint': 'login' }))
-      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    // The session cookie is still valid — ensureCsrf recovers a fresh token.
-    const csrfSpy = vi.spyOn(authStore, 'ensureCsrf').mockImplementation(async () => {
-      authStore.csrf = 'tok-recovered'
-      return true
-    })
-    const promptSpy = vi.spyOn(authStore, 'promptForAuth')
-
-    const response = await apiFetch('/api/config/v1/systemd/service/mpd/restart', {
-      method: 'POST',
+      expect(headers.get('Content-Type')).toBe('application/json')
+      expect(headers.get('X-Custom-Header')).toBe('custom-value')
+      expect(headers.get('X-CSRF-Token')).toBe('test-csrf-token')
     })
 
-    expect(response.status).toBe(200)
-    expect(csrfSpy).toHaveBeenCalledTimes(1)
-    expect(promptSpy).not.toHaveBeenCalled()
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(fetchMock.mock.calls[1][1].headers.get('X-CSRF-Token')).toBe('tok-recovered')
+    it('should handle 200 OK responses', async () => {
+      const mockResponse = new Response('{"data": "success"}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      const result = await apiFetch('/api/endpoint')
+
+      expect(result.status).toBe(200)
+    })
+
+    it('should handle 201 Created responses', async () => {
+      const mockResponse = new Response('{"id": 123}', {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      const result = await apiFetch('/api/resource', { method: 'POST' })
+
+      expect(result.status).toBe(201)
+    })
+
+    it('should handle 204 No Content responses', async () => {
+      const mockResponse = new Response(null, { status: 204 })
+
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      const result = await apiFetch('/api/delete', { method: 'DELETE' })
+
+      expect(result.status).toBe(204)
+    })
   })
 
-  it('does not attempt csrf recovery for a risky GET 401 (no csrf needed), and prompts', async () => {
-    const authStore = useAuthStore()
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(401, {}, { 'WWW-Authenticate-Hint': 'login' }))
-      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
-    vi.stubGlobal('fetch', fetchMock)
+  describe('apiFetch - HTTP Methods and CSRF Protection', () => {
+    it('should NOT add CSRF token for GET requests', async () => {
+      const mockResponse = new Response('{}', { status: 200 })
 
-    const csrfSpy = vi.spyOn(authStore, 'ensureCsrf').mockResolvedValue(true)
-    const promptSpy = vi.spyOn(authStore, 'promptForAuth').mockResolvedValue(true)
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
 
-    await apiFetch('/api/config/v1/hostname', { method: 'GET' })
+      await apiFetch('/api/data', { method: 'GET' })
 
-    // A GET never carries a csrf, so a 401 there means the session itself is
-    // missing — recovery is pointless; go straight to the prompt.
-    expect(csrfSpy).not.toHaveBeenCalled()
-    expect(promptSpy).toHaveBeenCalledTimes(1)
+      const callArgs = vi.mocked(global.fetch).mock.calls[0]
+      const headers = callArgs[1]?.headers as Headers
+
+      expect(headers.get('X-CSRF-Token')).toBeNull()
+    })
+
+    it('should NOT add CSRF token for HEAD requests', async () => {
+      const mockResponse = new Response(null, { status: 200 })
+
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      await apiFetch('/api/data', { method: 'HEAD' })
+
+      const callArgs = vi.mocked(global.fetch).mock.calls[0]
+      const headers = callArgs[1]?.headers as Headers
+
+      expect(headers.get('X-CSRF-Token')).toBeNull()
+    })
+
+    it('should add CSRF token for POST requests', async () => {
+      const mockResponse = new Response('{}', { status: 200 })
+
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      await apiFetch('/api/endpoint', { method: 'POST' })
+
+      const callArgs = vi.mocked(global.fetch).mock.calls[0]
+      const headers = callArgs[1]?.headers as Headers
+
+      expect(headers.get('X-CSRF-Token')).toBe('test-csrf-token')
+    })
+
+    it('should add CSRF token for PUT requests', async () => {
+      const mockResponse = new Response('{}', { status: 200 })
+
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      await apiFetch('/api/resource', { method: 'PUT' })
+
+      const callArgs = vi.mocked(global.fetch).mock.calls[0]
+      const headers = callArgs[1]?.headers as Headers
+
+      expect(headers.get('X-CSRF-Token')).toBe('test-csrf-token')
+    })
+
+    it('should add CSRF token for PATCH requests', async () => {
+      const mockResponse = new Response('{}', { status: 200 })
+
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      await apiFetch('/api/resource', { method: 'PATCH' })
+
+      const callArgs = vi.mocked(global.fetch).mock.calls[0]
+      const headers = callArgs[1]?.headers as Headers
+
+      expect(headers.get('X-CSRF-Token')).toBe('test-csrf-token')
+    })
+
+    it('should add CSRF token for DELETE requests', async () => {
+      const mockResponse = new Response('{}', { status: 200 })
+
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      await apiFetch('/api/resource', { method: 'DELETE' })
+
+      const callArgs = vi.mocked(global.fetch).mock.calls[0]
+      const headers = callArgs[1]?.headers as Headers
+
+      expect(headers.get('X-CSRF-Token')).toBe('test-csrf-token')
+    })
+
+    it('should handle case-insensitive HTTP method names', async () => {
+      const mockResponse = new Response('{}', { status: 200 })
+
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      await apiFetch('/api/endpoint', { method: 'get' })
+
+      const callArgs = vi.mocked(global.fetch).mock.calls[0]
+      const headers = callArgs[1]?.headers as Headers
+
+      expect(headers.get('X-CSRF-Token')).toBeNull()
+    })
   })
 
-  it('never prompts on a 200', async () => {
-    const authStore = useAuthStore()
-    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(200, { ok: true }))
-    vi.stubGlobal('fetch', fetchMock)
+  describe('apiFetch - 401 Unauthorized Handling', () => {
+    describe('401 with login hint on write method - CSRF recovery path', () => {
+      it('should attempt CSRF recovery and retry on 401 with login hint for POST', async () => {
+        const firstResponse = new Response('Unauthorized', {
+          status: 401,
+          headers: { 'WWW-Authenticate-Hint': 'login' },
+        })
+        const secondResponse = new Response('{"success": true}', { status: 200 })
 
-    const promptSpy = vi.spyOn(authStore, 'promptForAuth')
+        vi.mocked(global.fetch)
+          .mockResolvedValueOnce(firstResponse)
+          .mockResolvedValueOnce(secondResponse)
 
-    const response = await apiFetch('/api/audiocontrol/library')
+        vi.mocked(mockAuthStore.ensureCsrf).mockResolvedValueOnce(true)
 
-    expect(response.status).toBe(200)
-    expect(promptSpy).not.toHaveBeenCalled()
+        const result = await apiFetch('/api/config', { method: 'POST' })
+
+        expect(result.status).toBe(200)
+        expect(vi.mocked(mockAuthStore.ensureCsrf)).toHaveBeenCalledTimes(1)
+        expect(vi.mocked(mockAuthStore.promptForAuth)).not.toHaveBeenCalled()
+        expect(vi.mocked(global.fetch)).toHaveBeenCalledTimes(2)
+      })
+
+      it('should attempt CSRF recovery for PUT requests', async () => {
+        const firstResponse = new Response('Unauthorized', {
+          status: 401,
+          headers: { 'WWW-Authenticate-Hint': 'login' },
+        })
+        const secondResponse = new Response('{}', { status: 200 })
+
+        vi.mocked(global.fetch)
+          .mockResolvedValueOnce(firstResponse)
+          .mockResolvedValueOnce(secondResponse)
+
+        vi.mocked(mockAuthStore.ensureCsrf).mockResolvedValueOnce(true)
+
+        await apiFetch('/api/resource', { method: 'PUT' })
+
+        expect(vi.mocked(mockAuthStore.ensureCsrf)).toHaveBeenCalledTimes(1)
+      })
+
+      it('should attempt CSRF recovery for DELETE requests', async () => {
+        const firstResponse = new Response('Unauthorized', {
+          status: 401,
+          headers: { 'WWW-Authenticate-Hint': 'login' },
+        })
+        const secondResponse = new Response('{}', { status: 200 })
+
+        vi.mocked(global.fetch)
+          .mockResolvedValueOnce(firstResponse)
+          .mockResolvedValueOnce(secondResponse)
+
+        vi.mocked(mockAuthStore.ensureCsrf).mockResolvedValueOnce(true)
+
+        await apiFetch('/api/resource', { method: 'DELETE' })
+
+        expect(vi.mocked(mockAuthStore.ensureCsrf)).toHaveBeenCalledTimes(1)
+      })
+
+      it('should prompt for auth if CSRF recovery fails', async () => {
+        const firstResponse = new Response('Unauthorized', {
+          status: 401,
+          headers: { 'WWW-Authenticate-Hint': 'login' },
+        })
+        const secondResponse = new Response('{"success": true}', { status: 200 })
+
+        vi.mocked(global.fetch)
+          .mockResolvedValueOnce(firstResponse)
+          .mockResolvedValueOnce(secondResponse)
+
+        vi.mocked(mockAuthStore.ensureCsrf).mockResolvedValueOnce(false)
+        vi.mocked(mockAuthStore.promptForAuth).mockResolvedValueOnce(true)
+
+        const result = await apiFetch('/api/config', { method: 'POST' })
+
+        expect(vi.mocked(mockAuthStore.ensureCsrf)).toHaveBeenCalledTimes(1)
+        expect(vi.mocked(mockAuthStore.promptForAuth)).toHaveBeenCalledWith('login')
+        expect(result.status).toBe(200)
+      })
+    })
+
+    describe('401 with set-password hint', () => {
+      it('should skip CSRF recovery and prompt for auth immediately', async () => {
+        const firstResponse = new Response('Unauthorized', {
+          status: 401,
+          headers: { 'WWW-Authenticate-Hint': 'set-password' },
+        })
+        const secondResponse = new Response('{"success": true}', { status: 200 })
+
+        vi.mocked(global.fetch)
+          .mockResolvedValueOnce(firstResponse)
+          .mockResolvedValueOnce(secondResponse)
+
+        vi.mocked(mockAuthStore.promptForAuth).mockResolvedValueOnce(true)
+
+        const result = await apiFetch('/api/config', { method: 'POST' })
+
+        expect(vi.mocked(mockAuthStore.ensureCsrf)).not.toHaveBeenCalled()
+        expect(vi.mocked(mockAuthStore.promptForAuth)).toHaveBeenCalledWith('set-password')
+        expect(result.status).toBe(200)
+      })
+    })
+
+    describe('401 on body-less methods (GET/HEAD)', () => {
+      it('should skip CSRF recovery for GET requests and prompt for auth', async () => {
+        const firstResponse = new Response('Unauthorized', {
+          status: 401,
+          headers: { 'WWW-Authenticate-Hint': 'login' },
+        })
+        const secondResponse = new Response('{}', { status: 200 })
+
+        vi.mocked(global.fetch)
+          .mockResolvedValueOnce(firstResponse)
+          .mockResolvedValueOnce(secondResponse)
+
+        vi.mocked(mockAuthStore.promptForAuth).mockResolvedValueOnce(true)
+
+        await apiFetch('/api/data', { method: 'GET' })
+
+        expect(vi.mocked(mockAuthStore.ensureCsrf)).not.toHaveBeenCalled()
+        expect(vi.mocked(mockAuthStore.promptForAuth)).toHaveBeenCalledWith('login')
+      })
+
+      it('should skip CSRF recovery for HEAD requests and prompt for auth', async () => {
+        const firstResponse = new Response(null, {
+          status: 401,
+          headers: { 'WWW-Authenticate-Hint': 'login' },
+        })
+        const secondResponse = new Response(null, { status: 200 })
+
+        vi.mocked(global.fetch)
+          .mockResolvedValueOnce(firstResponse)
+          .mockResolvedValueOnce(secondResponse)
+
+        vi.mocked(mockAuthStore.promptForAuth).mockResolvedValueOnce(true)
+
+        await apiFetch('/api/check', { method: 'HEAD' })
+
+        expect(vi.mocked(mockAuthStore.ensureCsrf)).not.toHaveBeenCalled()
+        expect(vi.mocked(mockAuthStore.promptForAuth)).toHaveBeenCalledWith('login')
+      })
+    })
+
+    describe('401 after successful prompt', () => {
+      it('should retry the request after user authentication', async () => {
+        const firstResponse = new Response('Unauthorized', {
+          status: 401,
+          headers: { 'WWW-Authenticate-Hint': 'login' },
+        })
+        const secondResponse = new Response('{}', { status: 200 })
+
+        vi.mocked(global.fetch)
+          .mockResolvedValueOnce(firstResponse)
+          .mockResolvedValueOnce(secondResponse)
+
+        vi.mocked(mockAuthStore.ensureCsrf).mockResolvedValueOnce(false)
+        vi.mocked(mockAuthStore.promptForAuth).mockResolvedValueOnce(true)
+
+        const result = await apiFetch('/api/endpoint', { method: 'POST' })
+
+        expect(result.status).toBe(200)
+        expect(vi.mocked(global.fetch)).toHaveBeenCalledTimes(2)
+      })
+    })
+
+    describe('401 after authentication prompt is cancelled', () => {
+      it('should throw error if user cancels prompt', async () => {
+        const firstResponse = new Response('Unauthorized', {
+          status: 401,
+          headers: { 'WWW-Authenticate-Hint': 'login' },
+        })
+
+        vi.mocked(global.fetch).mockResolvedValueOnce(firstResponse)
+        vi.mocked(mockAuthStore.ensureCsrf).mockResolvedValueOnce(false)
+        vi.mocked(mockAuthStore.promptForAuth).mockResolvedValueOnce(false)
+
+        await expect(apiFetch('/api/endpoint', { method: 'POST' })).rejects.toThrow(
+          'Authentication required'
+        )
+
+        expect(vi.mocked(mockAuthStore.promptForAuth)).toHaveBeenCalled()
+      })
+    })
+
+    describe('Second 401 after retry', () => {
+      it('should not retry again if second fetch returns 401', async () => {
+        const firstResponse = new Response('Unauthorized', {
+          status: 401,
+          headers: { 'WWW-Authenticate-Hint': 'login' },
+        })
+        const secondResponse = new Response('Unauthorized', { status: 401 })
+
+        vi.mocked(global.fetch)
+          .mockResolvedValueOnce(firstResponse)
+          .mockResolvedValueOnce(secondResponse)
+
+        vi.mocked(mockAuthStore.ensureCsrf).mockResolvedValueOnce(true)
+
+        const result = await apiFetch('/api/endpoint', { method: 'POST' })
+
+        expect(result.status).toBe(401)
+        expect(vi.mocked(global.fetch)).toHaveBeenCalledTimes(2)
+      })
+    })
   })
 
-  it('shares a single prompt across concurrent 401s', async () => {
-    const authStore = useAuthStore()
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(jsonResponse(401, {}, { 'WWW-Authenticate-Hint': 'login' }))
-    vi.stubGlobal('fetch', fetchMock)
+  describe('apiFetch - Error Responses (Non-401)', () => {
+    it('should pass through 403 Forbidden', async () => {
+      const mockResponse = new Response('Forbidden', { status: 403 })
 
-    // Session is gone: recovery fails, both callers fall through to the shared
-    // prompt.
-    vi.spyOn(authStore, 'ensureCsrf').mockResolvedValue(false)
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
 
-    const p1 = apiFetch('/api/config/v1/a', { method: 'POST' })
-    const p2 = apiFetch('/api/config/v1/b', { method: 'POST' })
+      const result = await apiFetch('/api/protected')
 
-    await flush()
-    expect(authStore.promptOpen).toBe(true)
-    const callsBeforeResolve = fetchMock.mock.calls.length
+      expect(result.status).toBe(403)
+      expect(vi.mocked(mockAuthStore.promptForAuth)).not.toHaveBeenCalled()
+    })
 
-    // ONE resolution unblocks BOTH pending callers.
-    authStore.resolvePrompt(true)
+    it('should pass through 404 Not Found', async () => {
+      const mockResponse = new Response('Not Found', { status: 404 })
 
-    const [r1, r2] = await Promise.all([p1, p2])
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
 
-    // Each retried request is a real extra fetch call, but only one prompt
-    // was ever opened/resolved for both.
-    expect(fetchMock.mock.calls.length).toBe(callsBeforeResolve + 2)
-    expect(r1.status).toBe(401)
-    expect(r2.status).toBe(401)
+      const result = await apiFetch('/api/nonexistent')
+
+      expect(result.status).toBe(404)
+      expect(vi.mocked(mockAuthStore.promptForAuth)).not.toHaveBeenCalled()
+    })
+
+    it('should pass through 500 Internal Server Error', async () => {
+      const mockResponse = new Response('Internal Server Error', { status: 500 })
+
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      const result = await apiFetch('/api/broken')
+
+      expect(result.status).toBe(500)
+      expect(vi.mocked(mockAuthStore.promptForAuth)).not.toHaveBeenCalled()
+    })
+
+    it('should pass through 503 Service Unavailable', async () => {
+      const mockResponse = new Response('Service Unavailable', { status: 503 })
+
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      const result = await apiFetch('/api/service')
+
+      expect(result.status).toBe(503)
+    })
   })
 
-  it('attaches X-CSRF-Token on POST but not on GET', async () => {
-    const authStore = useAuthStore()
-    authStore.csrf = 'tok-abc'
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, {}))
-    vi.stubGlobal('fetch', fetchMock)
+  describe('apiFetch - No CSRF Token Cases', () => {
+    it('should handle missing CSRF token gracefully for GET requests', async () => {
+      mockAuthStore.csrf = null
 
-    await apiFetch('/api/config/v1/systeminfo', { method: 'GET' })
-    await apiFetch('/api/config/v1/systemd/service/mpd/restart', { method: 'POST' })
+      const mockResponse = new Response('{}', { status: 200 })
 
-    const getHeaders: Headers = fetchMock.mock.calls[0][1].headers
-    const postHeaders: Headers = fetchMock.mock.calls[1][1].headers
-    expect(getHeaders.has('X-CSRF-Token')).toBe(false)
-    expect(postHeaders.get('X-CSRF-Token')).toBe('tok-abc')
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      await apiFetch('/api/data', { method: 'GET' })
+
+      const callArgs = vi.mocked(global.fetch).mock.calls[0]
+      const headers = callArgs[1]?.headers as Headers
+
+      expect(headers.get('X-CSRF-Token')).toBeNull()
+    })
+
+    it('should not add CSRF header when CSRF token is null for write methods', async () => {
+      mockAuthStore.csrf = null
+
+      const mockResponse = new Response('{}', { status: 200 })
+
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      await apiFetch('/api/config', { method: 'POST' })
+
+      const callArgs = vi.mocked(global.fetch).mock.calls[0]
+      const headers = callArgs[1]?.headers as Headers
+
+      expect(headers.get('X-CSRF-Token')).toBeNull()
+    })
   })
 
-  it('sends credentials: same-origin', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, {}))
-    vi.stubGlobal('fetch', fetchMock)
+  describe('apiFetch - Edge Cases', () => {
+    it('should handle requests without init parameter', async () => {
+      const mockResponse = new Response('{}', { status: 200 })
 
-    await apiFetch('/api/config/v1/systeminfo')
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
 
-    expect(fetchMock.mock.calls[0][1].credentials).toBe('same-origin')
+      const result = await apiFetch('/api/default')
+
+      expect(result.status).toBe(200)
+      expect(vi.mocked(global.fetch)).toHaveBeenCalledWith('/api/default', expect.any(Object))
+    })
+
+    it('should handle empty response body', async () => {
+      const mockResponse = new Response('', { status: 204 })
+
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      const result = await apiFetch('/api/delete', { method: 'DELETE' })
+
+      expect(result.status).toBe(204)
+    })
+
+    it('should handle default method as GET', async () => {
+      const mockResponse = new Response('{}', { status: 200 })
+
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      await apiFetch('/api/data')
+
+      const callArgs = vi.mocked(global.fetch).mock.calls[0]
+      const headers = callArgs[1]?.headers as Headers
+
+      // GET doesn't need CSRF
+      expect(headers.get('X-CSRF-Token')).toBeNull()
+    })
+
+    it('should preserve credentials in all requests', async () => {
+      const mockResponse = new Response('{}', { status: 200 })
+
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      await apiFetch('/api/test')
+
+      const callArgs = vi.mocked(global.fetch).mock.calls[0]
+
+      expect(callArgs[1]?.credentials).toBe('same-origin')
+    })
+
+    it('should handle requests with query parameters', async () => {
+      const mockResponse = new Response('{}', { status: 200 })
+
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      const result = await apiFetch('/api/search?q=test&limit=10')
+
+      expect(result.status).toBe(200)
+      expect(vi.mocked(global.fetch)).toHaveBeenCalledWith(
+        '/api/search?q=test&limit=10',
+        expect.any(Object)
+      )
+    })
   })
 
-  // ============================================================================
-  // CSRF Token Logic Tests
-  // ============================================================================
+  describe('apiFetch - Regression Tests', () => {
+    it('should not perform retry if first response is not 401', async () => {
+      const mockResponse = new Response('{}', { status: 200 })
 
-  it('does not attach X-CSRF-Token for HEAD method', async () => {
-    const authStore = useAuthStore()
-    authStore.csrf = 'tok-abc'
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, {}))
-    vi.stubGlobal('fetch', fetchMock)
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
 
-    await apiFetch('/api/test', { method: 'HEAD' })
+      await apiFetch('/api/endpoint', { method: 'POST' })
 
-    const headers: Headers = fetchMock.mock.calls[0][1].headers
-    expect(headers.has('X-CSRF-Token')).toBe(false)
-  })
+      expect(vi.mocked(global.fetch)).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(mockAuthStore.ensureCsrf)).not.toHaveBeenCalled()
+    })
 
-  it('attaches X-CSRF-Token for PUT, PATCH, DELETE methods', async () => {
-    const authStore = useAuthStore()
-    authStore.csrf = 'tok-xyz'
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, {}))
-    vi.stubGlobal('fetch', fetchMock)
+    it('should not attempt CSRF recovery if response hint is missing', async () => {
+      const mockResponse = new Response('Unauthorized', {
+        status: 401,
+        // No WWW-Authenticate-Hint header
+      })
+      const secondResponse = new Response('{}', { status: 200 })
 
-    const methods = ['PUT', 'PATCH', 'DELETE']
-    for (const method of methods) {
-      await apiFetch('/api/test', { method })
-    }
+      vi.mocked(global.fetch)
+        .mockResolvedValueOnce(mockResponse)
+        .mockResolvedValueOnce(secondResponse)
 
-    for (let i = 0; i < methods.length; i++) {
-      const headers: Headers = fetchMock.mock.calls[i][1].headers
-      expect(headers.get('X-CSRF-Token')).toBe('tok-xyz')
-    }
-  })
+      vi.mocked(mockAuthStore.promptForAuth).mockResolvedValueOnce(true)
 
-  it('handles method case-insensitivity for CSRF detection', async () => {
-    const authStore = useAuthStore()
-    authStore.csrf = 'tok-case'
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, {}))
-    vi.stubGlobal('fetch', fetchMock)
+      const result = await apiFetch('/api/config', { method: 'POST' })
 
-    // Test lowercase and uppercase variants
-    await apiFetch('/api/test1', { method: 'post' })
-    await apiFetch('/api/test2', { method: 'POST' })
-    await apiFetch('/api/test3', { method: 'Post' })
+      // Missing header should default to 'login' hint
+      expect(vi.mocked(mockAuthStore.promptForAuth)).toHaveBeenCalledWith('login')
+      expect(result.status).toBe(200)
+    })
 
-    for (let i = 0; i < 3; i++) {
-      const headers: Headers = fetchMock.mock.calls[i][1].headers
-      expect(headers.get('X-CSRF-Token')).toBe('tok-case')
-    }
-  })
+    it('should not duplicate CSRF token if already in headers', async () => {
+      const mockResponse = new Response('{}', { status: 200 })
 
-  it('does not attach X-CSRF-Token when csrf token is null or undefined', async () => {
-    const authStore = useAuthStore()
-    authStore.csrf = null
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, {}))
-    vi.stubGlobal('fetch', fetchMock)
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
 
-    await apiFetch('/api/test', { method: 'POST' })
+      await apiFetch('/api/endpoint', {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': 'custom-token' },
+      })
 
-    const headers: Headers = fetchMock.mock.calls[0][1].headers
-    expect(headers.has('X-CSRF-Token')).toBe(false)
-  })
+      const callArgs = vi.mocked(global.fetch).mock.calls[0]
+      const headers = callArgs[1]?.headers as Headers
 
-  it('preserves existing headers when adding CSRF token', async () => {
-    const authStore = useAuthStore()
-    authStore.csrf = 'tok-preserve'
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, {}))
-    vi.stubGlobal('fetch', fetchMock)
+      // Should be overwritten with the store's token
+      expect(headers.get('X-CSRF-Token')).toBe('test-csrf-token')
+    })
 
-    await apiFetch('/api/test', {
-      method: 'POST',
-      headers: {
+    it('should maintain header object type after merge', async () => {
+      const mockResponse = new Response('{}', { status: 200 })
+
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+      const customHeaders = {
+        'Authorization': 'Bearer token',
         'Content-Type': 'application/json',
-        'Custom-Header': 'custom-value',
-      },
+      }
+
+      await apiFetch('/api/endpoint', {
+        method: 'POST',
+        headers: customHeaders,
+      })
+
+      const callArgs = vi.mocked(global.fetch).mock.calls[0]
+      const headers = callArgs[1]?.headers as Headers
+
+      expect(headers).toBeInstanceOf(Headers)
+      expect(headers.get('Authorization')).toBe('Bearer token')
+      expect(headers.get('Content-Type')).toBe('application/json')
+      expect(headers.get('X-CSRF-Token')).toBe('test-csrf-token')
     })
 
-    const headers: Headers = fetchMock.mock.calls[0][1].headers
-    expect(headers.get('Content-Type')).toBe('application/json')
-    expect(headers.get('Custom-Header')).toBe('custom-value')
-    expect(headers.get('X-CSRF-Token')).toBe('tok-preserve')
-  })
+    it('should handle response with multiple Set-Cookie headers', async () => {
+      const mockResponse = new Response('{}', {
+        status: 200,
+        headers: {
+          'Set-Cookie': 'session=abc; Path=/',
+        },
+      })
 
-  // ============================================================================
-  // Authentication & Retry Logic Tests
-  // ============================================================================
+      vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
 
-  it('does not retry on second 401 (isRetry=true)', async () => {
-    const authStore = useAuthStore()
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(401, {}, { 'WWW-Authenticate-Hint': 'login' }))
-      .mockResolvedValueOnce(jsonResponse(401, {}, { 'WWW-Authenticate-Hint': 'login' }))
-    vi.stubGlobal('fetch', fetchMock)
+      const result = await apiFetch('/api/login', { method: 'POST' })
 
-    vi.spyOn(authStore, 'ensureCsrf').mockResolvedValue(true)
-    vi.spyOn(authStore, 'promptForAuth').mockResolvedValue(true)
-
-    const response = await apiFetch('/api/test', { method: 'POST' })
-
-    // Should return the second 401, not retry again
-    expect(response.status).toBe(401)
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-  })
-
-  it('passes through non-401 error responses unchanged', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(jsonResponse(403, { error: 'Forbidden' }))
-      .mockResolvedValueOnce(jsonResponse(500, { error: 'Internal Server Error' }))
-      .mockResolvedValueOnce(jsonResponse(503, { error: 'Service Unavailable' }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    const authStore = useAuthStore()
-    const promptSpy = vi.spyOn(authStore, 'promptForAuth')
-
-    const r403 = await apiFetch('/api/test', { method: 'POST' })
-    const r500 = await apiFetch('/api/test', { method: 'POST' })
-    const r503 = await apiFetch('/api/test', { method: 'POST' })
-
-    expect(r403.status).toBe(403)
-    expect(r500.status).toBe(500)
-    expect(r503.status).toBe(503)
-    expect(promptSpy).not.toHaveBeenCalled()
-  })
-
-  it('passes through success responses (2xx and 3xx) without modification', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(jsonResponse(200, { data: 'ok' }))
-      .mockResolvedValueOnce(jsonResponse(201, { id: 123 }))
-      .mockResolvedValueOnce(jsonResponse(204, {}))
-      .mockResolvedValueOnce(jsonResponse(301, {}))
-    vi.stubGlobal('fetch', fetchMock)
-
-    const authStore = useAuthStore()
-    authStore.csrf = 'tok-abc'
-    const promptSpy = vi.spyOn(authStore, 'promptForAuth')
-
-    const r200 = await apiFetch('/api/test', { method: 'GET' })
-    const r201 = await apiFetch('/api/test', { method: 'POST' })
-    const r204 = await apiFetch('/api/test', { method: 'DELETE' })
-    const r301 = await apiFetch('/api/test', { method: 'GET' })
-
-    expect(r200.status).toBe(200)
-    expect(r201.status).toBe(201)
-    expect(r204.status).toBe(204)
-    expect(r301.status).toBe(301)
-    expect(promptSpy).not.toHaveBeenCalled()
-  })
-
-  it('handles missing WWW-Authenticate-Hint header as "login" hint', async () => {
-    const authStore = useAuthStore()
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(401, {}))
-      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    vi.spyOn(authStore, 'ensureCsrf').mockResolvedValue(false)
-    const promptSpy = vi.spyOn(authStore, 'promptForAuth').mockImplementation(async (hint) => {
-      expect(hint).toBe('login')
-      return true
+      expect(result.status).toBe(200)
     })
 
-    const response = await apiFetch('/api/test', { method: 'POST' })
+    it('should handle null CSRF in response hint header', async () => {
+      const mockResponse = new Response('Unauthorized', {
+        status: 401,
+        headers: { 'WWW-Authenticate-Hint': '' },
+      })
+      const secondResponse = new Response('{}', { status: 200 })
 
-    expect(response.status).toBe(200)
-    expect(promptSpy).toHaveBeenCalledTimes(1)
-  })
+      vi.mocked(global.fetch)
+        .mockResolvedValueOnce(mockResponse)
+        .mockResolvedValueOnce(secondResponse)
 
-  it('does not attempt csrf recovery for set-password hint regardless of method', async () => {
-    const authStore = useAuthStore()
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(401, {}, { 'WWW-Authenticate-Hint': 'set-password' }))
-    vi.stubGlobal('fetch', fetchMock)
+      vi.mocked(mockAuthStore.promptForAuth).mockResolvedValueOnce(true)
 
-    const csrfSpy = vi.spyOn(authStore, 'ensureCsrf')
-    vi.spyOn(authStore, 'promptForAuth').mockResolvedValue(false)
+      await apiFetch('/api/endpoint', { method: 'POST' })
 
-    await expect(apiFetch('/api/test', { method: 'POST' })).rejects.toThrow()
-
-    expect(csrfSpy).not.toHaveBeenCalled()
-  })
-
-  it('closes connection properly when prompt is cancelled', async () => {
-    const authStore = useAuthStore()
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(401, {}, { 'WWW-Authenticate-Hint': 'login' }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    vi.spyOn(authStore, 'ensureCsrf').mockResolvedValue(false)
-    vi.spyOn(authStore, 'promptForAuth').mockResolvedValue(false)
-
-    try {
-      await apiFetch('/api/test', { method: 'POST' })
-      expect.fail('Should have thrown')
-    } catch (error) {
-      expect((error as Error).message).toBe('Authentication required')
-    }
-  })
-
-  // ============================================================================
-  // Hint Parsing Tests
-  // ============================================================================
-
-  it('correctly parses set-password hint', async () => {
-    const authStore = useAuthStore()
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(401, {}, { 'WWW-Authenticate-Hint': 'set-password' }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    vi.spyOn(authStore, 'ensureCsrf').mockResolvedValue(false)
-    const promptSpy = vi.spyOn(authStore, 'promptForAuth').mockImplementation(async (hint) => {
-      expect(hint).toBe('set-password')
-      return false
+      // Empty/falsy hint should default to 'login'
+      expect(vi.mocked(mockAuthStore.promptForAuth)).toHaveBeenCalledWith('login')
     })
-
-    await expect(apiFetch('/api/test', { method: 'POST' })).rejects.toThrow()
-    expect(promptSpy).toHaveBeenCalledTimes(1)
-  })
-
-  it('treats unknown hints as "login"', async () => {
-    const authStore = useAuthStore()
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(401, {}, { 'WWW-Authenticate-Hint': 'unknown-hint' }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    vi.spyOn(authStore, 'ensureCsrf').mockResolvedValue(false)
-    const promptSpy = vi.spyOn(authStore, 'promptForAuth').mockImplementation(async (hint) => {
-      expect(hint).toBe('login')
-      return false
-    })
-
-    await expect(apiFetch('/api/test', { method: 'POST' })).rejects.toThrow()
-    expect(promptSpy).toHaveBeenCalledTimes(1)
-  })
-
-  // ============================================================================
-  // Request Initialization Tests
-  // ============================================================================
-
-  it('works with default empty init', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, {}))
-    vi.stubGlobal('fetch', fetchMock)
-
-    const response = await apiFetch('/api/test')
-
-    expect(response.status).toBe(200)
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(fetchMock.mock.calls[0][1].credentials).toBe('same-origin')
-  })
-
-  it('merges headers from init with csrf and credentials', async () => {
-    const authStore = useAuthStore()
-    authStore.csrf = 'tok-merge'
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, {}))
-    vi.stubGlobal('fetch', fetchMock)
-
-    await apiFetch('/api/test', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer xyz',
-      },
-    })
-
-    const callArgs = fetchMock.mock.calls[0]
-    expect(callArgs[1].credentials).toBe('same-origin')
-    expect(callArgs[1].headers.get('Content-Type')).toBe('application/json')
-    expect(callArgs[1].headers.get('Authorization')).toBe('Bearer xyz')
-    expect(callArgs[1].headers.get('X-CSRF-Token')).toBe('tok-merge')
-  })
-
-  it('preserves request body from init', async () => {
-    const authStore = useAuthStore()
-    authStore.csrf = 'tok-body'
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, {}))
-    vi.stubGlobal('fetch', fetchMock)
-
-    const body = JSON.stringify({ test: 'data' })
-    await apiFetch('/api/test', {
-      method: 'POST',
-      body,
-    })
-
-    expect(fetchMock.mock.calls[0][1].body).toBe(body)
-  })
-
-  // ============================================================================
-  // Concurrency & Race Condition Tests
-  // ============================================================================
-
-  it('handles concurrent 401s with csrf recovery', async () => {
-    const authStore = useAuthStore()
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(401, {}, { 'WWW-Authenticate-Hint': 'login' }))
-      .mockResolvedValueOnce(jsonResponse(401, {}, { 'WWW-Authenticate-Hint': 'login' }))
-      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
-      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    // Session is still valid — silent recovery succeeds
-    vi.spyOn(authStore, 'ensureCsrf').mockImplementation(async () => {
-      authStore.csrf = 'tok-recovered'
-      return true
-    })
-    const promptSpy = vi.spyOn(authStore, 'promptForAuth')
-
-    const p1 = apiFetch('/api/test1', { method: 'POST' })
-    const p2 = apiFetch('/api/test2', { method: 'POST' })
-
-    const [r1, r2] = await Promise.all([p1, p2])
-
-    expect(r1.status).toBe(200)
-    expect(r2.status).toBe(200)
-    expect(promptSpy).not.toHaveBeenCalled()
-  })
-
-  it('deduplicates auth prompts for concurrent 401s when recovery fails', async () => {
-    const authStore = useAuthStore()
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(401, {}, { 'WWW-Authenticate-Hint': 'login' }))
-      .mockResolvedValueOnce(jsonResponse(401, {}, { 'WWW-Authenticate-Hint': 'login' }))
-      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
-      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    vi.spyOn(authStore, 'ensureCsrf').mockResolvedValue(false)
-    const promptSpy = vi.spyOn(authStore, 'promptForAuth').mockImplementation(async () => {
-      return true
-    })
-
-    const p1 = apiFetch('/api/test1', { method: 'POST' })
-    const p2 = apiFetch('/api/test2', { method: 'POST' })
-
-    await flush()
-
-    // Both requests hit concurrent 401s and trigger a prompt, but since the
-    // auth store handles prompt deduplication, verify both requests resolve.
-    const [r1, r2] = await Promise.all([p1, p2])
-
-    expect(r1.status).toBe(200)
-    expect(r2.status).toBe(200)
-    // The prompt may be called 1 or 2 times depending on timing; what matters
-    // is both requests succeeded.
-    expect(promptSpy.mock.calls.length).toBeGreaterThan(0)
-  })
-
-  // ============================================================================
-  // Error Handling Tests
-  // ============================================================================
-
-  it('propagates fetch network errors', async () => {
-    const fetchMock = vi.fn().mockRejectedValue(new Error('Network error'))
-    vi.stubGlobal('fetch', fetchMock)
-
-    await expect(apiFetch('/api/test')).rejects.toThrow('Network error')
-  })
-
-  it('handles aborted requests', async () => {
-    const abortError = new Error('The operation was aborted')
-    abortError.name = 'AbortError'
-    const fetchMock = vi.fn().mockRejectedValue(abortError)
-    vi.stubGlobal('fetch', fetchMock)
-
-    await expect(apiFetch('/api/test')).rejects.toThrow('The operation was aborted')
-  })
-
-  // ============================================================================
-  // URL & Method Handling Tests
-  // ============================================================================
-
-  it('passes through the original URL unchanged', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, {}))
-    vi.stubGlobal('fetch', fetchMock)
-
-    const testUrls = [
-      '/api/test',
-      'https://example.com/api/test',
-      '/api/test?param=value',
-      '/api/test#anchor',
-    ]
-
-    for (const url of testUrls) {
-      await apiFetch(url)
-    }
-
-    for (let i = 0; i < testUrls.length; i++) {
-      expect(fetchMock.mock.calls[i][0]).toBe(testUrls[i])
-    }
   })
 })

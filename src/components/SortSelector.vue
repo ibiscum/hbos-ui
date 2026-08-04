@@ -23,7 +23,6 @@
       >
         Artist
       </button>
-
     </div>
   </div>
 </template>
@@ -39,19 +38,17 @@ interface SortSelectorProps {
 const props = defineProps<SortSelectorProps>()
 
 const emit = defineEmits<{
-  sortByChange: [value: 'release_date' | 'artist' | 'random']
-  toggleOrder: []
+  'sort-by-change': [value: 'release_date' | 'artist']
+  'toggle-order': []
 }>()
 
-const handleSortByChange = (newSortBy: 'release_date' | 'artist' | 'random') => {
+const handleSortByChange = (newSortBy: 'release_date' | 'artist') => {
+  emit('sort-by-change', newSortBy)
+
   if (newSortBy === 'release_date') {
-    emit('sortByChange', newSortBy)
     if (props.sortBy === 'release_date') {
-      emit('toggleOrder')
+      emit('toggle-order')
     }
-  } else {
-    // artist and random: just emit (random always reshuffles in the store)
-    emit('sortByChange', newSortBy)
   }
 }
 </script>

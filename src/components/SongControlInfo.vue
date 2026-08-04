@@ -49,7 +49,7 @@
       <AudioControlsHeader v-if="isOnHeader" />
       <AudioControls v-else isSeparate :isOnSticky="isOnSticky" />
 
-      <ProgressControl v-if="!isOnSticky" isOnHeader isDraggable />
+      <ProgressControl v-if="!isOnSticky" :isOnHeader="isOnHeader" isDraggable />
     </div>
   </div>
 </template>
@@ -65,17 +65,17 @@ import CustomMarquee from '@/components/CustomMarquee.vue'
 import MetadataTooltip from '@/components/MetadataTooltip.vue'
 
 import { storeToRefs } from 'pinia'
-import { usePlayerStore } from '@/stores/player.ts'
+import { usePlayerStore } from '@/stores/player'
 
 const router = useRouter()
 const { currentSong: song } = storeToRefs(usePlayerStore())
 
-interface AudioSongControlInfoProps {
+interface SongControlInfoProps {
   isOnSticky?: boolean
   isOnHeader?: boolean
 }
 
-const { isOnSticky = false, isOnHeader = false } = defineProps<AudioSongControlInfoProps>()
+const { isOnSticky = false, isOnHeader = false } = defineProps<SongControlInfoProps>()
 
 const goToNowPlaying = () => {
   router.push({ name: 'now-playing' })
@@ -175,10 +175,6 @@ const tooltipStyles = computed(() => {
       p {
         color: var(--color-body-primary);
       }
-    }
-
-    &__attr {
-      flex: 1;
     }
   }
 

@@ -220,7 +220,7 @@ describe('albums.vue', () => {
     it('renders genre dropdown only when genres exist', async () => {
       const { useAlbumStore } = await import('@/stores/album')
       const albumStore = useAlbumStore()
-      albumStore.genres.value = ['Rock', 'Pop']
+      albumStore.genres = ['Rock', 'Pop']
 
       const Albums = await import('@/views/library/albums/albums.vue')
       const wrapper = mount(Albums.default, {
@@ -339,7 +339,7 @@ describe('albums.vue', () => {
     it('toggles sort order only for release_date', async () => {
       const { useAlbumStore } = await import('@/stores/album')
       const albumStore = useAlbumStore()
-      albumStore.sortBy.value = 'release_date'
+      albumStore.sortBy = 'release_date'
 
       const Albums = await import('@/views/library/albums/albums.vue')
       const wrapper = mount(Albums.default, {
@@ -373,8 +373,8 @@ describe('albums.vue', () => {
     it('toggles genre selection', async () => {
       const { useAlbumStore } = await import('@/stores/album')
       const albumStore = useAlbumStore()
-      albumStore.genres.value = ['Rock', 'Pop']
-      albumStore.selectedGenres.value = []
+      albumStore.genres = ['Rock', 'Pop']
+      albumStore.selectedGenres = []
 
       const Albums = await import('@/views/library/albums/albums.vue')
       const wrapper = mount(Albums.default, {
@@ -406,7 +406,7 @@ describe('albums.vue', () => {
     it('opens and closes genre dropdown', async () => {
       const { useAlbumStore } = await import('@/stores/album')
       const albumStore = useAlbumStore()
-      albumStore.genres.value = ['Rock', 'Pop']
+      albumStore.genres = ['Rock', 'Pop']
 
       const Albums = await import('@/views/library/albums/albums.vue')
       const wrapper = mount(Albums.default, {

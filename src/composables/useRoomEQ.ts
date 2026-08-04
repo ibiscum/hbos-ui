@@ -6,7 +6,7 @@ import { ref, type Ref } from 'vue';
 import { type Filter } from '@/utils/filtercalc';
 import { type BiquadFilterType } from '@/utils/biquad';
 import { getConfigKeys, getConfigValue } from '@/api/config';
-import { useFilterStore } from '@/stores/filter_connector';
+import { useFilterStore } from '@/stores/filter-connector';
 import { useToastStore } from '@/stores/toast';
 import { convertUIFilterToStore } from '@/utils/filter-conversions';
 import { formatFilterTypeName } from '@/utils/filter-display';

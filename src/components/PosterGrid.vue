@@ -23,11 +23,11 @@
       </template>
     </div>
 
-    <div v-if="loaded && items.length === 0" class="no-items">
+    <div v-if="loaded && !loading && items.length === 0" class="no-items">
       <div v-if="isLibraryUpdating" class="library-updating">
         <div class="updating-content">
           <div class="loading-icon">
-            <Icon name="loading" />
+            <Icon icon="loading" />
           </div>
           <div class="updating-text">
             <div class="primary-text">Library update still running</div>
@@ -57,7 +57,7 @@ interface PosterGridProps<T> {
   items: T[]
   inRow?: boolean
   posterForm?: 'circle' | 'square'
-  showAll?: boolean // New prop to disable pagination
+  showAll?: boolean // Disable pagination and render all items.
 }
 
 const {
@@ -95,8 +95,6 @@ const chunkSize = ref(getChunkSize())
 const currentPage = ref<number>(0)
 const data = ref<T[]>([]) as Ref<T[]>
 
-const scrolledToBottom = ref<boolean>(false)
-
 // Calculate how many items fit based on screen size
 const getMaxItemsForRow = () => {
   if (!inRow) return 20 // For grid view, keep existing behavior
@@ -128,6 +126,9 @@ function loadNextChunk() {
   } else {
     if (items.length > 0) {
       const start = currentPage.value * chunkSize.value
+      if (start >= items.length) {
+        return
+      }
       const end = start + chunkSize.value
       const nextChunk = items.slice(start, end)
 
@@ -146,10 +147,7 @@ function handleScroll() {
   const scrollPosition = window.innerHeight + window.scrollY + scrollBuffer
 
   if (scrollPosition >= document.body.scrollHeight) {
-    scrolledToBottom.value = true
     loadNextChunk()
-  } else {
-    scrolledToBottom.value = false
   }
 }
 

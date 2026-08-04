@@ -44,8 +44,8 @@ const discoverableCountdown = ref(60)
 const countdownInterval = ref<number | null>(null)
 const isCountdownActive = ref(false)
 const modalOpen = ref(false)
-const modalShouldRequest = ref(false);
-const capability = ref("KeyboardOnly")
+const modalShouldRequest = ref(false)
+const capability = ref('KeyboardOnly')
 
 
 /* FUNCTIONS */
@@ -198,7 +198,6 @@ async function toggleDiscoverable() {
     else stopCountdown()
   } catch (error) {
     console.error('Failed to toggle discoverable state:', error)
-    toastStore.showErrorToast('Failed to toggle discoverable state.')
   }
 }
 
@@ -232,7 +231,6 @@ async function togglePairingWithPassword() {
     capability.value = newCapability
   } catch (error) {
     console.error('Failed to toggle pairing with password:', error)
-    toastStore.showErrorToast('Failed to toggle pairing with password.')
   }
 }
 

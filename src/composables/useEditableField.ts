@@ -49,12 +49,31 @@ export function useEditableField<T = string>(
     defaultValue
   } = options
 
+  const hasDefaultValue = defaultValue !== null && defaultValue !== undefined
+
+  const toEditableString = (value: T | null | undefined): string => {
+    return value === null || value === undefined ? '' : String(value)
+  }
+
+  const resolveRawValue = (): { hasValue: boolean; rawValue: string } => {
+    const trimmedValue = editValue.value.trim()
+    if (trimmedValue) {
+      return { hasValue: true, rawValue: trimmedValue }
+    }
+
+    if (hasDefaultValue) {
+      return { hasValue: true, rawValue: toEditableString(defaultValue) }
+    }
+
+    return { hasValue: false, rawValue: '' }
+  }
+
   /**
    * Start editing mode
    */
   const startEditing = () => {
-    const currentValue = initialValue.value
-    editValue.value = currentValue?.toString() || defaultValue?.toString() || ''
+    const currentValue = initialValue.value ?? defaultValue
+    editValue.value = toEditableString(currentValue)
     isEditing.value = true
     editError.value = ''
   }
@@ -72,16 +91,25 @@ export function useEditableField<T = string>(
    * Save the edited value
    */
   const saveEdit = async (): Promise<boolean> => {
-    const trimmedValue = editValue.value.trim()
-    if (!trimmedValue && !defaultValue) {
-      editError.value = 'Value cannot be empty'
+    const { hasValue, rawValue } = resolveRawValue()
+
+    let transformedValue: T
+    try {
+      transformedValue = transformer(rawValue)
+    } catch (err) {
+      editError.value = err instanceof Error ? err.message : 'Invalid value'
       return false
     }
 
-    const transformedValue = transformer(trimmedValue || defaultValue?.toString() || '')
+    let isValid = false
+    try {
+      isValid = validator(transformedValue)
+    } catch {
+      isValid = false
+    }
 
-    if (!validator(transformedValue)) {
-      editError.value = 'Invalid value'
+    if (!isValid) {
+      editError.value = hasValue ? 'Invalid value' : 'Value cannot be empty'
       return false
     }
 
@@ -112,11 +140,20 @@ export function useEditableField<T = string>(
    * Check if the current edit value is valid for saving
    */
   const canSave = (): boolean => {
-    const trimmedValue = editValue.value.trim()
-    if (!trimmedValue && !defaultValue) return false
+    const { rawValue } = resolveRawValue()
 
-    const transformedValue = transformer(trimmedValue || defaultValue?.toString() || '')
-    return validator(transformedValue)
+    let transformedValue: T
+    try {
+      transformedValue = transformer(rawValue)
+    } catch {
+      return false
+    }
+
+    try {
+      return validator(transformedValue)
+    } catch {
+      return false
+    }
   }
 
   return {

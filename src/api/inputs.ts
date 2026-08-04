@@ -45,14 +45,13 @@ export interface InputsResponse {
 }
 
 /**
- * Build inputs API URL using audiocontrol base URL
+ * Build the inputs API URL from the config store base URL.
+ * @returns The full URL to the inputs endpoint
  */
-const buildInputsApiUrl = (endpoint: string): string => {
+const buildInputsApiUrl = (): string => {
   const configStore = useAppConfigStore()
   const apiBaseUrl = configStore.getApiBaseUrl()
-  const url = `${apiBaseUrl}/inputs${endpoint}`
-  console.log('Inputs API URL:', url)
-  return url
+  return `${apiBaseUrl}/inputs`
 }
 
 /**
@@ -64,7 +63,7 @@ const buildInputsApiUrl = (endpoint: string): string => {
  */
 export const getInputs = async (): Promise<InputsResponse | null> => {
   try {
-    const url = buildInputsApiUrl('')
+    const url = buildInputsApiUrl()
     const response = await apiFetch(url)
 
     if (!response.ok) {

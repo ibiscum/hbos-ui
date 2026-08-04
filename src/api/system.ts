@@ -219,10 +219,16 @@ export const getSystemInfo = async (): Promise<SystemInfo> => {
 
 /**
  * Update system hostname and/or pretty hostname
+ * @param request - Must contain at least hostname or pretty_hostname
  */
 export const updateHostname = async (request: HostnameUpdateRequest): Promise<HostnameUpdateResponse> => {
   const appConfigStore = useAppConfigStore()
   const baseUrl = appConfigStore.getConfigApiBaseUrl()
+
+  // Validate that at least one field is provided
+  if (!request.hostname && !request.pretty_hostname) {
+    throw new Error('At least one of hostname or pretty_hostname must be provided')
+  }
 
   const response = await apiFetch(`${baseUrl}/hostname`, {
     method: 'POST',
@@ -262,10 +268,16 @@ export const getSoundCards = async (): Promise<SoundCardsResponse> => {
 
 /**
  * Set device tree overlay for soundcard
+ * @param request - Must include non-empty dtoverlay string
  */
 export const setSoundCardDtoverlay = async (request: SetDtoverlayRequest): Promise<SetDtoverlayResponse> => {
   const appConfigStore = useAppConfigStore()
   const baseUrl = appConfigStore.getConfigApiBaseUrl()
+
+  // Validate dtoverlay is not empty
+  if (!request.dtoverlay || request.dtoverlay.trim().length === 0) {
+    throw new Error('Device tree overlay name cannot be empty')
+  }
 
   const response = await apiFetch(`${baseUrl}/soundcard/dtoverlay`, {
     method: 'POST',
@@ -387,10 +399,16 @@ export const getSoundCardDetectionStatus = async (): Promise<{
 
 /**
  * Disable automatic sound card detection and set a fixed sound card
+ * @param card_name - Card name cannot be empty
  */
 export const disableSoundCardDetection = async (card_name: string): Promise<SetDtoverlayResponse> => {
   const appConfigStore = useAppConfigStore()
   const baseUrl = appConfigStore.getConfigApiBaseUrl()
+
+  // Validate card_name is not empty
+  if (!card_name || card_name.trim().length === 0) {
+    throw new Error('Card name cannot be empty')
+  }
 
   const response = await apiFetch(`${baseUrl}/soundcard/detection/disable`, {
     method: 'POST',
@@ -509,10 +527,23 @@ export const getBackgroundJobs = async (): Promise<BackgroundJobsResponse> => {
 
 /**
  * Check if specific files exist on the system
+ * @param filePaths - Array of file paths to check (must not be empty, paths must not be empty)
  */
 export const checkFileExistence = async (filePaths: string[]): Promise<FileExistence[]> => {
   const appConfigStore = useAppConfigStore()
   const baseUrl = appConfigStore.getConfigApiBaseUrl()
+
+  // Validate filePaths array is not empty
+  if (!filePaths || filePaths.length === 0) {
+    throw new Error('File paths array cannot be empty')
+  }
+
+  // Validate all paths are non-empty strings
+  for (const filePath of filePaths) {
+    if (!filePath || filePath.trim().length === 0) {
+      throw new Error('File paths cannot be empty strings')
+    }
+  }
 
   const results: FileExistence[] = []
 

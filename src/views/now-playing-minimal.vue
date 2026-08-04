@@ -1,12 +1,10 @@
 <template>
-  <div class="now-playing now-playing--minimal">
-    <!-- Hide the title in minimal view -->
-    <h1 class="now-playing__title" style="display: none;">
-      <router-link to="/now-playing-minimal" class="title-link">
-        Now Playing
-        <span class="minimal-hint">Switch to minimal view</span>
-      </router-link>
-    </h1>
+  <div
+    class="now-playing now-playing--minimal"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Now Playing minimal view"
+  >
 
     <div class="now-playing__player">
       <div
@@ -56,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import CoverArt from '@/components/CoverArt.vue'
 import ProgressControl from '@/components/ProgressControl.vue'
@@ -65,7 +63,7 @@ import VolumeControl from '@/components/VolumeControl.vue'
 import MetadataTooltip from '@/components/MetadataTooltip.vue'
 
 import { storeToRefs } from 'pinia'
-import { usePlayerStore } from '@/stores/player.ts'
+import { usePlayerStore } from '@/stores/player'
 
 const { currentSong: song } = storeToRefs(usePlayerStore())
 
@@ -81,10 +79,33 @@ onUnmounted(() => {
   document.body.style.overflow = originalBodyOverflow.value
 })
 
-if (route.query.dark !== undefined) {
-  onMounted(() => document.documentElement.classList.add('dark'))
-  onUnmounted(() => document.documentElement.classList.remove('dark'))
-}
+const addedDarkClass = ref(false)
+
+watch(
+  () => route.query.dark,
+  (darkQuery) => {
+    if (darkQuery !== undefined) {
+      if (!document.documentElement.classList.contains('dark')) {
+        document.documentElement.classList.add('dark')
+        addedDarkClass.value = true
+      }
+      return
+    }
+
+    if (addedDarkClass.value) {
+      document.documentElement.classList.remove('dark')
+      addedDarkClass.value = false
+    }
+  },
+  { immediate: true }
+)
+
+onUnmounted(() => {
+  if (addedDarkClass.value) {
+    document.documentElement.classList.remove('dark')
+    addedDarkClass.value = false
+  }
+})
 
 // Cover art event handlers
 const onCoverArtLoaded = (result: { success: boolean; urls: string[]; source: string }) => {
@@ -161,60 +182,6 @@ const tooltipStyles = computed(() => {
     left: 0;
     background: var(--background-primary);
     z-index: 1000;
-  }
-
-  &__title {
-    @include media-down(sm) {
-      display: none;
-    }
-
-    .title-link {
-      color: var(--color-text);
-      text-decoration: none;
-      position: relative;
-      display: inline-block;
-      transition: color 0.3s ease;
-
-      &:hover {
-        color: var(--color-accent);
-        cursor: pointer;
-
-        .minimal-hint {
-          opacity: 1;
-          visibility: visible;
-        }
-      }
-    }
-
-    .minimal-hint {
-      position: absolute;
-      top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--background-secondary);
-      color: var(--color-text-secondary);
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 0.75rem;
-      font-weight: 400;
-      white-space: nowrap;
-      opacity: 0;
-      visibility: hidden;
-      transition: all 0.3s ease;
-      margin-top: 8px;
-      z-index: 10;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-
-      &::before {
-        content: '';
-        position: absolute;
-        top: -4px;
-        left: 50%;
-        transform: translateX(-50%);
-        border: 4px solid transparent;
-        border-bottom-color: var(--background-secondary);
-      }
-    }
   }
 
   &__player {

@@ -7,14 +7,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ref } from 'vue'
 import { useRoomEQ, type RoomEQConfigItem } from '../useRoomEQ'
 import * as configApi from '@/api/config'
-import { useFilterStore } from '@/stores/filter_connector'
+import { useFilterStore } from '@/stores/filter-connector'
 import { useToastStore } from '@/stores/toast'
 import { convertUIFilterToStore } from '@/utils/filter-conversions'
 import { formatFilterTypeName } from '@/utils/filter-display'
 
 // Mock the dependencies
 vi.mock('@/api/config')
-vi.mock('@/stores/filter_connector')
+vi.mock('@/stores/filter-connector')
 vi.mock('@/stores/toast')
 vi.mock('@/utils/filter-conversions')
 vi.mock('@/utils/filter-display')
@@ -42,9 +42,9 @@ describe('useRoomEQ Composable - Inconsistencies', () => {
     vi.mocked(convertUIFilterToStore).mockReturnValue({
       frequency: 100,
       gain: 0,
-      Q: 1,
+      q: 1,
       filter_type: 'peaking',
-    })
+    } as any)
     vi.mocked(formatFilterTypeName).mockReturnValue('Peaking')
 
     // Setup composable refs
@@ -144,7 +144,7 @@ describe('useRoomEQ Composable - Inconsistencies', () => {
 
       vi.mocked(configApi.getConfigValue).mockResolvedValue({
         status: 'success',
-        data: { value: JSON.stringify(invalidConfig) },
+        data: { key: 'correction-filters.invalid', value: JSON.stringify(invalidConfig) },
       })
 
       const { loadRoomEQSettings, roomEQConfigs } = useRoomEQ(
@@ -258,7 +258,7 @@ describe('useRoomEQ Composable - Inconsistencies', () => {
 
       vi.mocked(configApi.getConfigValue).mockResolvedValue({
         status: 'success',
-        data: { value: 'not-valid-json{' },
+        data: { key: 'correction-filters.bad-json', value: 'not-valid-json{' },
       })
 
       const { loadRoomEQSettings } = useRoomEQ(
@@ -483,7 +483,7 @@ describe('useRoomEQ Composable - Inconsistencies', () => {
 
       vi.mocked(configApi.getConfigValue).mockResolvedValue({
         status: 'success',
-        data: { value: 'not-json' },
+        data: { key: 'correction-filters.test', value: 'not-json' },
       })
 
       const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -536,7 +536,7 @@ describe('useRoomEQ Composable - Inconsistencies', () => {
   describe('SORTING INCONSISTENCY - Potential invalid date handling', () => {
     it('should sort configs by created_at timestamp', async () => {
       const now = Date.now()
-      const configs = [
+      const configs: any[] = [
         {
           status: 'success',
           data: {
@@ -597,7 +597,7 @@ describe('useRoomEQ Composable - Inconsistencies', () => {
 
       vi.mocked(configApi.getConfigValue).mockResolvedValue({
         status: 'success',
-        data: { value: invalidDateConfig },
+        data: { key: 'correction-filters.invalid', value: invalidDateConfig },
       })
 
       const { loadRoomEQSettings, roomEQConfigs } = useRoomEQ(

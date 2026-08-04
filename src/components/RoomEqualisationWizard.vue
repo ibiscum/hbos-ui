@@ -548,7 +548,7 @@ const reset = () => {
   rangeMax.value = 20000
   maxBoost.value = 6
   maxCut.value = 12
-  optimizerPreset.value = 'Default'
+  optimizerPreset.value = 'default'
   addLowpass.value = false
   addHighpass.value = false
 
@@ -797,8 +797,8 @@ const detectUsableRange = async () => {
           success: data.success,
           usable_freq_low: range.low_hz || range.min_frequency || range.usable_freq_low || userMinFrequency.value,
           usable_freq_high: range.high_hz || range.max_frequency || range.usable_freq_high || userMaxFrequency.value,
-          recommended_min: Math.max(30, range.low_hz || range.recommended_min || range.min_frequency || userMinFrequency.value),
-          recommended_max: range.high_hz || range.recommended_max || range.max_frequency || userMaxFrequency.value,
+          recommended_min: Math.max(30, range.recommended_min || range.low_hz || range.min_frequency || userMinFrequency.value),
+          recommended_max: range.recommended_max || range.high_hz || range.max_frequency || userMaxFrequency.value,
           message: data.message,
           analysis: {
             dynamic_range: range.dynamic_range || 0,
@@ -1100,6 +1100,7 @@ import {
   getRoomEQOptimizerPresets,
   checkRoomEQVersionRequirement,
   ROOMEQ_MINIMUM_VERSION,
+  type RoomEQOptimizerPreset,
   type NewRoomEQOptimizationRequest,
   type NewRoomEQOptimizationProgress,
   type NewRoomEQOptimizedFilter,
@@ -1111,6 +1112,7 @@ const optStatus = ref('')
 const apiVersionError = ref('')
 const optimizerPreset = ref('default')
 const optimizerPresetOptions = ref<string[]>(['default'])
+const optimizerPresetsByKey = ref<Record<string, RoomEQOptimizerPreset>>({})
 const optimizedResponse = ref<{ frequencies: number[]; magnitudes: number[] } | null>(null)
 const optimisationProgress = ref(0)
 const currentOptimizationId = ref<string | null>(null)
@@ -1129,12 +1131,14 @@ const loadOptimizerPresets = async () => {
     if (!exportMode.value) {
       optimizerPresetOptions.value = ['default']
       optimizerPreset.value = 'default'
+      optimizerPresetsByKey.value = {}
       return
     }
     const resp = await getRoomEQOptimizerPresets()
     if (resp.success && resp.data && resp.data.optimizer_presets && Array.isArray(resp.data.optimizer_presets)) {
-      // Extract the keys (IDs) from the optimizer presets
-      const presetKeys = resp.data.optimizer_presets.map(preset => preset.key)
+      const presetsByKey = Object.fromEntries(resp.data.optimizer_presets.map(preset => [preset.key, preset]))
+      const presetKeys = Object.keys(presetsByKey)
+      optimizerPresetsByKey.value = presetsByKey
       optimizerPresetOptions.value = exportMode.value ? presetKeys : ['default']
       if (!optimizerPresetOptions.value.includes(optimizerPreset.value)) {
         optimizerPreset.value = optimizerPresetOptions.value[0] || 'default'
@@ -1142,10 +1146,12 @@ const loadOptimizerPresets = async () => {
     } else {
       optimizerPresetOptions.value = ['default']
       optimizerPreset.value = 'default'
+      optimizerPresetsByKey.value = {}
     }
   } catch {
     optimizerPresetOptions.value = ['default']
     optimizerPreset.value = 'default'
+    optimizerPresetsByKey.value = {}
   }
 }
 const runOptimisation = async () => {
@@ -1187,6 +1193,8 @@ const runOptimisation = async () => {
     console.log('Target display names:', targetDisplayNames.value)
 
     // Build the new API payload format
+    const selectedPreset = optimizerPresetsByKey.value[optimizerPreset.value]
+
     const payload: NewRoomEQOptimizationRequest = {
       measured_curve: {
         frequencies: measurement.value.frequencies,
@@ -1200,9 +1208,9 @@ const runOptimisation = async () => {
         }))
       },
       optimizer_params: {
-        qmax: 10.0,
-        mindb: -10.0,
-        maxdb: 3.0,
+        qmax: selectedPreset?.qmax ?? 10.0,
+        mindb: selectedPreset?.mindb ?? -10.0,
+        maxdb: selectedPreset?.maxdb ?? 3.0,
         add_highpass: addHighpass.value,
   acceptable_error: 1.0,
   min_frequency: userMinFrequency.value,
