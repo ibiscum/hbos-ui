@@ -490,7 +490,7 @@ export const getCacheStats = async (): Promise<CacheStatsResponse> => {
   const appConfigStore = useAppConfigStore()
   const baseUrl = appConfigStore.getConfigApiBaseUrl()
 
-  const response = await apiFetch(`${baseUrl}/cache/stats`, {
+  const response = await apiFetch(`${baseUrl}/stats`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
