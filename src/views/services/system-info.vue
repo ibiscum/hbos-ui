@@ -362,11 +362,11 @@
           </div>
           <table v-else-if="coverArtMethods" class="info-table">
             <tbody>
-              <tr v-for="method in coverArtMethods.methods.filter(m => m.method !== 'Url')" :key="method.method">
+                <tr v-for="method in visibleCoverArtMethods" :key="method.method">
                 <td class="label">{{ method.method }}</td>
                 <td class="value">
                   <span class="providers-list">
-                    {{ method.providers.map(p => p.display_name).join(', ') }}
+                      {{ formatProviderNames(method) }}
                   </span>
                 </td>
               </tr>
@@ -791,7 +791,7 @@ import { getVolumeInfo, type VolumeInfo } from '@/api/volume'
 import { getDSPProgramInfo, type DSPProgramInfo } from '@/api/dsptoolkit'
 import { useEditableText } from '@/composables/useEditableField'
 import { useFavouritesInfo } from '@/composables/useFavouritesInfo'
-import { getCoverArtMethods, type CoverArtMethodsResponse } from '@/api/coverart'
+import { getCoverArtMethods, type CoverArtMethod, type CoverArtMethodsResponse } from '@/api/coverart'
 // TODO: Update to use new PipeWire API
 // import { listPipewireDevices, getPipewireMonoStereo, getPipewireBalance, type PipewireDevices } from '@/api/pipewire'
 import { useAppConfigStore } from '@/stores/appconfig'
@@ -931,6 +931,14 @@ const backgroundServices = ref<BackgroundService[]>([])
 
 // Computed ref for hostname
 const currentHostname = computed(() => systemInfo.value?.system?.pretty_hostname)
+
+const visibleCoverArtMethods = computed<CoverArtMethod[]>(() => {
+  return coverArtMethods.value?.methods.filter((method: CoverArtMethod) => method.method !== 'Url') ?? []
+})
+
+const formatProviderNames = (method: CoverArtMethod): string => {
+  return method.providers.map((provider) => provider.display_name).join(', ')
+}
 
 // Computed ref for sorted background jobs (newest first)
 const sortedBackgroundJobs = computed(() => {
@@ -1138,7 +1146,7 @@ const loadSoundCards = async () => {
     if (response.status === 'success') {
       availableSoundCards.value = response.data.soundcards
       // Find current soundcard's dtoverlay
-      const currentCard = availableSoundCards.value.find(card =>
+        const currentCard = availableSoundCards.value.find((card: SoundCard) =>
         card.name === systemInfo.value?.soundcard.name
       )
       selectedSoundCard.value = currentCard?.dtoverlay || ''
