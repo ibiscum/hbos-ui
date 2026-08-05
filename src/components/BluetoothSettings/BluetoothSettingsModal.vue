@@ -3,18 +3,19 @@
     <div v-if="open" class="modal">
       <ContentBox>
         <div class="modal-content">
-          <h1>Enter Pincode</h1>
+          <h1>Enter Passkey</h1>
 
           <input
             v-model="passkey"
             maxlength="6"
             inputmode="numeric"
-            @input="passkey = passkey.replace(/[^0-9]/g, '')"
+            aria-label="Bluetooth passkey"
+            @input="sanitizePasskey"
           />
 
           <div class="modal-buttons-div">
-            <button @click="close()">Close</button>
-            <button :disabled="passkey.length !== 6" @click="sendPasskey()">
+            <button type="button" @click="close()">Close</button>
+            <button type="button" :disabled="passkey.length !== 6" @click="sendPasskey()">
               Enter
             </button>
           </div>
@@ -42,7 +43,7 @@ const { open } = defineProps({
 const configStore = useAppConfigStore()
 const apiBaseUrl = configStore.getConfigApiBaseUrl()
 const emit = defineEmits(['update:open'])
-const passkey = ref("")
+const passkey = ref('')
 
 
 /* FUNCTIONS */
@@ -53,7 +54,15 @@ const passkey = ref("")
   * not directly inside of the button.
   */
 function close() {
+  passkey.value = ''
   emit('update:open', false)
+}
+
+/**
+  * Keep passkey numeric and limited to 6 digits.
+  */
+function sanitizePasskey() {
+  passkey.value = passkey.value.replace(/\D/g, '').slice(0, 6)
 }
 
 /**
@@ -61,22 +70,29 @@ function close() {
   * This function is called when the "send" button is pressed.
   */
 async function sendPasskey() {
+  if (passkey.value.length !== 6) {
+    return
+  }
+
   try {
     const response = await apiFetch(`${apiBaseUrl}/bluetooth/passkey`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ passkey: passkey.value })
     })
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
 
     await response.json()
-    emit('update:open', false)
+    close()
   } catch (error) {
-    console.error("Failed to send passkey:", error)
+    console.error('Failed to send passkey:', error)
   }
 }
 </script>
 
-<style>
+<style scoped>
 button {
   color: var(--color-body);
   transition: all 0.25s;

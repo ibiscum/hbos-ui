@@ -378,4 +378,294 @@ describe('player store - unit and regression tests', () => {
     expect(mockApiFetch).toHaveBeenCalledWith('/api/now-playing')
     store.clearPollingInterval()
   })
+
+  it('currentVolume prefers hardware volume and falls back to player volume/default', () => {
+    const store = usePlayerStore()
+
+    expect(store.currentVolume).toBe(50)
+
+    store.currentData = { player: { name: 'mpd' }, volume: 33 } as any
+    expect(store.currentVolume).toBe(33)
+
+    store.volumeState = { percentage: 77, muted: false } as any
+    expect(store.currentVolume).toBe(77)
+  })
+
+  it('volume availability getters reflect volume info state', () => {
+    const store = usePlayerStore()
+
+    expect(store.isVolumeAvailable).toBe(false)
+    expect(store.hasVolumeControl).toBe(false)
+
+    store.volumeInfo = { available: true, current_state: { percentage: 40, muted: false } } as any
+    store.volumeAvailable = true
+
+    expect(store.isVolumeAvailable).toBe(true)
+    expect(store.hasVolumeControl).toBe(true)
+  })
+
+  it('fetchPlayers returns parsed players for valid payload', async () => {
+    const store = usePlayerStore()
+    mockApiFetch.mockReset()
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ players: [{ name: 'mpd' }] }),
+    })
+
+    await expect(store.fetchPlayers()).resolves.toEqual([{ name: 'mpd' }])
+  })
+
+  it('fetchPlayers returns empty array when request throws', async () => {
+    const store = usePlayerStore()
+    mockApiFetch.mockReset()
+    mockApiFetch.mockRejectedValueOnce(new Error('players down'))
+
+    await expect(store.fetchPlayers()).resolves.toEqual([])
+  })
+
+  it('fetchPlayersAndUpdatePlayerDropdown executes fetch flow', async () => {
+    const store = usePlayerStore()
+    mockApiFetch.mockReset()
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ players: [{ name: 'mpd' }] }),
+    })
+
+    await store.fetchPlayersAndUpdatePlayerDropdown()
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/players')
+  })
+
+  it('retrieveActivePlayer returns active player name when available', async () => {
+    const store = usePlayerStore()
+    mockApiFetch.mockReset()
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ player: { name: 'alsa' } }),
+    })
+
+    await expect(store.retrieveActivePlayer()).resolves.toBe('alsa')
+  })
+
+  it('retrieveActivePlayer returns null when response has no player name', async () => {
+    const store = usePlayerStore()
+    mockApiFetch.mockReset()
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ player: {} }),
+    })
+
+    await expect(store.retrieveActivePlayer()).resolves.toBeNull()
+  })
+
+  it('retrieveActivePlayer returns null when request fails', async () => {
+    const store = usePlayerStore()
+    mockApiFetch.mockReset()
+    mockApiFetch.mockRejectedValueOnce(new Error('now-playing offline'))
+
+    await expect(store.retrieveActivePlayer()).resolves.toBeNull()
+  })
+
+  it('toggleCurrentSongFavourite reports error when no song is active', async () => {
+    const store = usePlayerStore()
+    store.currentData = { player: { name: 'mpd' }, song: null } as any
+
+    await expect(store.toggleCurrentSongFavourite()).resolves.toBe(false)
+    expect(mockShowErrorToast).toHaveBeenCalledWith('No song currently playing')
+  })
+
+  it('toggleCurrentSongFavourite surfaces favourites error when toggle fails', async () => {
+    const store = usePlayerStore()
+    store.currentData = {
+      player: { name: 'mpd' },
+      song: { artist: 'Artist', title: 'Song', duration: 120 },
+    } as any
+    favouritesErrorState.value = 'provider failed'
+    mockToggleFavourite.mockResolvedValue(false)
+
+    await expect(store.toggleCurrentSongFavourite()).resolves.toBe(false)
+    expect(mockShowErrorToast).toHaveBeenCalledWith('provider failed')
+  })
+
+  it('toggleCurrentSongFavourite handles thrown errors', async () => {
+    const store = usePlayerStore()
+    store.currentData = {
+      player: { name: 'mpd' },
+      song: { artist: 'Artist', title: 'Song', duration: 120 },
+    } as any
+    mockToggleFavourite.mockRejectedValueOnce(new Error('toggle failed'))
+
+    await expect(store.toggleCurrentSongFavourite()).resolves.toBe(false)
+    expect(mockShowErrorToast).toHaveBeenCalledWith('Failed to update favourites')
+  })
+
+  it('checkCurrentSongFavouriteStatus stores provider data when favourite details exist', async () => {
+    const store = usePlayerStore()
+    store.currentData = {
+      player: { name: 'mpd' },
+      song: { artist: 'Artist', title: 'Song', duration: 120 },
+    } as any
+    mockGetFavouriteDetails.mockResolvedValue({
+      is_favourite: true,
+      providers: ['tidal', 'spotify'],
+    })
+
+    await store.checkCurrentSongFavouriteStatus()
+
+    expect(store.currentSongIsFavourite).toBe(true)
+    expect(store.currentSongFavouriteProviders).toEqual(['tidal', 'spotify'])
+    expect(store.checkingFavourite).toBe(false)
+  })
+
+  it('checkCurrentSongFavouriteStatus handles favourites lookup errors', async () => {
+    const store = usePlayerStore()
+    store.currentData = {
+      player: { name: 'mpd' },
+      song: { artist: 'Artist', title: 'Song', duration: 120 },
+    } as any
+    mockGetFavouriteDetails.mockRejectedValueOnce(new Error('lookup failed'))
+
+    await store.checkCurrentSongFavouriteStatus()
+
+    expect(store.currentSongIsFavourite).toBe(false)
+    expect(store.currentSongFavouriteProviders).toEqual([])
+    expect(store.checkingFavourite).toBe(false)
+  })
+
+  it('sendCommand returns false when command request throws', async () => {
+    const store = usePlayerStore()
+    mockApiFetch.mockReset()
+    mockApiFetch.mockRejectedValueOnce(new Error('command down'))
+
+    await expect(store.sendCommand('play')).resolves.toBe(false)
+    expect(store.isSendingCommand).toBe(false)
+  })
+
+  it('initializeVolumeControl stores current state when available', async () => {
+    const store = usePlayerStore()
+    mockGetVolumeInfo.mockResolvedValueOnce({
+      available: true,
+      current_state: { percentage: 61, muted: false },
+    })
+
+    await store.initializeVolumeControl()
+
+    expect(store.volumeAvailable).toBe(true)
+    expect(store.volumeInfo).toEqual({
+      available: true,
+      current_state: { percentage: 61, muted: false },
+    })
+    expect(store.volumeState).toEqual({ percentage: 61, muted: false })
+  })
+
+  it('initializeVolumeControl handles failures and marks volume unavailable', async () => {
+    const store = usePlayerStore()
+    mockGetVolumeInfo.mockRejectedValueOnce(new Error('volume api down'))
+
+    await store.initializeVolumeControl()
+
+    expect(store.volumeAvailable).toBe(false)
+  })
+
+  it('fetchVolumeState updates volume state when API returns data', async () => {
+    const store = usePlayerStore()
+    mockGetVolumeState.mockResolvedValueOnce({ percentage: 22, muted: true })
+
+    await store.fetchVolumeState()
+
+    expect(store.volumeState).toEqual({ percentage: 22, muted: true })
+  })
+
+  it('setVolume validates bounds and updates volume state on success', async () => {
+    const store = usePlayerStore()
+    mockSetVolumeLevel.mockResolvedValueOnce({ success: true, new_state: { percentage: 30, muted: false } })
+
+    await expect(store.setVolume(-1)).resolves.toBe(false)
+    await expect(store.setVolume(101)).resolves.toBe(false)
+    await expect(store.setVolume(30)).resolves.toBe(true)
+    expect(store.volumeState).toEqual({ percentage: 30, muted: false })
+  })
+
+  it('setVolume returns false when API response is unsuccessful', async () => {
+    const store = usePlayerStore()
+    mockSetVolumeLevel.mockResolvedValueOnce({ success: false, new_state: null })
+
+    await expect(store.setVolume(40)).resolves.toBe(false)
+  })
+
+  it('increase/decrease/mute helpers update state on success and return false on failure', async () => {
+    const store = usePlayerStore()
+
+    mockIncreaseVolume.mockResolvedValueOnce({ success: true, new_state: { percentage: 55, muted: false } })
+    await expect(store.increaseVolumeBy(5)).resolves.toBe(true)
+    expect(store.volumeState).toEqual({ percentage: 55, muted: false })
+
+    mockDecreaseVolume.mockResolvedValueOnce({ success: true, new_state: { percentage: 45, muted: false } })
+    await expect(store.decreaseVolumeBy(5)).resolves.toBe(true)
+    expect(store.volumeState).toEqual({ percentage: 45, muted: false })
+
+    mockToggleMute.mockResolvedValueOnce({ success: true, new_state: { percentage: 45, muted: true } })
+    await expect(store.muteToggle()).resolves.toBe(true)
+    expect(store.volumeState).toEqual({ percentage: 45, muted: true })
+
+    mockIncreaseVolume.mockRejectedValueOnce(new Error('up fail'))
+    await expect(store.increaseVolumeBy(5)).resolves.toBe(false)
+
+    mockDecreaseVolume.mockRejectedValueOnce(new Error('down fail'))
+    await expect(store.decreaseVolumeBy(5)).resolves.toBe(false)
+
+    mockToggleMute.mockRejectedValueOnce(new Error('mute fail'))
+    await expect(store.muteToggle()).resolves.toBe(false)
+  })
+
+  it('sendLibraryCommand resolves active library, posts command, and refreshes player state', async () => {
+    const store = usePlayerStore()
+    libraryStoreState.activeLibrary = null
+    mockGetAvailableLibrary.mockImplementation(async () => {
+      libraryStoreState.activeLibrary = 'mpd'
+    })
+    mockLibraryFetch.mockReturnValueOnce({
+      post: vi.fn().mockReturnValue({
+        json: vi.fn().mockResolvedValue({ error: { value: null } }),
+      }),
+    })
+
+    const resultPromise = store.sendLibraryCommand('next/track')
+    await vi.runAllTimersAsync()
+
+    await expect(resultPromise).resolves.toBe(true)
+    expect(mockGetAvailableLibrary).toHaveBeenCalledTimes(1)
+    expect(mockLibraryFetch).toHaveBeenCalledWith('/player/:activeLibrary/command/next%2Ftrack')
+  })
+
+  it('sendLibraryCommand returns false and shows toast when command API reports an error', async () => {
+    const store = usePlayerStore()
+    mockLibraryFetch.mockReturnValueOnce({
+      post: vi.fn().mockReturnValue({
+        json: vi.fn().mockResolvedValue({ error: { value: 'denied' } }),
+      }),
+    })
+
+    await expect(store.sendLibraryCommand('pause')).resolves.toBe(false)
+    expect(mockShowErrorToast).toHaveBeenCalledWith('Command error: denied')
+  })
+
+  it('sendLibraryCommand returns false when no library is available after lookup', async () => {
+    const store = usePlayerStore()
+    libraryStoreState.activeLibrary = null
+    mockGetAvailableLibrary.mockResolvedValueOnce(undefined)
+
+    await expect(store.sendLibraryCommand('pause')).resolves.toBe(false)
+    expect(store.isSendingCommand).toBe(false)
+  })
+
+  it('sendLibraryCommand returns false when request throws', async () => {
+    const store = usePlayerStore()
+    mockLibraryFetch.mockImplementationOnce(() => {
+      throw new Error('library command down')
+    })
+
+    await expect(store.sendLibraryCommand('pause')).resolves.toBe(false)
+    expect(store.isSendingCommand).toBe(false)
+  })
 })

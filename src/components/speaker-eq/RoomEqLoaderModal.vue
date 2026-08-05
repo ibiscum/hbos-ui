@@ -1,10 +1,10 @@
 <template>
-  <teleport to="body">
+  <Teleport to="body">
     <div v-if="open" class="modal-backdrop" @click.self="$emit('close')">
       <div class="modal-content room-eq-modal">
         <div class="modal-header">
           <h2>Load Room EQ Configuration</h2>
-          <button class="close-btn" @click="$emit('close')">×</button>
+          <button type="button" class="close-btn" aria-label="Close room EQ loader" @click="$emit('close')">×</button>
         </div>
         <div class="modal-body">
           <div v-if="loading" class="loading-message">
@@ -20,13 +20,13 @@
                 <div
                   v-for="config in configs"
                   :key="config.key"
-                  :class="['config-item', { selected: selectedConfig === config }]"
-                  @click="selectedConfig = config"
+                  :class="['config-item', { selected: selectedConfigKey === config.key }]"
+                  @click="selectConfig(config)"
                 >
                   <div class="config-name">{{ config.data.name }}</div>
                   <div class="config-details">
                     {{ config.data.filters.length }} filters •
-                    {{ new Date(config.data.created_at).toLocaleDateString() }}
+                    {{ formatCreatedAt(config.data.created_at) }}
                   </div>
                 </div>
               </div>
@@ -51,9 +51,10 @@
             </div>
 
             <div class="modal-actions">
-              <button @click="$emit('close')" class="btn secondary">Cancel</button>
+              <button type="button" @click="$emit('close')" class="btn secondary">Cancel</button>
               <button
-                @click="$emit('load', selectedConfig!, channelMode)"
+                type="button"
+                @click="emitLoad"
                 :disabled="!selectedConfig"
                 class="btn primary"
               >
@@ -64,11 +65,11 @@
         </div>
       </div>
     </div>
-  </teleport>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 export interface RoomEQConfig {
   name: string;
@@ -87,19 +88,62 @@ export interface RoomEQConfigItem {
   data: RoomEQConfig;
 }
 
-defineProps<{
+const props = defineProps<{
   open: boolean
   loading: boolean
   configs: RoomEQConfigItem[]
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   close: []
   load: [config: RoomEQConfigItem, channelMode: 'left' | 'right' | 'both']
 }>();
 
-const selectedConfig = ref<RoomEQConfigItem | null>(null);
+const selectedConfigKey = ref<string | null>(null);
 const channelMode = ref<'left' | 'right' | 'both'>('both');
+
+const selectedConfig = computed(() => {
+  if (!selectedConfigKey.value) {
+    return null
+  }
+  return props.configs.find(config => config.key === selectedConfigKey.value)
+})
+
+watch(() => props.open, (open) => {
+  if (!open) {
+    selectedConfigKey.value = null
+    channelMode.value = 'both'
+  }
+})
+
+watch(() => props.configs, (configs) => {
+  if (!selectedConfigKey.value) {
+    return
+  }
+  const selectionStillExists = configs.some(config => config.key === selectedConfigKey.value)
+  if (!selectionStillExists) {
+    selectedConfigKey.value = null
+  }
+})
+
+function selectConfig(config: RoomEQConfigItem) {
+  selectedConfigKey.value = config.key
+}
+
+function emitLoad() {
+  if (!selectedConfig.value) {
+    return
+  }
+  emit('load', selectedConfig.value, channelMode.value)
+}
+
+function formatCreatedAt(createdAt: string): string {
+  const parsedDate = new Date(createdAt)
+  if (Number.isNaN(parsedDate.getTime())) {
+    return 'Unknown date'
+  }
+  return parsedDate.toLocaleDateString()
+}
 </script>
 
 <style scoped lang="scss">

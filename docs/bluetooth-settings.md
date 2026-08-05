@@ -1,7 +1,7 @@
 # BluetoothSettings Component
 
 **Location**: [src/components/BluetoothSettings.vue](src/components/BluetoothSettings.vue)  
-**Test File**: [src/components/__tests__/BluetoothSettings.test.ts](src/components/__tests__/BluetoothSettings.test.ts)  
+**Test Files**: [src/components/__tests__/BluetoothSettings.test.ts](src/components/__tests__/BluetoothSettings.test.ts), [src/components/BluetoothSettings/__tests__/BluetoothSettingsModal.test.ts](src/components/BluetoothSettings/__tests__/BluetoothSettingsModal.test.ts)  
 **Type**: Vue 3 Composition API Component (`<script setup>`)  
 **Language**: TypeScript  
 **Statistics**: 294 lines | Template: 24 lines | Script: 246 lines | Styles: 24 lines
@@ -713,6 +713,9 @@ const newCapability = capability.value === 'NoInputNoOutput'
 ### Test File Location
 [src/components/__tests__/BluetoothSettings.test.ts](src/components/__tests__/BluetoothSettings.test.ts)
 
+### Related Modal Test File
+[src/components/BluetoothSettings/__tests__/BluetoothSettingsModal.test.ts](src/components/BluetoothSettings/__tests__/BluetoothSettingsModal.test.ts)
+
 ### Test Coverage
 
 #### Mount & Initialization (7 tests)
@@ -752,11 +755,19 @@ const newCapability = capability.value === 'NoInputNoOutput'
 - Toggles from NoInputNoOutput to KeyboardOnly
 - Shows error on invalid capability
 
-#### Modal Functionality (4 tests)
-- Shows modal on backend true
-- Handles string 'true' response
-- Doesn't show modal on false
-- Handles modal API errors
+#### Modal Polling Integration
+- Modal polling endpoint calls are covered through countdown behavior tests in the parent component suite.
+- Detailed modal behavior and submission flows are covered in the dedicated modal suite.
+
+#### BluetoothSettingsModal Component (8 tests)
+- Renders only when open
+- Sanitizes passkey input to 6 numeric digits
+- Disables enter until passkey is valid
+- Clears passkey and emits close event
+- Submits passkey payload on success
+- Keeps modal open on non-ok response
+- Keeps modal open on request rejection
+- Prevents requests for invalid-length passkeys
 
 #### Cleanup (1 test)
 - Clears interval on unmount
@@ -788,6 +799,9 @@ pnpm test
 
 # Run this component's tests only
 pnpm test src/components/__tests__/BluetoothSettings.test.ts
+
+# Run the modal component tests only
+pnpm test src/components/BluetoothSettings/__tests__/BluetoothSettingsModal.test.ts
 
 # Run with coverage
 pnpm test:coverage
@@ -907,7 +921,7 @@ import OtherSettings from '@/components/OtherSettings.vue'
 
 - [BluetoothDevices.vue](bluetooth-devices.md) - Device connection management
 - [BluetoothDeviceEntry.vue](bluetooth-device-entry.md) - Individual device representation
-- [BluetoothSettingsModal.vue](src/components/BluetoothSettings/BluetoothSettingsModal.vue) - Modal feedback component
+- [Bluetooth Settings Modal](bluetooth-settings-modal.md) - Passkey modal behavior, API contract, and dedicated regression tests
 - [ContentBox.vue](src/components/ContentBox.vue) - Container component
 - [ToggleSwitch.vue](src/components/ToggleSwitch.vue) - Toggle input component
 

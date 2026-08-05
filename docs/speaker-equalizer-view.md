@@ -33,6 +33,17 @@ src/views/sound/__tests__/speaker-equalizer.test.ts combines unit and regression
 - active-channel watcher refresh contract for backend capabilities
 - keyboard listener cleanup on unmount
 
+Component-level modal contract coverage is maintained separately in:
+
+- src/components/speaker-eq/__tests__/AddFilterModal.test.ts
+- src/components/speaker-eq/__tests__/BackendInfoModal.test.ts
+- src/components/speaker-eq/__tests__/EqFilterItem.test.ts
+- src/components/speaker-eq/__tests__/RoomEqLoaderModal.test.ts
+- docs/add-filter-modal.md
+- docs/backend-info-modal.md
+- docs/eq-filter-item.md
+- docs/room-eq-loader-modal.md
+
 ## Why This Matters
 
 Speaker equalizer is the core high-interaction sound editor and is coupled to backend state, keyboard shortcuts, and modal workflows. Regressions in modal precedence, keyboard handling, or query-driven Room EQ application can silently produce unsafe control behavior or user confusion. These tests lock core interaction contracts and the restored keyboard-guard consistency.

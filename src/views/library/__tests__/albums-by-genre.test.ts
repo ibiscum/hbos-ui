@@ -3,39 +3,41 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import { createPinia, setActivePinia } from 'pinia'
 import { ref } from 'vue'
+
 import AlbumsByGenre from '../albums-by-genre.vue'
 
-// Mock stores
-vi.mock('@/stores/album', () => {
-  const mockAlbumStore = {
-    getAlbumCoverById: vi.fn((id: string) => `cover-${id}.jpg`),
-  }
-  return {
-    useAlbumStore: () => mockAlbumStore,
-  }
-})
+const {
+  libraryFetchMock,
+  fetchJsonMock,
+  showErrorToastMock,
+  getAlbumCoverByIdMock,
+} = vi.hoisted(() => ({
+  libraryFetchMock: vi.fn(),
+  fetchJsonMock: vi.fn(),
+  showErrorToastMock: vi.fn(),
+  getAlbumCoverByIdMock: vi.fn(),
+}))
+
+vi.mock('@/stores/album', () => ({
+  useAlbumStore: () => ({
+    getAlbumCoverById: getAlbumCoverByIdMock,
+  }),
+}))
 
 vi.mock('@/stores/toast', () => ({
   useToastStore: () => ({
-    showErrorToast: vi.fn(),
+    showErrorToast: showErrorToastMock,
   }),
 }))
 
 vi.mock('@/composables/useLibraryFetch', () => ({
-  useLibraryFetch: () => vi.fn(() => ({
-    json: vi.fn(() =>
-      Promise.resolve({
-        error: ref(null),
-        data: ref({ albums: [] }),
-      })
-    ),
-  })),
+  useLibraryFetch: () => libraryFetchMock,
 }))
 
 vi.mock('@/components/PageContent.vue', () => ({
   default: {
     name: 'PageContent',
-    template: '<div class="page-content"><slot /></div>',
+    template: '<div class="page-content"><h1 data-testid="title">{{ title }}</h1><slot /></div>',
     props: ['title', 'backrouterLink'],
   },
 }))
@@ -43,317 +45,268 @@ vi.mock('@/components/PageContent.vue', () => ({
 vi.mock('@/components/PosterGrid.vue', () => ({
   default: {
     name: 'PosterGrid',
-    template: '<div class="poster-grid" :data-loading="loading" :data-loaded="loaded" :data-items="items.length"></div>',
+    template:
+      '<div class="poster-grid" :data-loading="String(loading)" :data-loaded="String(loaded)" :data-count="items.length"><button data-testid="poster-click" @click="$emit(\'click\', items[0])">open</button></div>',
     props: ['loading', 'loaded', 'items'],
     emits: ['click'],
   },
 }))
 
-describe('AlbumsByGenre.vue', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let router: any
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let pinia: any
+describe('albums-by-genre.vue', () => {
+  const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
   beforeEach(() => {
-    pinia = createPinia()
-    setActivePinia(pinia)
+    setActivePinia(createPinia())
 
-    router = createRouter({
+    vi.clearAllMocks()
+
+    getAlbumCoverByIdMock.mockImplementation((id: string) => `cover-${id}.jpg`)
+    libraryFetchMock.mockReturnValue({ json: fetchJsonMock })
+    fetchJsonMock.mockResolvedValue({
+      error: ref(null),
+      data: ref({ albums: [] }),
+    })
+  })
+
+  const createRouterForTest = () =>
+    createRouter({
       history: createMemoryHistory(),
       routes: [
         {
-          path: '/albums-by-genre/:category',
+          path: '/albums-by-genre/:category?',
           name: 'albums-by-genre',
-          component: { template: '<div></div>' },
+          component: { template: '<div />' },
         },
         {
           path: '/album/:albumId',
           name: 'album',
-          component: { template: '<div></div>' },
+          component: { template: '<div />' },
         },
         {
           path: '/genres',
           name: 'genres',
-          component: { template: '<div></div>' },
+          component: { template: '<div />' },
         },
       ],
     })
-  })
 
-  const createWrapper = async (genre = 'rock') => {
-    router.push({ name: 'albums-by-genre', params: { category: genre } })
+  const mountView = async (genre: string | undefined = 'rock') => {
+    const router = createRouterForTest()
+
+    if (genre === undefined) {
+      router.push({ name: 'albums-by-genre' })
+    } else {
+      router.push({ name: 'albums-by-genre', params: { category: genre } })
+    }
+
     await router.isReady()
+
     const wrapper = mount(AlbumsByGenre, {
       global: {
-        plugins: [router, pinia],
-        stubs: {
-          PageContent: true,
-          PosterGrid: true,
-        },
+        plugins: [router],
       },
     })
+
     await flushPromises()
-    return wrapper as any
+
+    return { wrapper, router }
   }
 
-  it('renders component with PageContent and PosterGrid', async () => {
-    const wrapper = await createWrapper()
-    expect(wrapper.vm).toBeDefined()
+  it('renders category title and requests encoded genre on mount', async () => {
+    await mountView('rock & roll')
+
+    expect(libraryFetchMock).toHaveBeenCalledWith('/library/:activeLibrary/albums/by-genre/rock%20%26%20roll')
   })
 
-  it('extracts genre from route params as category', async () => {
-    const wrapper = await createWrapper('jazz')
-    expect(wrapper.vm.category).toBe('jazz')
+  it('maps fetched albums into PosterGrid items with cover and year', async () => {
+    fetchJsonMock.mockResolvedValueOnce({
+      error: ref(null),
+      data: ref({
+        albums: [
+          {
+            id: 'album1',
+            name: 'Test Album',
+            artists: ['Artist Name'],
+            release_date: '2023-12-25',
+          },
+        ],
+      }),
+    })
+
+    const { wrapper } = await mountView('jazz')
+    const albumItems = wrapper.vm.albumItems
+
+    expect(wrapper.find('[data-testid="title"]').text()).toBe('jazz')
+    expect(wrapper.find('.poster-grid').attributes('data-count')).toBe('1')
+    expect(albumItems[0]).toEqual({
+      $id: 'album1',
+      $title: 'Test Album',
+      $subtitle: 'Artist Name',
+      $note: '2023',
+      $cover_src: 'cover-album1.jpg',
+    })
+    expect(getAlbumCoverByIdMock).toHaveBeenCalledWith('album1')
   })
 
-  it('initializes with empty albums array', async () => {
-    const wrapper = await createWrapper()
+  it('warns and normalizes invalid albums with missing id or name', async () => {
+    fetchJsonMock.mockResolvedValueOnce({
+      error: ref(null),
+      data: ref({
+        albums: [
+          {
+            id: '',
+            name: 'Nameless ID',
+            artists: [],
+          },
+          {
+            id: 'missing-name',
+            name: '',
+            artists: [],
+          },
+        ],
+      }),
+    })
+
+    const { wrapper } = await mountView('electronic')
+
+    expect(consoleWarnSpy).toHaveBeenCalledWith('Invalid album data:', {
+      id: '',
+      name: 'Nameless ID',
+      artists: [],
+    })
+    expect(consoleWarnSpy).toHaveBeenCalledWith('Invalid album data:', {
+      id: 'missing-name',
+      name: '',
+      artists: [],
+    })
+    expect(wrapper.vm.albumItems).toEqual([
+      {
+        $id: '',
+        $title: 'Nameless ID',
+        $subtitle: '',
+        $note: '',
+        $cover_src: '',
+      },
+      {
+        $id: 'missing-name',
+        $title: '',
+        $subtitle: '',
+        $note: '',
+        $cover_src: '',
+      },
+    ])
+    expect(getAlbumCoverByIdMock).not.toHaveBeenCalled()
+  })
+
+  it('shows a toast and skips API call when category is missing', async () => {
+    await mountView('')
+
+    expect(showErrorToastMock).toHaveBeenCalledWith('Genre not specified')
+    expect(libraryFetchMock).not.toHaveBeenCalled()
+  })
+
+  it('shows backend string errors from the API response', async () => {
+    fetchJsonMock.mockResolvedValueOnce({
+      error: ref('backend unavailable'),
+      data: ref(null),
+    })
+
+    await mountView('rock')
+
+    expect(showErrorToastMock).toHaveBeenCalledWith('Failed to load albums: backend unavailable')
+  })
+
+  it('normalizes non-string backend errors', async () => {
+    fetchJsonMock.mockResolvedValueOnce({
+      error: ref({ code: 'E_FAIL' }),
+      data: ref(null),
+    })
+
+    await mountView('rock')
+
+    expect(showErrorToastMock).toHaveBeenCalledWith('Failed to load albums: Unknown error')
+  })
+
+  it('keeps albums empty when response has no albums array and no error', async () => {
+    fetchJsonMock.mockResolvedValueOnce({
+      error: ref(null),
+      data: ref({}),
+    })
+
+    const { wrapper } = await mountView('ambient')
+
     expect(wrapper.vm.albums).toEqual([])
-    expect(Array.isArray(wrapper.vm.albums)).toBe(true)
+    expect(showErrorToastMock).not.toHaveBeenCalled()
   })
 
-  it('initializes with boolean loading and loaded states', async () => {
-    const wrapper = await createWrapper()
-    expect(typeof wrapper.vm.loading).toBe('boolean')
-    expect(typeof wrapper.vm.loaded).toBe('boolean')
+  it('navigates to album details with genres query when PosterGrid emits click', async () => {
+    fetchJsonMock.mockResolvedValueOnce({
+      error: ref(null),
+      data: ref({
+        albums: [
+          {
+            id: 'album42',
+            name: 'Clicked Album',
+            artists: ['Artist'],
+            release_date: '2024-01-01',
+          },
+        ],
+      }),
+    })
+
+    const { wrapper, router } = await mountView('pop')
+
+    await wrapper.find('[data-testid="poster-click"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('album')
+    expect(router.currentRoute.value.params.albumId).toBe('album42')
+    expect(router.currentRoute.value.query.from).toBe('genres')
   })
 
-  it('sets loading state during album fetch', async () => {
-    const wrapper = await createWrapper()
-    wrapper.vm.loading = true
-    expect(wrapper.vm.loading).toBe(true)
-    wrapper.vm.loading = false
-    expect(wrapper.vm.loading).toBe(false)
-  })
+  it('updates loading and loaded props around an in-flight fetch', async () => {
+    let resolveJson: ((value: { error: ReturnType<typeof ref>; data: ReturnType<typeof ref> }) => void) | undefined
 
-  it('transforms albums to PosterItem format', async () => {
-    const wrapper = await createWrapper()
-    wrapper.vm.albums = [
-      {
-        id: 'album1',
-        name: 'Test Album',
-        artists: ['Artist Name'],
-        release_date: '2023-01-15',
+    fetchJsonMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveJson = resolve
+        }),
+    )
+
+    const router = createRouterForTest()
+    router.push({ name: 'albums-by-genre', params: { category: 'downtempo' } })
+    await router.isReady()
+
+    const wrapper = mount(AlbumsByGenre, {
+      global: {
+        plugins: [router],
       },
-    ]
+    })
+
     await wrapper.vm.$nextTick()
 
-    const items = wrapper.vm.albumItems
-    expect(items.length).toBe(1)
-    expect(items[0].$id).toBe('album1')
-    expect(items[0].$title).toBe('Test Album')
-    expect(items[0].$subtitle).toBe('Artist Name')
-    expect(items[0].$note).toBe('2023')
+    expect(wrapper.find('.poster-grid').attributes('data-loading')).toBe('true')
+    expect(wrapper.find('.poster-grid').attributes('data-loaded')).toBe('false')
+
+    resolveJson?.({
+      error: ref(null),
+      data: ref({ albums: [] }),
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('.poster-grid').attributes('data-loading')).toBe('false')
+    expect(wrapper.find('.poster-grid').attributes('data-loaded')).toBe('true')
   })
 
-  it('handles album with missing artist', async () => {
-    const wrapper = await createWrapper()
-    wrapper.vm.albums = [
-      {
-        id: 'album1',
-        name: 'Test Album',
-        artists: [],
-        release_date: '2023-01-15',
-      },
-    ]
-    await wrapper.vm.$nextTick()
+  it('handles unexpected fetch failures with generic toast', async () => {
+    fetchJsonMock.mockRejectedValueOnce(new Error('network down'))
 
-    const items = wrapper.vm.albumItems
-    expect(items[0].$subtitle).toBe('')
-  })
+    await mountView('soul')
 
-  it('handles album with missing release date', async () => {
-    const wrapper = await createWrapper()
-    wrapper.vm.albums = [
-      {
-        id: 'album1',
-        name: 'Test Album',
-        artists: ['Artist Name'],
-      },
-    ]
-    await wrapper.vm.$nextTick()
-
-    const items = wrapper.vm.albumItems
-    expect(items[0].$note).toBe('')
-  })
-
-  it('extracts year from release date', async () => {
-    const wrapper = await createWrapper()
-    wrapper.vm.albums = [
-      {
-        id: 'album1',
-        name: 'Test Album',
-        artists: ['Artist Name'],
-        release_date: '2023-12-25',
-      },
-    ]
-    await wrapper.vm.$nextTick()
-
-    const items = wrapper.vm.albumItems
-    expect(items[0].$note).toBe('2023')
-    expect(items[0].$note.length).toBe(4)
-  })
-
-  it('retrieves album cover from store', async () => {
-    const wrapper = await createWrapper()
-    wrapper.vm.albums = [
-      {
-        id: 'album1',
-        name: 'Test Album',
-        artists: ['Artist Name'],
-        release_date: '2023-01-15',
-      },
-    ]
-    await wrapper.vm.$nextTick()
-
-    const items = wrapper.vm.albumItems
-    expect(items[0].$cover_src).toBe('cover-album1.jpg')
-  })
-
-  it('loads albums on mount', async () => {
-    const wrapper = await createWrapper()
-    expect(wrapper.vm.loadAlbums).toBeDefined()
-  })
-
-  it('URL encodes genre parameter', async () => {
-    const wrapper = await createWrapper('rock & roll')
-    expect(wrapper.vm.category).toBe('rock & roll')
-  })
-
-  it('handles empty albums response gracefully', async () => {
-    const wrapper = await createWrapper()
-    wrapper.vm.albums = []
-    await wrapper.vm.$nextTick()
-
-    expect(wrapper.vm.albumItems).toEqual([])
-  })
-
-  it('updates loading state during fetch', async () => {
-    const wrapper = await createWrapper()
-    expect(wrapper.vm.loading).toBe(false)
-    wrapper.vm.loading = true
-    expect(wrapper.vm.loading).toBe(true)
-  })
-
-  it('updates loaded state after fetch', async () => {
-    const wrapper = await createWrapper()
-    expect(typeof wrapper.vm.loaded).toBe('boolean')
-    wrapper.vm.loaded = false
-    expect(wrapper.vm.loaded).toBe(false)
-    wrapper.vm.loaded = true
-    expect(wrapper.vm.loaded).toBe(true)
-  })
-
-  it('provides genre title to PageContent', async () => {
-    const wrapper = await createWrapper('indie')
-    expect(wrapper.vm.category).toBe('indie')
-  })
-
-  it('back route links to genres page', async () => {
-    const wrapper = await createWrapper()
-    expect(wrapper.vm.router).toBeDefined()
-  })
-
-  it('handles multiple albums in response', async () => {
-    const wrapper = await createWrapper()
-    wrapper.vm.albums = [
-      {
-        id: 'album1',
-        name: 'Album 1',
-        artists: ['Artist 1'],
-        release_date: '2023-01-01',
-      },
-      {
-        id: 'album2',
-        name: 'Album 2',
-        artists: ['Artist 2'],
-        release_date: '2024-01-01',
-      },
-      {
-        id: 'album3',
-        name: 'Album 3',
-        artists: ['Artist 3'],
-        release_date: '2025-01-01',
-      },
-    ]
-    await wrapper.vm.$nextTick()
-
-    expect(wrapper.vm.albumItems.length).toBe(3)
-    expect(wrapper.vm.albumItems[0].$title).toBe('Album 1')
-    expect(wrapper.vm.albumItems[1].$title).toBe('Album 2')
-    expect(wrapper.vm.albumItems[2].$title).toBe('Album 3')
-  })
-
-  it('maintains album id mapping to computed items', async () => {
-    const wrapper = await createWrapper()
-    wrapper.vm.albums = [
-      {
-        id: 'unique-id-123',
-        name: 'Test Album',
-        artists: ['Artist Name'],
-        release_date: '2023-01-15',
-      },
-    ]
-    await wrapper.vm.$nextTick()
-
-    const items = wrapper.vm.albumItems
-    expect(items[0].$id).toBe('unique-id-123')
-  })
-
-  it('stores have correct methods available', async () => {
-    const wrapper = await createWrapper()
-    expect(typeof wrapper.vm.loadAlbums).toBe('function')
-  })
-
-  it('computes albumItems with PosterItem type', async () => {
-    const wrapper = await createWrapper()
-    wrapper.vm.albums = [
-      {
-        id: 'album1',
-        name: 'Test Album',
-        artists: ['Artist Name'],
-        release_date: '2023-01-15',
-      },
-    ]
-    await wrapper.vm.$nextTick()
-
-    const items = wrapper.vm.albumItems
-    expect(items[0]).toHaveProperty('$id')
-    expect(items[0]).toHaveProperty('$title')
-    expect(items[0]).toHaveProperty('$subtitle')
-    expect(items[0]).toHaveProperty('$note')
-    expect(items[0]).toHaveProperty('$cover_src')
-  })
-
-  it('genre parameter accepts special characters', async () => {
-    const wrapper = await createWrapper('hip-hop/rap')
-    expect(wrapper.vm.category).toBe('hip-hop/rap')
-  })
-
-  it('genre parameter accepts spaces', async () => {
-    const wrapper = await createWrapper('classic rock')
-    expect(wrapper.vm.category).toBe('classic rock')
-  })
-
-  it('router instance available for navigation', async () => {
-    const wrapper = await createWrapper()
-    expect(wrapper.vm.router).toBeDefined()
-    expect(typeof wrapper.vm.router.push).toBe('function')
-  })
-
-  it('reference to toastStore for error handling', async () => {
-    const wrapper = await createWrapper()
-    expect(wrapper.vm.toastStore).toBeDefined()
-  })
-
-  it('reference to libraryFetch for API calls', async () => {
-    const wrapper = await createWrapper()
-    expect(wrapper.vm.libraryFetch).toBeDefined()
-  })
-
-  it('reference to albumStore for cover URLs', async () => {
-    const wrapper = await createWrapper()
-    expect(wrapper.vm.albumStore).toBeDefined()
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading albums by genre')
+    expect(showErrorToastMock).toHaveBeenCalledWith('An error occurred while loading albums')
   })
 })

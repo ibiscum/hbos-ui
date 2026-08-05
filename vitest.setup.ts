@@ -1,3 +1,5 @@
+/// <reference types="vitest/globals" />
+
 // Node (>=22) ships a native `globalThis.localStorage` backed by a file on
 // disk. In sandboxed/CI environments without a writable default location it
 // comes up as a broken stub (`{}`, no methods) instead of throwing or being

@@ -29,6 +29,18 @@ export interface AppConfig {
   }
 }
 
+const viteEnv = (import.meta as ImportMeta & {
+  env: {
+    PROD?: boolean
+    VITE_APP_DEVICE_IP?: string
+    VITE_APP_DEVICE_PORT?: string
+    VITE_APP_API_PREFIX?: string
+    VITE_APP_CONFIG_API_PREFIX?: string
+    VITE_APP_DSPTOOLKIT_API_PREFIX?: string
+    VITE_APP_ROOMEQ_API_PREFIX?: string
+  }
+}).env
+
 // Utility function to validate config values
 const validateApiConfig = (config: unknown): boolean => {
   if (!config || typeof config !== 'object') return false
@@ -92,28 +104,28 @@ export const useAppConfigStore = defineStore('appconfig', () => {
   const config = ref<AppConfig>({
     radioPlayer: 'mpd', // Default radio player
     audiocontrol_api: {
-      deviceIP: import.meta.env.VITE_APP_DEVICE_IP || window.location.hostname,
-      devicePort: parseInt(import.meta.env.VITE_APP_DEVICE_PORT || '80', 10),
-      apiPrefix: import.meta.env.VITE_APP_API_PREFIX || '/api/audiocontrol',
-      useProxy: !import.meta.env.PROD // Use proxy in development to avoid CORS
+      deviceIP: viteEnv.VITE_APP_DEVICE_IP || window.location.hostname,
+      devicePort: parseInt(viteEnv.VITE_APP_DEVICE_PORT || '80', 10),
+      apiPrefix: viteEnv.VITE_APP_API_PREFIX || '/api/audiocontrol',
+      useProxy: !viteEnv.PROD // Use proxy in development to avoid CORS
     },
     config_api: {
-      deviceIP: import.meta.env.VITE_APP_DEVICE_IP || window.location.hostname,
-      devicePort: parseInt(import.meta.env.VITE_APP_DEVICE_PORT || '80', 10),
-      apiPrefix: import.meta.env.VITE_APP_CONFIG_API_PREFIX || '/api/config/v1',
-      useProxy: !import.meta.env.PROD // Use proxy in development to avoid CORS
+      deviceIP: viteEnv.VITE_APP_DEVICE_IP || window.location.hostname,
+      devicePort: parseInt(viteEnv.VITE_APP_DEVICE_PORT || '80', 10),
+      apiPrefix: viteEnv.VITE_APP_CONFIG_API_PREFIX || '/api/config/v1',
+      useProxy: !viteEnv.PROD // Use proxy in development to avoid CORS
     },
     dsptoolkit_api: {
-      deviceIP: import.meta.env.VITE_APP_DEVICE_IP || window.location.hostname,
-      devicePort: parseInt(import.meta.env.VITE_APP_DEVICE_PORT || '80', 10),
-      apiPrefix: import.meta.env.VITE_APP_DSPTOOLKIT_API_PREFIX || '/api/dsptoolkit',
-      useProxy: !import.meta.env.PROD // Use proxy in development to avoid CORS
+      deviceIP: viteEnv.VITE_APP_DEVICE_IP || window.location.hostname,
+      devicePort: parseInt(viteEnv.VITE_APP_DEVICE_PORT || '80', 10),
+      apiPrefix: viteEnv.VITE_APP_DSPTOOLKIT_API_PREFIX || '/api/dsptoolkit',
+      useProxy: !viteEnv.PROD // Use proxy in development to avoid CORS
     },
     roomeq_api: {
-      deviceIP: import.meta.env.VITE_APP_DEVICE_IP || window.location.hostname,
-      devicePort: parseInt(import.meta.env.VITE_APP_DEVICE_PORT || '80', 10),
-      apiPrefix: import.meta.env.VITE_APP_ROOMEQ_API_PREFIX || '/api/roomeq',
-      useProxy: !import.meta.env.PROD // Use proxy in development to avoid CORS
+      deviceIP: viteEnv.VITE_APP_DEVICE_IP || window.location.hostname,
+      devicePort: parseInt(viteEnv.VITE_APP_DEVICE_PORT || '80', 10),
+      apiPrefix: viteEnv.VITE_APP_ROOMEQ_API_PREFIX || '/api/roomeq',
+      useProxy: !viteEnv.PROD // Use proxy in development to avoid CORS
     }
   })
   const loading = ref(false)

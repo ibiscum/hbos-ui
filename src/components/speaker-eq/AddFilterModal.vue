@@ -1,13 +1,14 @@
 <template>
-  <teleport to="body">
+  <Teleport to="body">
     <div v-if="open" class="modal-backdrop" @click.self="$emit('close')">
       <div class="modal-content">
         <h2>Add New Filter</h2>
-        <p>Select filter type</p>
+        <p>Select a filter type.</p>
 
         <div class="filter-type-selector">
           <button v-for="type in filterTypes" :key="type"
-            :class="['filter-type-option']"
+            type="button"
+            class="filter-type-option"
             @click="$emit('add', type)">
             <Icon :icon="getFilterIconName(type)" class="filter-icon" />
             <span class="filter-name">{{ formatFilterTypeName(type) }}</span>
@@ -15,7 +16,7 @@
         </div>
       </div>
     </div>
-  </teleport>
+  </Teleport>
 </template>
 
 <script setup lang="ts">

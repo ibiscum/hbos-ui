@@ -362,11 +362,11 @@
           </div>
           <table v-else-if="coverArtMethods" class="info-table">
             <tbody>
-              <tr v-for="method in coverArtMethods.methods.filter(m => m.method !== 'Url')" :key="method.method">
+                <tr v-for="method in visibleCoverArtMethods" :key="method.method">
                 <td class="label">{{ method.method }}</td>
                 <td class="value">
                   <span class="providers-list">
-                    {{ method.providers.map(p => p.display_name).join(', ') }}
+                      {{ formatProviderNames(method) }}
                   </span>
                 </td>
               </tr>
@@ -791,7 +791,7 @@ import { getVolumeInfo, type VolumeInfo } from '@/api/volume'
 import { getDSPProgramInfo, type DSPProgramInfo } from '@/api/dsptoolkit'
 import { useEditableText } from '@/composables/useEditableField'
 import { useFavouritesInfo } from '@/composables/useFavouritesInfo'
-import { getCoverArtMethods, type CoverArtMethodsResponse } from '@/api/coverart'
+import { getCoverArtMethods, type CoverArtMethod, type CoverArtMethodsResponse } from '@/api/coverart'
 // TODO: Update to use new PipeWire API
 // import { listPipewireDevices, getPipewireMonoStereo, getPipewireBalance, type PipewireDevices } from '@/api/pipewire'
 import { useAppConfigStore } from '@/stores/appconfig'
@@ -874,6 +874,24 @@ const filesToCheck = [
   '/etc/hifiberry.user'
 ]
 
+const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(message))
+    }, timeoutMs)
+  })
+
+  try {
+    return await Promise.race([promise, timeoutPromise])
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId)
+    }
+  }
+}
+
 // Library stats state
 const libraryStatsLoading = ref(true)
 const libraryStatsError = ref('')
@@ -913,6 +931,14 @@ const backgroundServices = ref<BackgroundService[]>([])
 
 // Computed ref for hostname
 const currentHostname = computed(() => systemInfo.value?.system?.pretty_hostname)
+
+const visibleCoverArtMethods = computed<CoverArtMethod[]>(() => {
+  return coverArtMethods.value?.methods.filter((method: CoverArtMethod) => method.method !== 'Url') ?? []
+})
+
+const formatProviderNames = (method: CoverArtMethod): string => {
+  return method.providers.map((provider) => provider.display_name).join(', ')
+}
 
 // Computed ref for sorted background jobs (newest first)
 const sortedBackgroundJobs = computed(() => {
@@ -1120,7 +1146,7 @@ const loadSoundCards = async () => {
     if (response.status === 'success') {
       availableSoundCards.value = response.data.soundcards
       // Find current soundcard's dtoverlay
-      const currentCard = availableSoundCards.value.find(card =>
+        const currentCard = availableSoundCards.value.find((card: SoundCard) =>
         card.name === systemInfo.value?.soundcard.name
       )
       selectedSoundCard.value = currentCard?.dtoverlay || ''
@@ -1206,12 +1232,7 @@ const fetchSystemInfo = async () => {
   try {
     console.log('fetchSystemInfo: Calling getSystemInfo API...')
 
-    // Add timeout to prevent hanging
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Request timeout after 10 seconds')), 10000)
-    )
-
-    const data = await Promise.race([getSystemInfo(), timeoutPromise])
+    const data = await withTimeout(getSystemInfo(), 10000, 'Request timeout after 10 seconds')
     console.log('fetchSystemInfo: API call completed, data:', data)
 
     if (data.status === 'success') {
@@ -1296,12 +1317,7 @@ const fetchCacheStats = async () => {
   try {
     console.log('fetchCacheStats: Calling getCacheStats API...')
 
-    // Add timeout to prevent hanging
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Cache stats request timeout after 10 seconds')), 10000)
-    )
-
-    const data = await Promise.race([getCacheStats(), timeoutPromise])
+    const data = await withTimeout(getCacheStats(), 10000, 'Cache stats request timeout after 10 seconds')
     console.log('fetchCacheStats: API call completed, data:', data)
     cacheStats.value = data
   } catch (err) {
@@ -1321,12 +1337,11 @@ const fetchBackgroundJobs = async () => {
   try {
     console.log('fetchBackgroundJobs: Calling getBackgroundJobs API...')
 
-    // Add timeout to prevent hanging
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Background jobs request timeout after 10 seconds')), 10000)
+    const data = await withTimeout(
+      getBackgroundJobs(),
+      10000,
+      'Background jobs request timeout after 10 seconds',
     )
-
-    const data = await Promise.race([getBackgroundJobs(), timeoutPromise])
     console.log('fetchBackgroundJobs: API call completed, data:', data)
 
     // Validate response structure
@@ -1371,12 +1386,11 @@ const fetchNetworkConfiguration = async () => {
   try {
     console.log('fetchNetworkConfiguration: Calling getNetworkConfiguration API...')
 
-    // Add timeout to prevent hanging
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Network configuration request timeout after 10 seconds')), 10000)
+    const response = await withTimeout(
+      getNetworkConfiguration(),
+      10000,
+      'Network configuration request timeout after 10 seconds',
     )
-
-    const response = await Promise.race([getNetworkConfiguration(), timeoutPromise])
     console.log('fetchNetworkConfiguration: API call completed, response:', response)
 
     if (response.status === 'success' && response.data) {
@@ -1401,12 +1415,7 @@ const fetchI2CDevices = async () => {
   try {
     console.log('fetchI2CDevices: Calling scanI2CDevices API...')
 
-    // Add timeout to prevent hanging
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('I2C devices scan timeout after 10 seconds')), 10000)
-    )
-
-    const response = await Promise.race([scanI2CDevices(), timeoutPromise])
+    const response = await withTimeout(scanI2CDevices(), 10000, 'I2C devices scan timeout after 10 seconds')
     console.log('fetchI2CDevices: API call completed, response:', response)
 
     if (response.status === 'success' && response.data) {
@@ -1471,12 +1480,11 @@ const fetchFileExistence = async () => {
   try {
     console.log('fetchFileExistence: Calling checkFileExistence API...')
 
-    // Add timeout to prevent hanging
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('File existence check timeout after 10 seconds')), 10000)
+    const results = await withTimeout(
+      checkFileExistence(filesToCheck),
+      10000,
+      'File existence check timeout after 10 seconds',
     )
-
-    const results = await Promise.race([checkFileExistence(filesToCheck), timeoutPromise])
     console.log('fetchFileExistence: API call completed, results:', results)
 
     fileExistence.value = results
@@ -1620,7 +1628,7 @@ const fetchBackgroundServices = async () => {
 
       // Handle local web interface version
       if (service.isLocal) {
-        serviceCheck.version = import.meta.env.VITE_APP_VERSION
+        serviceCheck.version = (import.meta as ImportMeta & { env: { VITE_APP_VERSION?: string } }).env.VITE_APP_VERSION
         serviceCheck.status = 'available'
         serviceCheck.lastChecked = new Date()
         console.log(`${service.name} version: ${serviceCheck.version}`)

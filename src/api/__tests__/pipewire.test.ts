@@ -136,6 +136,50 @@ describe('PipeWire API - Core API', () => {
         expect.any(Object)
       )
     })
+
+    it('should use proxy base URL when useProxy is enabled', async () => {
+      vi.mocked(useAppConfigStore).mockReturnValue({
+        config: {
+          audiocontrol_api: {
+            deviceIP: '192.168.1.10',
+            devicePort: 8080,
+            useProxy: true,
+          },
+        },
+      } as any)
+      vi.mocked(apiFetch).mockResolvedValueOnce(
+        new Response(JSON.stringify({ version: '1.0', api_version: '1.0' }), { status: 200 })
+      )
+
+      await getVersion()
+
+      expect(apiFetch).toHaveBeenCalledWith(
+        `${window.location.origin}/api/pipewire/v1/version`,
+        expect.any(Object)
+      )
+    })
+
+    it('should omit port suffix when direct device port is 80', async () => {
+      vi.mocked(useAppConfigStore).mockReturnValue({
+        config: {
+          audiocontrol_api: {
+            deviceIP: '192.168.1.20',
+            devicePort: 80,
+            useProxy: false,
+          },
+        },
+      } as any)
+      vi.mocked(apiFetch).mockResolvedValueOnce(
+        new Response(JSON.stringify({ version: '1.0', api_version: '1.0' }), { status: 200 })
+      )
+
+      await getVersion()
+
+      expect(apiFetch).toHaveBeenCalledWith(
+        'http://192.168.1.20/api/pipewire/v1/version',
+        expect.any(Object)
+      )
+    })
   })
 
   describe('listEndpoints', () => {
@@ -239,6 +283,52 @@ describe('PipeWire API - Core API', () => {
       await refreshCache()
       const call = vi.mocked(apiFetch).mock.calls[0]
       expect(call[1]?.method).toBe('POST')
+    })
+  })
+
+  describe('properties endpoints', () => {
+    it('should list all object properties', async () => {
+      const mockProperties = {
+        objects: [
+          {
+            id: 5,
+            name: 'sink-main',
+            type: 'node',
+            properties: { 'device.description': 'Main sink' },
+          },
+        ],
+      }
+      vi.mocked(apiFetch).mockResolvedValueOnce(
+        new Response(JSON.stringify(mockProperties), { status: 200 })
+      )
+
+      const result = await getAllProperties()
+
+      expect((result as any).objects).toHaveLength(1)
+      expect(apiFetch).toHaveBeenCalledWith(
+        'http://localhost:2716/api/pipewire/v1/properties',
+        expect.any(Object)
+      )
+    })
+
+    it('should fetch properties for a single object', async () => {
+      const mockObjectProperties = {
+        id: 7,
+        name: 'capture-node',
+        type: 'node',
+        properties: { 'node.description': 'Capture node' },
+      }
+      vi.mocked(apiFetch).mockResolvedValueOnce(
+        new Response(JSON.stringify(mockObjectProperties), { status: 200 })
+      )
+
+      const result = await getObjectProperties(7)
+
+      expect((result as any).id).toBe(7)
+      expect(apiFetch).toHaveBeenCalledWith(
+        'http://localhost:2716/api/pipewire/v1/properties/7',
+        expect.any(Object)
+      )
     })
   })
 })
@@ -1015,6 +1105,15 @@ describe('PipeWire API - Error Handling', () => {
     const result = await getVersion()
     expect(isApiError(result)).toBe(true)
     expect((result as any).error).toBe('Network Error')
+  })
+
+  it('should use unknown error message for non-Error rejections', async () => {
+    vi.mocked(apiFetch).mockRejectedValueOnce('timeout')
+
+    const result = await getVersion()
+
+    expect(isApiError(result)).toBe(true)
+    expect((result as any).message).toBe('Unknown error')
   })
 
   it('should return error response for failed requests', async () => {

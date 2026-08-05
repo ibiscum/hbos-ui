@@ -1,15 +1,18 @@
 <template>
-  <teleport to="body">
+  <Teleport to="body">
     <div v-if="open" class="modal-backdrop" @click.self="$emit('close')">
       <div class="modal-content backend-info-modal">
         <div class="modal-header">
           <h2>{{ capabilities?.backendName || 'Backend' }} Information</h2>
-          <button class="close-btn" @click="$emit('close')">×</button>
+          <button type="button" class="close-btn" aria-label="Close backend information" @click="$emit('close')">×</button>
         </div>
-        <div class="modal-body" v-html="capabilities?.backendDescription"></div>
+        <div v-if="capabilities?.backendDescription" class="modal-body" v-html="capabilities.backendDescription"></div>
+        <div v-else class="modal-body empty-description">
+          No backend description available.
+        </div>
       </div>
     </div>
-  </teleport>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -58,5 +61,9 @@ defineEmits<{
   :deep(p) {
     margin: 0 0 12px;
   }
+}
+
+.empty-description {
+  text-align: center;
 }
 </style>

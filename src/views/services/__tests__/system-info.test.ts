@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, afterAll, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
-import SystemInfoView from '../system-info.vue'
+import SystemInfoView from '@/views/services/system-info.vue'
 
 const baseSystemInfo = {
   status: 'success' as const,
@@ -573,6 +573,145 @@ describe('services/system-info view consolidated unit and regression tests', () 
 
       wrapper.unmount()
       vi.useRealTimers()
+    })
+
+    it('surfaces timeout error when file existence check hangs', async () => {
+      vi.useFakeTimers()
+
+      mocks.checkFileExistence.mockImplementationOnce(() => new Promise(() => {}))
+
+      const wrapper = mountView()
+      await vi.advanceTimersByTimeAsync(10050)
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('File existence check timeout after 10 seconds')
+
+      wrapper.unmount()
+      vi.useRealTimers()
+    })
+
+    it('surfaces timeout error when system info request hangs', async () => {
+      vi.useFakeTimers()
+
+      mocks.getSystemInfo.mockImplementationOnce(() => new Promise(() => {}))
+
+      const wrapper = mountView()
+      await vi.advanceTimersByTimeAsync(10050)
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Request timeout after 10 seconds')
+
+      wrapper.unmount()
+      vi.useRealTimers()
+    })
+
+    it('surfaces timeout error when cache stats request hangs', async () => {
+      vi.useFakeTimers()
+
+      mocks.getCacheStats.mockImplementationOnce(() => new Promise(() => {}))
+
+      const wrapper = mountView()
+      await vi.advanceTimersByTimeAsync(10050)
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Cache stats request timeout after 10 seconds')
+
+      wrapper.unmount()
+      vi.useRealTimers()
+    })
+
+    it('surfaces timeout error when background jobs request hangs', async () => {
+      vi.useFakeTimers()
+
+      mocks.getBackgroundJobs.mockImplementationOnce(() => new Promise(() => {}))
+
+      const wrapper = mountView()
+      await vi.advanceTimersByTimeAsync(10050)
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Background jobs request timeout after 10 seconds')
+
+      wrapper.unmount()
+      vi.useRealTimers()
+    })
+
+    it('surfaces timeout error when network configuration request hangs', async () => {
+      vi.useFakeTimers()
+
+      mocks.getNetworkConfiguration.mockImplementationOnce(() => new Promise(() => {}))
+
+      const wrapper = mountView()
+      await vi.advanceTimersByTimeAsync(10050)
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Network configuration request timeout after 10 seconds')
+
+      wrapper.unmount()
+      vi.useRealTimers()
+    })
+
+    it('surfaces timeout error when I2C scan request hangs', async () => {
+      vi.useFakeTimers()
+
+      mocks.scanI2CDevices.mockImplementationOnce(() => new Promise(() => {}))
+
+      const wrapper = mountView()
+      await vi.advanceTimersByTimeAsync(10050)
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('I2C devices scan timeout after 10 seconds')
+
+      wrapper.unmount()
+      vi.useRealTimers()
+    })
+
+    it('shows fallback input error when inputs request throws non-Error value', async () => {
+      mocks.getInputs.mockRejectedValueOnce('unexpected failure payload')
+
+      const wrapper = mountView()
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Failed to load input devices')
+
+      wrapper.unmount()
+    })
+
+    it('resets countdown back to 60s after it reaches zero while auto-update is enabled', async () => {
+      vi.useFakeTimers()
+
+      const wrapper = mountView()
+      await flushPromises()
+
+      await wrapper.get('.auto-update-indicator').trigger('click')
+      await flushPromises()
+
+      // Force countdown to the boundary and advance one tick to execute the reset branch.
+      ;(wrapper.vm as unknown as { countdownSeconds: number }).countdownSeconds = 0
+      await vi.advanceTimersByTimeAsync(1000)
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Auto-update in 60s')
+
+      wrapper.unmount()
+      vi.useRealTimers()
+    })
+
+    it('resets paused auto-update state on unmount when user is editing', async () => {
+      const logSpy = vi.spyOn(console, 'log')
+
+      const wrapper = mountView()
+      await flushPromises()
+
+      await wrapper.get('.hostname-display .edit-button').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Auto-update paused')
+
+      wrapper.unmount()
+
+      expect(logSpy).toHaveBeenCalledWith('System Info: Resetting auto-update paused state on unmount')
+
+      logSpy.mockRestore()
     })
   })
 })
