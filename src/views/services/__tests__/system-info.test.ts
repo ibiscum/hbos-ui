@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, afterAll, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
-import SystemInfoView from '../system-info.vue'
+import SystemInfoView from '@/views/services/system-info.vue'
 
 const baseSystemInfo = {
   status: 'success' as const,

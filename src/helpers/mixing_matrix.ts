@@ -97,16 +97,16 @@ export function matrixToSettings(matrix: number[][]): { mode: AudioMode; balance
     return null
   }
 
-  // Extract the coefficients
+  // Extract the coefficients (rows are outputs, columns are inputs)
   const ll = matrix[0][0] // Left in -> Left out
-  const lr = matrix[0][1] // Left in -> Right out
-  const rl = matrix[1][0] // Right in -> Left out
+  const lr = matrix[0][1] // Right in -> Left out
+  const rl = matrix[1][0] // Left in -> Right out
   const rr = matrix[1][1] // Right in -> Right out
 
   // Calculate balance from output gains
-  // Find the maximum gain on each output to determine balance
-  const leftOutGain = Math.max(Math.abs(ll), Math.abs(rl))
-  const rightOutGain = Math.max(Math.abs(lr), Math.abs(rr))
+  // Find the maximum gain on each output row to determine balance
+  const leftOutGain = Math.max(Math.abs(ll), Math.abs(lr))
+  const rightOutGain = Math.max(Math.abs(rl), Math.abs(rr))
 
   let balance = 0
   if (leftOutGain > 0 && rightOutGain > 0) {
@@ -139,7 +139,7 @@ export function matrixToSettings(matrix: number[][]): { mode: AudioMode; balance
     return { mode: 'stereo', balance }
   } else if (isClose(normLL, 0) && isClose(normLR, 1) && isClose(normRL, 1) && isClose(normRR, 0)) {
     return { mode: 'swapped', balance }
-  } else if (isClose(normLL, 0.5) && isClose(normLR, 0.5) && isClose(normRL, 0.5) && isClose(normRR, 0.5)) {
+  } else if (isClose(normLL, 1) && isClose(normLR, 1) && isClose(normRL, 1) && isClose(normRR, 1)) {
     return { mode: 'mono', balance }
   } else if (isClose(normLL, 1) && isClose(normLR, 1) && isClose(normRL, 0) && isClose(normRR, 0)) {
     return { mode: 'left', balance }

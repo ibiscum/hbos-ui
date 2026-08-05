@@ -1,1162 +1,469 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
+import { ref, type Ref } from 'vue'
 
-// Mock stores
-vi.mock('@/stores/album', () => {
-  const mockAlbumStore = {
-    loading: { value: false },
-    loaded: { value: true },
-    sortedAlbums: { value: [] },
-    sortBy: { value: 'release_date' as 'release_date' | 'artist' | 'random' },
-    sortOrder: { value: 'desc' as 'asc' | 'desc' },
-    genres: { value: [] },
-    selectedGenres: { value: [] },
-    getAlbums: vi.fn(),
+import AlbumsView from '@/views/library/albums/albums.vue'
+import { deleteAlbum as apiDeleteAlbum } from '@/api/audiocontrol-library'
+
+const runtime = vi.hoisted(() => {
+  return {
+    loading: null as unknown as Ref<boolean>,
+    loaded: null as unknown as Ref<boolean>,
+    sortedAlbums: null as unknown as Ref<Array<{ id: string }>>,
+    sortBy: null as unknown as Ref<'release_date' | 'artist' | 'random'>,
+    sortOrder: null as unknown as Ref<'asc' | 'desc'>,
+    genres: null as unknown as Ref<string[]>,
+    selectedGenres: null as unknown as Ref<string[]>,
+    supportsDelete: null as unknown as Ref<boolean>,
+    activeLibrary: null as unknown as Ref<string>,
+
+    getAlbums: vi.fn(async () => undefined),
     clearSearch: vi.fn(),
     setSortBy: vi.fn(),
     toggleSortOrder: vi.fn(),
     shuffleAlbums: vi.fn(),
-    loadGenres: vi.fn(),
+    loadGenres: vi.fn(async () => undefined),
     setGenreFilter: vi.fn(),
     setSearchQuery: vi.fn(),
-  }
-  return {
-    useAlbumStore: () => mockAlbumStore,
+
+    sendCommand: vi.fn(async () => undefined),
+    sendLibraryCommand: vi.fn(async () => undefined),
+    addTrackToQueue: vi.fn(async () => undefined),
+
+    showErrorToast: vi.fn(),
+    showSuccessToast: vi.fn(),
+
+    libraryFetchImpl: vi.fn(),
   }
 })
 
+vi.mock('pinia', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('pinia')>()
+  return {
+    ...actual,
+    storeToRefs: <T extends object>(store: T): T => store,
+  }
+})
+
+vi.mock('@/stores/album', () => ({
+  useAlbumStore: () => ({
+    loading: runtime.loading,
+    loaded: runtime.loaded,
+    sortedAlbums: runtime.sortedAlbums,
+    sortBy: runtime.sortBy,
+    sortOrder: runtime.sortOrder,
+    genres: runtime.genres,
+    selectedGenres: runtime.selectedGenres,
+    getAlbums: runtime.getAlbums,
+    clearSearch: runtime.clearSearch,
+    setSortBy: runtime.setSortBy,
+    toggleSortOrder: runtime.toggleSortOrder,
+    shuffleAlbums: runtime.shuffleAlbums,
+    loadGenres: runtime.loadGenres,
+    setGenreFilter: runtime.setGenreFilter,
+    setSearchQuery: runtime.setSearchQuery,
+  }),
+}))
+
 vi.mock('@/stores/player', () => ({
   usePlayerStore: () => ({
-    sendCommand: vi.fn(),
-    sendLibraryCommand: vi.fn(),
-    addTrackToQueue: vi.fn(),
+    sendCommand: runtime.sendCommand,
+    sendLibraryCommand: runtime.sendLibraryCommand,
+    addTrackToQueue: runtime.addTrackToQueue,
   }),
 }))
 
 vi.mock('@/stores/toast', () => ({
   useToastStore: () => ({
-    showErrorToast: vi.fn(),
-    showSuccessToast: vi.fn(),
+    showErrorToast: runtime.showErrorToast,
+    showSuccessToast: runtime.showSuccessToast,
   }),
 }))
 
 vi.mock('@/stores/library', () => ({
   useLibraryStore: () => ({
-    supportsDelete: { value: false },
-    activeLibrary: { value: 'default' },
+    supportsDelete: runtime.supportsDelete,
+    activeLibrary: runtime.activeLibrary,
   }),
 }))
 
 vi.mock('@/composables/useLibraryFetch', () => ({
-  useLibraryFetch: () => vi.fn(),
+  useLibraryFetch: () => runtime.libraryFetchImpl,
 }))
 
 vi.mock('@/api/audiocontrol-library', () => ({
-  deleteAlbum: vi.fn(),
+  deleteAlbum: vi.fn(async () => undefined),
 }))
 
-// Mock components
 vi.mock('@/components/PageContent.vue', () => ({
   default: {
     name: 'PageContent',
-    template: '<div data-test="page-content"><slot /></div>',
     props: ['title', 'backrouterLink'],
-  },
-}))
-
-vi.mock('@/components/CustomSearchField.vue', () => ({
-  default: {
-    name: 'CustomSearchField',
-    template: '<input data-test="search-field" />',
-    props: ['modelValue', 'placeholder', 'debounce'],
-    emits: ['update:modelValue', 'change'],
-  },
-}))
-
-vi.mock('@/components/SortSelector.vue', () => ({
-  default: {
-    name: 'SortSelector',
-    template: '<div data-test="sort-selector" />',
-    props: ['sortBy', 'sortOrder'],
-    emits: ['sort-by-change', 'toggle-order'],
+    template: '<section class="page-content-stub" :data-title="title" :data-back-link="backrouterLink?.name"><slot /></section>',
   },
 }))
 
 vi.mock('@/components/Icon.vue', () => ({
   default: {
     name: 'Icon',
-    template: '<i data-test="icon" />',
-    props: ['icon', 'width', 'height'],
+    props: ['icon'],
+    template: '<i class="icon-stub" :data-icon="icon" />',
+  },
+}))
+
+vi.mock('@/components/SortSelector.vue', () => ({
+  default: {
+    name: 'SortSelector',
+    props: ['sortBy', 'sortOrder'],
+    emits: ['sort-by-change', 'toggle-order'],
+    template: `
+      <div class="sort-selector-stub">
+        <button class="sort-release" @click="$emit('sort-by-change', 'release_date')">release</button>
+        <button class="sort-artist" @click="$emit('sort-by-change', 'artist')">artist</button>
+        <button class="sort-random" @click="$emit('sort-by-change', 'random')">random</button>
+        <button class="sort-toggle" @click="$emit('toggle-order')">toggle</button>
+      </div>
+    `,
+  },
+}))
+
+vi.mock('@/components/CustomSearchField.vue', () => ({
+  default: {
+    name: 'CustomSearchField',
+    props: ['modelValue'],
+    emits: ['change', 'update:modelValue'],
+    template: `
+      <div class="search-stub">
+        <button class="search-change" @click="$emit('change', 'Beatles')">change</button>
+        <button class="search-vmodel" @click="$emit('update:modelValue', 'Radiohead')">vmodel</button>
+      </div>
+    `,
   },
 }))
 
 vi.mock('@/components/PosterGrid.vue', () => ({
   default: {
     name: 'PosterGrid',
-    template: '<div data-test="poster-grid" />',
     props: ['loading', 'loaded', 'items'],
     emits: ['click', 'contextmenu'],
+    template: `
+      <div class="poster-grid-stub" :data-loading="loading ? 'yes' : 'no'" :data-loaded="loaded ? 'yes' : 'no'" :data-items="items.length">
+        <button class="poster-open" @click="$emit('click', items[0] ?? { id: 'fallback-id' })">open</button>
+        <button class="poster-menu" @contextmenu.prevent="$emit('contextmenu', items[0] ?? { id: 'fallback-id' }, $event)">menu</button>
+      </div>
+    `,
   },
 }))
 
-// Create test router
-const createTestRouter = () => {
+function setLibraryTracks(tracks: Array<{ id?: string; uri?: string }>) {
+  runtime.libraryFetchImpl.mockImplementation(() => ({
+    json: vi.fn(async () => ({
+      data: { value: { album: { tracks } } },
+    })),
+  }))
+}
+
+function setLibraryFetchFailure() {
+  runtime.libraryFetchImpl.mockImplementation(() => ({
+    json: vi.fn(async () => {
+      throw new Error('fetch failed')
+    }),
+  }))
+}
+
+function createTestRouter() {
   return createRouter({
     history: createMemoryHistory(),
     routes: [
-      {
-        path: '/albums',
-        name: 'albums',
-        component: { template: '<div>Albums</div>' },
-      },
-      {
-        path: '/album/:albumId',
-        name: 'album',
-        component: { template: '<div>Album</div>' },
-      },
-      {
-        path: '/library',
-        name: 'library',
-        component: { template: '<div>Library</div>' },
-      },
+      { path: '/albums', name: 'albums', component: { template: '<div>Albums</div>' } },
+      { path: '/album/:albumId', name: 'album', component: { template: '<div>Album</div>' } },
+      { path: '/library', name: 'library', component: { template: '<div>Library</div>' } },
     ],
   })
 }
 
-describe('albums.vue', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let router: any
+async function mountView() {
+  const router = createTestRouter()
+  await router.push({ name: 'albums' })
+  await router.isReady()
 
+  const wrapper = mount(AlbumsView, {
+    global: {
+      plugins: [router],
+      stubs: { Teleport: true },
+    },
+    attachTo: document.body,
+  })
+
+  await flushPromises()
+  return { wrapper, router }
+}
+
+describe('albums.vue consolidated unit and regression tests', () => {
   beforeEach(() => {
-    setActivePinia(createPinia())
-    router = createTestRouter()
-    vi.clearAllMocks()
+    runtime.loading = ref(false)
+    runtime.loaded = ref(true)
+    runtime.sortedAlbums = ref([{ id: 'album-1' }])
+    runtime.sortBy = ref('release_date')
+    runtime.sortOrder = ref('desc')
+    runtime.genres = ref([])
+    runtime.selectedGenres = ref([])
+    runtime.supportsDelete = ref(false)
+    runtime.activeLibrary = ref('default')
+
+    runtime.getAlbums.mockClear()
+    runtime.clearSearch.mockClear()
+    runtime.setSortBy.mockClear()
+    runtime.toggleSortOrder.mockClear()
+    runtime.shuffleAlbums.mockClear()
+    runtime.loadGenres.mockClear()
+    runtime.setGenreFilter.mockClear()
+    runtime.setSearchQuery.mockClear()
+
+    runtime.sendCommand.mockClear()
+    runtime.sendLibraryCommand.mockClear()
+    runtime.addTrackToQueue.mockClear()
+
+    runtime.showErrorToast.mockClear()
+    runtime.showSuccessToast.mockClear()
+
+    runtime.libraryFetchImpl.mockReset()
+    setLibraryTracks([])
+
+    vi.mocked(apiDeleteAlbum).mockClear()
   })
 
-  afterEach(() => {
-    vi.restoreAllMocks()
+  it('loads albums and genres on mount and wires page shell contract', async () => {
+    const addSpy = vi.spyOn(document, 'addEventListener')
+
+    const { wrapper } = await mountView()
+
+    expect(wrapper.get('.page-content-stub').attributes('data-title')).toBe('Albums')
+    expect(wrapper.get('.page-content-stub').attributes('data-back-link')).toBe('library')
+    expect(runtime.getAlbums).toHaveBeenCalledTimes(1)
+    expect(runtime.clearSearch).toHaveBeenCalledTimes(1)
+    expect(runtime.loadGenres).toHaveBeenCalledTimes(1)
+    expect(addSpy).toHaveBeenCalledWith('click', expect.any(Function))
+
+    addSpy.mockRestore()
   })
 
-  describe('component rendering', () => {
-    it('renders page content with title', async () => {
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
+  it('removes document click listener on unmount', async () => {
+    const removeSpy = vi.spyOn(document, 'removeEventListener')
+    const { wrapper } = await mountView()
 
-      // When components are stubbed, verify the component mounted successfully
-      expect(wrapper.vm).toBeDefined()
-      expect(wrapper.find('[data-test="page-content"]').exists() || wrapper.find('.card').exists() || wrapper.vm).toBeTruthy()
-    })
+    wrapper.unmount()
 
-    it('renders controls bar with sort selector', async () => {
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // With components stubbed, verify component mounts without error
-      expect(wrapper.vm).toBeDefined()
-    })
-
-    it('renders search field', async () => {
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // With components stubbed, verify component mounts without error
-      expect(wrapper.vm).toBeDefined()
-    })
-
-    it('renders shuffle button', async () => {
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // With components stubbed, verify component mounts without error
-      expect(wrapper.vm).toBeDefined()
-    })
-
-    it('renders genre dropdown only when genres exist', async () => {
-      const { useAlbumStore } = await import('@/stores/album')
-      const albumStore = useAlbumStore()
-      albumStore.genres = ['Rock', 'Pop']
-
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // With components stubbed, verify component mounts without error
-      expect(wrapper.vm).toBeDefined()
-    })
-
-    it('renders poster grid with albums', async () => {
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // With components stubbed, verify component mounts without error
-      expect(wrapper.vm).toBeDefined()
-    })
+    expect(removeSpy).toHaveBeenCalledWith('click', expect.any(Function))
+    removeSpy.mockRestore()
   })
 
-  describe('sorting functionality', () => {
-    it('handles sort by change to release_date', async () => {
-      const { useAlbumStore } = await import('@/stores/album')
-      const albumStore = useAlbumStore()
+  it('routes to album details when poster item is clicked', async () => {
+    const { wrapper, router } = await mountView()
 
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
+    await wrapper.get('.poster-open').trigger('click')
+    await flushPromises()
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-      vm.handleSortByChange('release_date')
-
-      expect(albumStore.setSortBy).toHaveBeenCalledWith('release_date')
-    })
-
-    it('handles sort by change to artist', async () => {
-      const { useAlbumStore } = await import('@/stores/album')
-      const albumStore = useAlbumStore()
-
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-      vm.handleSortByChange('artist')
-
-      expect(albumStore.setSortBy).toHaveBeenCalledWith('artist')
-    })
-
-    it('shuffles albums on random sort', async () => {
-      const { useAlbumStore } = await import('@/stores/album')
-      const albumStore = useAlbumStore()
-
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-      vm.handleSortByChange('random')
-
-      expect(albumStore.shuffleAlbums).toHaveBeenCalled()
-    })
-
-    it('toggles sort order only for release_date', async () => {
-      const { useAlbumStore } = await import('@/stores/album')
-      const albumStore = useAlbumStore()
-      albumStore.sortBy = 'release_date'
-
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-      // Just verify it doesn't throw
-      expect(() => {
-        try {
-          vm.handleToggleOrder()
-        } catch {
-
-          // Expected with mocks
-        }
-      }).not.toThrow()
-    })
+    expect(router.currentRoute.value.name).toBe('album')
+    expect(router.currentRoute.value.params.albumId).toBe('album-1')
+    expect(router.currentRoute.value.query.from).toBe('albums')
   })
 
-  describe('genre filtering', () => {
-    it('toggles genre selection', async () => {
-      const { useAlbumStore } = await import('@/stores/album')
-      const albumStore = useAlbumStore()
-      albumStore.genres = ['Rock', 'Pop']
-      albumStore.selectedGenres = []
+  it('switches sort modes and enforces release_date-only order toggling', async () => {
+    const { wrapper } = await mountView()
 
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
+    await wrapper.get('.sort-random').trigger('click')
+    await wrapper.get('.sort-artist').trigger('click')
+    await wrapper.get('.sort-toggle').trigger('click')
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-      // Just verify it doesn't throw
-      expect(() => {
-        try {
-          vm.toggleGenre('Rock')
-        } catch {
+    expect(runtime.shuffleAlbums).toHaveBeenCalledTimes(1)
+    expect(runtime.setSortBy).toHaveBeenCalledWith('artist')
+    expect(runtime.toggleSortOrder).toHaveBeenCalledTimes(1)
 
-          // Expected with mocks
-        }
-      }).not.toThrow()
-    })
+    runtime.sortBy.value = 'random'
+    await wrapper.get('.sort-toggle').trigger('click')
 
-    it('opens and closes genre dropdown', async () => {
-      const { useAlbumStore } = await import('@/stores/album')
-      const albumStore = useAlbumStore()
-      albumStore.genres = ['Rock', 'Pop']
-
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-      expect(vm.genreOpen).toBe(false)
-      vm.genreOpen = true
-      expect(vm.genreOpen).toBe(true)
-    })
-
-    it('loads genres on mount', async () => {
-      const { useAlbumStore } = await import('@/stores/album')
-      const albumStore = useAlbumStore()
-
-      const Albums = await import('@/views/library/albums/albums.vue')
-      mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      await flushPromises()
-
-      expect(albumStore.loadGenres).toHaveBeenCalled()
-    })
+    expect(runtime.toggleSortOrder).toHaveBeenCalledTimes(1)
   })
 
-  describe('search functionality', () => {
-    it('updates search query on input change', async () => {
-      const { useAlbumStore } = await import('@/stores/album')
-      const albumStore = useAlbumStore()
+  it('handles search change and v-model updates via CustomSearchField', async () => {
+    const { wrapper } = await mountView()
 
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
+    await wrapper.get('.search-change').trigger('click')
+    await wrapper.get('.search-vmodel').trigger('click')
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-      vm.onSearch('Beatles')
-
-      expect(albumStore.setSearchQuery).toHaveBeenCalledWith('Beatles')
-      expect(vm.search).toBe('Beatles')
-    })
-
-    it('clears search on mount', async () => {
-      const { useAlbumStore } = await import('@/stores/album')
-      const albumStore = useAlbumStore()
-
-      const Albums = await import('@/views/library/albums/albums.vue')
-      mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      await flushPromises()
-
-      expect(albumStore.clearSearch).toHaveBeenCalled()
-    })
+    expect(runtime.setSearchQuery).toHaveBeenCalledWith('Beatles')
   })
 
-  describe('context menu', () => {
-    it('opens context menu on right-click', async () => {
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
+  it('uses shuffle button click contract', async () => {
+    const { wrapper } = await mountView()
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-      const mockEvent = new MouseEvent('contextmenu', { clientX: 100, clientY: 200 })
-      vm.onAlbumContextMenu({ id: 'album-123' }, mockEvent)
+    await wrapper.get('.shuffle-btn').trigger('click')
 
-      expect(vm.contextMenu.visible).toBe(true)
-      expect(vm.contextMenu.albumId).toBe('album-123')
-      expect(vm.contextMenu.x).toBe(100)
-      expect(vm.contextMenu.y).toBe(200)
-    })
-
-    it('closes context menu', async () => {
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-      vm.contextMenu.visible = true
-      vm.closeContextMenu()
-
-      expect(vm.contextMenu.visible).toBe(false)
-    })
-
-    it('closes context menu on document click outside', async () => {
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-      vm.contextMenu.visible = true
-
-      const event = new MouseEvent('click', { clientX: 0, clientY: 0 })
-      vm.onDocumentClick(event)
-
-      expect(vm.contextMenu.visible).toBe(false)
-    })
+    expect(runtime.shuffleAlbums).toHaveBeenCalledTimes(1)
   })
 
-  describe('album actions', () => {
-    it('plays album now - pauses, clears queue, adds tracks, plays', async () => {
-      const { usePlayerStore } = await import('@/stores/player')
-      const { useToastStore } = await import('@/stores/toast')
-      usePlayerStore()
-      useToastStore()
+  it('shows genre dropdown only when genres exist and toggles menu state', async () => {
+    runtime.genres.value = ['rock', 'pop']
+    const { wrapper } = await mountView()
 
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
+    expect(wrapper.find('.genre-dropdown').exists()).toBe(true)
+    expect(wrapper.find('.genre-menu').exists()).toBe(false)
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-      vm.contextMenu.albumId = 'album-123'
-
-      // Mock fetchAlbumTracks
-      vi.spyOn(vm, 'fetchAlbumTracks').mockResolvedValue([
-        { id: 'track1', uri: 'uri1' },
-        { id: 'track2', uri: 'uri2' },
-      ])
-
-      try {
-        await vm.playNow()
-      } catch {
-
-        // Expected - mocks might not be complete
-      }
-
-      expect(vm.contextMenu.visible).toBe(false)
-    })
-
-    it('adds album to queue', async () => {
-      const { usePlayerStore } = await import('@/stores/player')
-      usePlayerStore()
-
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-      vm.contextMenu.albumId = 'album-123'
-
-      vi.spyOn(vm, 'fetchAlbumTracks').mockResolvedValue([
-        { id: 'track1', uri: 'uri1' },
-      ])
-
-      try {
-        await vm.addToQueue()
-      } catch {
-
-        // Expected - mocks might not be complete
-      }
-
-      expect(vm.contextMenu.visible).toBe(false)
-    })
-
-    it('deletes album with confirmation', async () => {
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-      vm.contextMenu.albumId = 'album-123'
-
-      // Mock confirm to return true
-      window.confirm = vi.fn(() => true)
-
-      try {
-        await vm.deleteAlbum()
-      } catch {
-
-        // Expected - mocks might not be complete
-      }
-
-      expect(vm.contextMenu.visible).toBe(false)
-    })
-
-    it('does not delete album if confirmation cancelled', async () => {
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-      window.confirm = vi.fn(() => false)
-
-      try {
-        await vm.deleteAlbum()
-      } catch {
-
-        // Expected
-      }
-
-      // Context menu should still be closed
-      expect(vm.contextMenu.visible).toBe(false)
-    })
+    await wrapper.get('.genre-dropdown-btn').trigger('click')
+    expect(wrapper.find('.genre-menu').exists()).toBe(true)
   })
 
-  describe('event listeners', () => {
-    it('adds click listener on mount', async () => {
-      const addEventListenerSpy = vi.spyOn(document, 'addEventListener')
+  it('adds and removes genre filters from current selection', async () => {
+    runtime.genres.value = ['rock']
+    runtime.selectedGenres.value = ['rock']
+    const { wrapper } = await mountView()
 
-      const Albums = await import('@/views/library/albums/albums.vue')
-      mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
+    await wrapper.get('.genre-dropdown-btn').trigger('click')
+    await wrapper.get('.genre-option input').trigger('change')
+    expect(runtime.setGenreFilter).toHaveBeenLastCalledWith([])
 
-      await flushPromises()
-
-      expect(addEventListenerSpy).toHaveBeenCalledWith('click', expect.any(Function))
-      addEventListenerSpy.mockRestore()
-    })
-
-    it('removes click listener on unmount', async () => {
-      const removeEventListenerSpy = vi.spyOn(document, 'removeEventListener')
-
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      wrapper.unmount()
-
-      expect(removeEventListenerSpy).toHaveBeenCalledWith('click', expect.any(Function))
-      removeEventListenerSpy.mockRestore()
-    })
+    runtime.selectedGenres.value = []
+    await wrapper.get('.genre-option input').trigger('change')
+    expect(runtime.setGenreFilter).toHaveBeenLastCalledWith(['rock'])
   })
 
-  describe('navigation', () => {
-    it('navigates to album on poster click', async () => {
-      const routerPushSpy = vi.spyOn(router, 'push')
+  it('closes an open genre menu when clicking outside', async () => {
+    runtime.genres.value = ['rock']
+    const { wrapper } = await mountView()
 
-      const Albums = await import('@/views/library/albums/albums.vue')
-      mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
+    await wrapper.get('.genre-dropdown-btn').trigger('click')
+    expect(wrapper.find('.genre-menu').exists()).toBe(true)
 
-      routerPushSpy.mockClear()
-    })
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+
+    expect(wrapper.find('.genre-menu').exists()).toBe(false)
   })
 
-  describe('error handling', () => {
-    it('has error handling in catch blocks', async () => {
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
+  it('opens context menu with album id and coordinates and closes on document click', async () => {
+    const { wrapper } = await mountView()
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
+    await wrapper.get('.poster-menu').trigger('contextmenu', { clientX: 110, clientY: 240 })
 
-      // Verify functions exist
-      expect(vm.playNow).toBeDefined()
-      expect(vm.addToQueue).toBeDefined()
-      expect(vm.deleteAlbum).toBeDefined()
-    })
+    const menu = wrapper.get('.album-context-menu')
+    expect(menu.attributes('style')).toContain('top: 240px')
+    expect(menu.attributes('style')).toContain('left: 110px')
 
-    it('playNow has try-catch error handling', () => {
-      // Documents that playNow catches errors and shows error toast
-      const codeExample = `
-        try {
-          const tracks = await fetchAlbumTracks(albumId)
-          await playerStore.sendCommand('pause')
-          await playerStore.sendCommand('clear_queue')
-          for (const track of tracks) {
-            await playerStore.addTrackToQueue(track)
-          }
-          await playerStore.sendLibraryCommand('play')
-        } catch (err) {
-          toastStore.showErrorToast('Failed to play album')
-        }
-      `
-      expect(codeExample).toContain('catch (err)')
-      expect(codeExample).toContain('showErrorToast')
-    })
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
 
-    it('addToQueue has try-catch error handling', () => {
-      // Documents that addToQueue catches errors and shows error toast
-      const codeExample = `
-        try {
-          const tracks = await fetchAlbumTracks(albumId)
-          for (const track of tracks) {
-            await playerStore.addTrackToQueue(track)
-          }
-        } catch (err) {
-          toastStore.showErrorToast('Failed to add album to queue')
-        }
-      `
-      expect(codeExample).toContain('catch (err)')
-      expect(codeExample).toContain('showErrorToast')
-    })
-
-    it('deleteAlbum has try-catch error handling', () => {
-      // Documents that deleteAlbum catches errors and shows error toast
-      const codeExample = `
-        try {
-          await apiDeleteAlbum(activeLibrary.value!, albumId)
-          toastStore.showSuccessToast('Album deleted')
-          await getAlbums()
-        } catch (err) {
-          toastStore.showErrorToast('Failed to delete album')
-        }
-      `
-      expect(codeExample).toContain('catch (err)')
-      expect(codeExample).toContain('showErrorToast')
-    })
-
-    it('error variables are unused (err vs _err)', () => {
-      // Documents inconsistency: catch blocks use 'err' but never read it
-      // Should use '_err' to indicate intentionally unused
-      expect(true).toBe(true) // Documents the pattern
-    })
+    expect(wrapper.find('.album-context-menu').exists()).toBe(false)
   })
 
-  describe('Error Path Testing - IMPROVED', () => {
-    it('playNow closes context menu when successful', async () => {
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
+  it('plays now by pausing, clearing queue, enqueueing tracks, and starting playback', async () => {
+    setLibraryTracks([{ id: 't1' }, { uri: 'u2' }])
+    const { wrapper } = await mountView()
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-      vm.contextMenu.albumId = 'album-123'
-      vm.contextMenu.visible = true
+    await wrapper.get('.poster-menu').trigger('contextmenu', { clientX: 10, clientY: 10 })
+    await wrapper.get('.ctx-item').trigger('click')
+    await flushPromises()
 
-      // Mock fetchAlbumTracks to return empty (safe path)
-      vi.spyOn(vm, 'fetchAlbumTracks').mockResolvedValue([])
-
-      await vm.playNow()
-
-      // ✅ VERIFY: Context menu closed after operation
-      expect(vm.contextMenu.visible).toBe(false)
-    })
-
-    it('playNow returns early if tracks array is empty', async () => {
-      const { usePlayerStore } = await import('@/stores/player')
-      const playerStore = usePlayerStore()
-
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-      vm.contextMenu.albumId = 'album-empty'
-
-      // Mock fetchAlbumTracks to return empty array
-      vi.spyOn(vm, 'fetchAlbumTracks').mockResolvedValue([])
-
-      const sendCommandSpy = vi.spyOn(playerStore, 'sendCommand')
-      const sendLibraryCommandSpy = vi.spyOn(playerStore, 'sendLibraryCommand')
-
-      await vm.playNow()
-
-      // ✅ VERIFY: No player commands called when tracks empty
-      expect(sendCommandSpy).not.toHaveBeenCalled()
-      expect(sendLibraryCommandSpy).not.toHaveBeenCalled()
-    })
-
-    it('addToQueue closes context menu when successful', async () => {
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-      vm.contextMenu.albumId = 'album-123'
-      vm.contextMenu.visible = true
-
-      vi.spyOn(vm, 'fetchAlbumTracks').mockResolvedValue([])
-
-      await vm.addToQueue()
-
-      // ✅ VERIFY: Context menu closed
-      expect(vm.contextMenu.visible).toBe(false)
-    })
-
-    it('deleteAlbum closes context menu when user cancels', async () => {
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-      vm.contextMenu.albumId = 'album-123'
-      vm.contextMenu.visible = true
-
-      // Mock confirm to return false (user cancelled)
-      window.confirm = vi.fn(() => false)
-
-      await vm.deleteAlbum()
-
-      // ✅ VERIFY: Context menu still closed
-      expect(vm.contextMenu.visible).toBe(false)
-    })
+    expect(runtime.sendCommand).toHaveBeenNthCalledWith(1, 'pause')
+    expect(runtime.sendCommand).toHaveBeenNthCalledWith(2, 'clear_queue')
+    expect(runtime.addTrackToQueue).toHaveBeenCalledTimes(2)
+    expect(runtime.sendLibraryCommand).toHaveBeenCalledWith('play')
   })
 
-  describe('Edge Cases & Defensive Coding', () => {
-    it('onSearch updates internal search state', async () => {
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
+  it('returns early for play now when fetched tracks are empty', async () => {
+    setLibraryTracks([])
+    const { wrapper } = await mountView()
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
+    await wrapper.get('.poster-menu').trigger('contextmenu', { clientX: 10, clientY: 10 })
+    await wrapper.get('.ctx-item').trigger('click')
+    await flushPromises()
 
-      vm.onSearch('Beatles')
-
-      // ✅ VERIFY: Internal search state updated
-      expect(vm.search).toBe('Beatles')
-    })
-
-    it('closeContextMenu sets visible to false', async () => {
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-
-      vm.contextMenu.visible = true
-      vm.closeContextMenu()
-
-      // ✅ VERIFY: Context menu closed
-      expect(vm.contextMenu.visible).toBe(false)
-    })
-
-    it('onDocumentClick closes context menu when visible', async () => {
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-
-      vm.contextMenu.visible = true
-      const event = new MouseEvent('click')
-      vm.onDocumentClick(event)
-
-      // ✅ VERIFY: Context menu closed
-      expect(vm.contextMenu.visible).toBe(false)
-    })
-
-    it('handleSortByChange calls shuffleAlbums when random is selected', async () => {
-      const { useAlbumStore } = await import('@/stores/album')
-      const albumStore = useAlbumStore()
-
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-
-      vi.clearAllMocks()
-      vm.handleSortByChange('random')
-
-      // ✅ VERIFY: Shuffle called instead of setSortBy
-      expect(albumStore.shuffleAlbums).toHaveBeenCalled()
-      expect(albumStore.setSortBy).not.toHaveBeenCalled()
-    })
-
-    it('handleSortByChange calls setSortBy for non-random sorts', async () => {
-      const { useAlbumStore } = await import('@/stores/album')
-      const albumStore = useAlbumStore()
-
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
-
-      vi.clearAllMocks()
-      vm.handleSortByChange('release_date')
-
-      // ✅ VERIFY: setSortBy called, not shuffle
-      expect(albumStore.setSortBy).toHaveBeenCalledWith('release_date')
-      expect(albumStore.shuffleAlbums).not.toHaveBeenCalled()
-    })
+    expect(runtime.sendCommand).not.toHaveBeenCalled()
+    expect(runtime.sendLibraryCommand).not.toHaveBeenCalled()
   })
 
-  describe('Event Listener Behavior', () => {
-    it('onDocumentClick closes context menu when visible', async () => {
-      const Albums = await import('@/views/library/albums/albums.vue')
-      const wrapper = mount(Albums.default, {
-        global: {
-          plugins: [router],
-          stubs: {
-            PageContent: true,
-            SortSelector: true,
-            CustomSearchField: true,
-            Icon: true,
-            PosterGrid: true,
-          },
-        },
-      })
+  it('shows error toast when play now fetch fails', async () => {
+    setLibraryFetchFailure()
+    const { wrapper } = await mountView()
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vm = wrapper.vm as any
+    await wrapper.get('.poster-menu').trigger('contextmenu', { clientX: 10, clientY: 10 })
+    await wrapper.get('.ctx-item').trigger('click')
+    await flushPromises()
 
-      vm.contextMenu.visible = true
-      vm.genreOpen = false
+    expect(runtime.showErrorToast).toHaveBeenCalledWith('Failed to play album')
+  })
 
-      const event = new MouseEvent('click', { clientX: 0, clientY: 0 })
-      vm.onDocumentClick(event)
+  it('adds album tracks to queue and handles failure branch', async () => {
+    setLibraryTracks([{ id: 't1' }])
+    const { wrapper } = await mountView()
 
-      // ✅ VERIFY: Context menu closed
-      expect(vm.contextMenu.visible).toBe(false)
+    await wrapper.get('.poster-menu').trigger('contextmenu', { clientX: 10, clientY: 10 })
+    await wrapper.findAll('.ctx-item')[1].trigger('click')
+    await flushPromises()
+    expect(runtime.addTrackToQueue).toHaveBeenCalledTimes(1)
+
+    runtime.addTrackToQueue.mockImplementationOnce(async () => {
+      throw new Error('queue-failed')
     })
+    setLibraryTracks([{ id: 't2' }])
+
+    await wrapper.get('.poster-menu').trigger('contextmenu', { clientX: 10, clientY: 10 })
+    await wrapper.findAll('.ctx-item')[1].trigger('click')
+    await flushPromises()
+    expect(runtime.showErrorToast).toHaveBeenCalledWith('Failed to add album to queue')
+  })
+
+  it('uses empty-track fallback when library response has no album payload', async () => {
+    runtime.libraryFetchImpl.mockImplementation(() => ({
+      json: vi.fn(async () => ({ data: { value: {} } })),
+    }))
+    const { wrapper } = await mountView()
+
+    await wrapper.get('.poster-menu').trigger('contextmenu', { clientX: 10, clientY: 10 })
+    await wrapper.findAll('.ctx-item')[1].trigger('click')
+    await flushPromises()
+
+    expect(runtime.addTrackToQueue).not.toHaveBeenCalled()
+    expect(runtime.showErrorToast).not.toHaveBeenCalledWith('Failed to add album to queue')
+  })
+
+  it('supports delete flow: cancel, no library selected, success, and API failure', async () => {
+    runtime.supportsDelete.value = true
+    const confirmMock = vi.fn()
+    vi.stubGlobal('confirm', confirmMock)
+    const { wrapper } = await mountView()
+
+    confirmMock.mockReturnValueOnce(false)
+    await wrapper.get('.poster-menu').trigger('contextmenu', { clientX: 10, clientY: 10 })
+    await wrapper.get('.ctx-item--danger').trigger('click')
+    await flushPromises()
+    expect(apiDeleteAlbum).not.toHaveBeenCalled()
+
+    runtime.activeLibrary.value = ''
+    confirmMock.mockReturnValueOnce(true)
+    await wrapper.get('.poster-menu').trigger('contextmenu', { clientX: 10, clientY: 10 })
+    await wrapper.get('.ctx-item--danger').trigger('click')
+    await flushPromises()
+    expect(runtime.showErrorToast).toHaveBeenCalledWith('No library selected')
+
+    runtime.activeLibrary.value = 'default'
+    vi.mocked(apiDeleteAlbum).mockResolvedValueOnce(undefined)
+    confirmMock.mockReturnValueOnce(true)
+    await wrapper.get('.poster-menu').trigger('contextmenu', { clientX: 10, clientY: 10 })
+    await wrapper.get('.ctx-item--danger').trigger('click')
+    await flushPromises()
+    expect(apiDeleteAlbum).toHaveBeenCalledWith('default', 'album-1')
+    expect(runtime.showSuccessToast).toHaveBeenCalledWith('Album deleted')
+    expect(runtime.getAlbums).toHaveBeenCalledTimes(2)
+
+    vi.mocked(apiDeleteAlbum).mockRejectedValueOnce(new Error('delete failed'))
+    confirmMock.mockReturnValueOnce(true)
+    await wrapper.get('.poster-menu').trigger('contextmenu', { clientX: 10, clientY: 10 })
+    await wrapper.get('.ctx-item--danger').trigger('click')
+    await flushPromises()
+    expect(runtime.showErrorToast).toHaveBeenCalledWith('Failed to delete album')
+
+    vi.unstubAllGlobals()
   })
 })

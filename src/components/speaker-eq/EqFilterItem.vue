@@ -7,21 +7,26 @@
         <div class="filter-details">
           <h3 v-if="filter.icon === 'generic_normalized'">
             {{ formatFilterTypeName(filter.icon) }} |
-            b0={{ filter.genericCoeffs?.b0 || 1 }}
-            b1={{ filter.genericCoeffs?.b1 || 0 }}
-            b2={{ filter.genericCoeffs?.b2 || 0 }}
-            a1={{ filter.genericCoeffs?.a1 || 0 }}
-            a2={{ filter.genericCoeffs?.a2 || 0 }}
+            b0={{ filter.genericCoeffs?.b0 ?? 1 }}
+            b1={{ filter.genericCoeffs?.b1 ?? 0 }}
+            b2={{ filter.genericCoeffs?.b2 ?? 0 }}
+            a1={{ filter.genericCoeffs?.a1 ?? 0 }}
+            a2={{ filter.genericCoeffs?.a2 ?? 0 }}
           </h3>
           <h3 v-else>
-            {{ formatFilterTypeName(filter.icon) }} | {{ filter.frequency }} Hz | {{ filter.gain }} dB | Q {{ filter.Q ? filter.Q.toFixed(2) : 'N/A' }}
+            {{ formatFilterTypeName(filter.icon) }} | {{ filter.frequency }} Hz | {{ filter.gain }} dB | Q {{ filter.Q != null ? filter.Q.toFixed(2) : 'N/A' }}
           </h3>
         </div>
       </div>
       <div class="filter-actions" @click.stop>
-        <div class="filter-remove" @click="$emit('remove', filter.id)">
+        <button
+          type="button"
+          class="filter-remove"
+          aria-label="Remove filter"
+          @click="$emit('remove', filter.id)"
+        >
           <Icon icon="close" />
-        </div>
+        </button>
       </div>
     </div>
 
@@ -31,11 +36,11 @@
           <div class="control-group" v-for="ctrl in standardControls" :key="ctrl.label">
             <label>{{ ctrl.label }}</label>
             <div class="control-buttons">
-              <button @click="$emit(ctrl.decEvent as any, filter)" class="control-btn">
+              <button type="button" :aria-label="`Decrease ${ctrl.label}`" @click="$emit(ctrl.decEvent as any, filter)" class="control-btn">
                 <Icon icon="minus-small" />
               </button>
               <span class="control-value">{{ ctrl.format(filter) }}</span>
-              <button @click="$emit(ctrl.incEvent as any, filter)" class="control-btn">
+              <button type="button" :aria-label="`Increase ${ctrl.label}`" @click="$emit(ctrl.incEvent as any, filter)" class="control-btn">
                 <Icon icon="plus-small" />
               </button>
             </div>
@@ -47,7 +52,7 @@
         <div class="coefficient-inputs">
           <div v-for="coeff in (['b0', 'b1', 'b2', 'a1', 'a2'] as const)" :key="coeff" class="coefficient-group">
             <label>{{ coeff }}</label>
-            <input type="number" step="0.001"
+                 <input type="number" step="0.001" :aria-label="`${coeff} coefficient`"
                    :value="filter.genericCoeffs?.[coeff] ?? (coeff === 'b0' ? 1 : 0)"
                    @input="$emit('update-generic-coeff', filter, coeff, $event)"
                    :placeholder="coeff === 'b0' ? '1.000' : '0.000'" />

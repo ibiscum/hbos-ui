@@ -342,6 +342,39 @@ describe('RoomEQ API - Comprehensive Unit & Regression Tests', () => {
       })
     })
 
+    describe('keepRoomEQNoisePlaying', () => {
+      it('should extend white noise playback with default duration', async () => {
+        const mockResponse: roomeq.RoomEQSignalResponse = {
+          message: 'Noise playback extended',
+          status: 'playing',
+          new_stop_time: '2024-01-01T12:00:10Z'
+        }
+
+        mockApiFetch.mockResolvedValue(
+          new Response(JSON.stringify(mockResponse), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        )
+
+        const result = await roomeq.keepRoomEQNoisePlaying()
+
+        expect(result.success).toBe(true)
+        expect(String(mockApiFetch.mock.calls[0]?.[0] || '')).toContain('/audio/noise/keep-playing?duration=3')
+      })
+
+      it('should return failure detail when extension request is rejected', async () => {
+        mockApiFetch.mockResolvedValue(
+          new Response('failed', { status: 500, statusText: 'Internal Server Error' })
+        )
+
+        const result = await roomeq.keepRoomEQNoisePlaying(9)
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('Failed to extend white noise playback')
+      })
+    })
+
     describe('getRoomEQNoiseStatus', () => {
       it('should fetch noise status when active', async () => {
         const mockStatus: roomeq.RoomEQNoiseStatus = {
@@ -432,6 +465,56 @@ describe('RoomEQ API - Comprehensive Unit & Regression Tests', () => {
         expect(callUrl).toContain('sweeps=2')
       })
     })
+
+    describe('startRoomEQSweepSox', () => {
+      it('should include generator parameter and custom sweep options', async () => {
+        const mockResponse: roomeq.RoomEQSweepStartResponse = {
+          status: 'playing',
+          signal_type: 'sine_sweep',
+          start_freq: 30,
+          end_freq: 16000,
+          duration: 6,
+          sweeps: 3,
+          total_duration: 18,
+          amplitude: 0.6,
+          device: 'hw:2',
+          stop_time: '2024-01-01T12:00:18Z'
+        }
+
+        mockApiFetch.mockResolvedValue(
+          new Response(JSON.stringify(mockResponse), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        )
+
+        const result = await roomeq.startRoomEQSweepSox({
+          startFreq: 30,
+          endFreq: 16000,
+          duration: 6,
+          sweeps: 3,
+          amplitude: 0.6,
+          device: 'hw:2'
+        })
+
+        expect(result.success).toBe(true)
+        const callUrl = String(mockApiFetch.mock.calls[0]?.[0] || '')
+        expect(callUrl).toContain('generator=sine_sox')
+        expect(callUrl).toContain('start_freq=30')
+        expect(callUrl).toContain('end_freq=16000')
+      })
+
+      it('should return failure detail when sox sweep start fails', async () => {
+        mockApiFetch.mockResolvedValue(
+          new Response('bad request', { status: 400, statusText: 'Bad Request' })
+        )
+
+        const result = await roomeq.startRoomEQSweepSox()
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('Failed to start SoX sine sweeps')
+      })
+    })
   })
 
   // ============= RECORDING TESTS =============
@@ -483,6 +566,42 @@ describe('RoomEQ API - Comprehensive Unit & Regression Tests', () => {
         expect(callUrl).toContain('sample_rate=48000')
         expect(callUrl).toContain('device=hw')
       })
+
+      it('should include filename hint when provided', async () => {
+        const mockResponse: roomeq.RoomEQRecordingStartResponse = {
+          status: 'recording',
+          recording_id: 'rec-filename',
+          filename: 'custom-name.wav',
+          duration: 8
+        }
+
+        mockApiFetch.mockResolvedValue(
+          new Response(JSON.stringify(mockResponse), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        )
+
+        const result = await roomeq.startRoomEQRecording({
+          duration: 8,
+          filenameHint: 'custom-name.wav'
+        })
+
+        expect(result.success).toBe(true)
+        const callUrl = String(mockApiFetch.mock.calls[0]?.[0] || '')
+        expect(callUrl).toContain('filename=custom-name.wav')
+      })
+
+      it('should return failure detail when recording start fails', async () => {
+        mockApiFetch.mockResolvedValue(
+          new Response('failure', { status: 503, statusText: 'Service Unavailable' })
+        )
+
+        const result = await roomeq.startRoomEQRecording({ duration: 4 })
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('Failed to start recording')
+      })
     })
 
     describe('getRoomEQRecordingStatus', () => {
@@ -529,6 +648,17 @@ describe('RoomEQ API - Comprehensive Unit & Regression Tests', () => {
           expect.stringContaining('/audio/record/status/123'),
           expect.any(Object)
         )
+      })
+
+      it('should return failure detail when recording status lookup fails', async () => {
+        mockApiFetch.mockResolvedValue(
+          new Response('missing', { status: 404, statusText: 'Not Found' })
+        )
+
+        const result = await roomeq.getRoomEQRecordingStatus('rec/missing')
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('Failed to get recording status')
       })
     })
   })
@@ -618,6 +748,17 @@ describe('RoomEQ API - Comprehensive Unit & Regression Tests', () => {
         const callUrl = (mockApiFetch.mock.calls[0]?.[0] as string) || ''
         expect(callUrl).toContain('fft_size=4096')
         expect(callUrl).toContain('points_per_octave=24')
+      })
+
+      it('should return failure detail when FFT analysis endpoint fails', async () => {
+        mockApiFetch.mockResolvedValue(
+          new Response('failed', { status: 502, statusText: 'Bad Gateway' })
+        )
+
+        const result = await roomeq.analyzeRoomEQFFTRecording('rec-err')
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('Failed to perform FFT analysis')
       })
     })
 
@@ -766,6 +907,99 @@ describe('RoomEQ API - Comprehensive Unit & Regression Tests', () => {
         const callUrl = (mockApiFetch.mock.calls[0]?.[0] as string) || ''
         expect(callUrl).toContain('filepath1=')
         expect(callUrl).toContain('filepath2=')
+      })
+
+      it('should include optional analysis parameters in diff requests', async () => {
+        const mockDiff: roomeq.RoomEQFFTDifferenceResponse = {
+          status: 'success',
+          comparison_info: {
+            analysis_parameters: {
+              fft_size: 8192,
+              window_type: 'blackman',
+              normalize: 1000,
+              points_per_octave: 24,
+              psychoacoustic_smoothing: null,
+              analyzed_duration: 6,
+              analyzed_samples: 288000,
+              start_time: 1
+            },
+            file1: { filename: 'a.wav', peak_frequency: 100, peak_magnitude: -3, spectral_centroid: 80 },
+            file2: { filename: 'b.wav', peak_frequency: 120, peak_magnitude: -4, spectral_centroid: 90 }
+          },
+          difference_analysis: {
+            title: 'Diff',
+            description: 'Diff',
+            diff_type: 'magnitude',
+            frequencies: [100],
+            magnitudes: [-1],
+            phases: [0],
+            sample_rate: 48000,
+            peak_frequency: 100,
+            peak_magnitude: -1,
+            source_info: {
+              result1_title: 'A',
+              result2_title: 'B',
+              result1_peak_freq: 100,
+              result2_peak_freq: 120
+            },
+            spectral_density: { type: 'mag', description: 'mag', units: 'dB', computation: 'fft' },
+            statistics: {
+              n_points: 1,
+              frequency_range: [100, 100],
+              mean_difference_db: -1,
+              rms_difference_db: -1,
+              max_difference_db: -1
+            }
+          },
+          individual_analyses: {
+            file1_fft: { peak_frequency: 100, peak_magnitude: -3, spectral_centroid: 80 },
+            file2_fft: { peak_frequency: 120, peak_magnitude: -4, spectral_centroid: 90 }
+          }
+        }
+
+        mockApiFetch.mockResolvedValue(
+          new Response(JSON.stringify(mockDiff), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        )
+
+        const result = await roomeq.analyzeRoomEQFFTDifference(
+          'rec-1',
+          'file-2.wav',
+          'recording_id',
+          'filename',
+          {
+            pointsPerOctave: 24,
+            windowType: 'blackman',
+            normalize: 1000,
+            startAt: 1,
+            duration: 6,
+            fftSize: 8192
+          }
+        )
+
+        expect(result.success).toBe(true)
+        const callUrl = String(mockApiFetch.mock.calls[0]?.[0] || '')
+        expect(callUrl).toContain('recording_id1=rec-1')
+        expect(callUrl).toContain('filename2=file-2.wav')
+        expect(callUrl).toContain('points_per_octave=24')
+        expect(callUrl).toContain('window=blackman')
+        expect(callUrl).toContain('normalize=1000')
+        expect(callUrl).toContain('start_at=1')
+        expect(callUrl).toContain('duration=6')
+        expect(callUrl).toContain('fft_size=8192')
+      })
+
+      it('should return failure detail when FFT diff endpoint fails', async () => {
+        mockApiFetch.mockResolvedValue(
+          new Response('failed', { status: 500, statusText: 'Internal Server Error' })
+        )
+
+        const result = await roomeq.analyzeRoomEQFFTDifference('a', 'b')
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('Failed to perform FFT difference analysis')
       })
     })
   })
@@ -1245,6 +1479,128 @@ describe('RoomEQ API - Comprehensive Unit & Regression Tests', () => {
     })
 
     describe('performRoomMeasurement', () => {
+      it('should fail when noise playback cannot start', async () => {
+        mockApiFetch.mockResolvedValue(
+          new Response('noise failed', { status: 500, statusText: 'Internal Server Error' })
+        )
+
+        const result = await roomeq.performRoomMeasurement(0, 0.5)
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('Failed to start noise playback')
+      })
+
+      it('should fail when recording cannot start after noise starts', async () => {
+        mockApiFetch.mockImplementation((url: string) => {
+          if (url.includes('/audio/noise/start')) {
+            return Promise.resolve(new Response(JSON.stringify({
+              message: 'Noise started',
+              status: 'playing',
+              filename: 'noise.wav'
+            }), { status: 200, headers: { 'content-type': 'application/json' } }))
+          }
+
+          if (url.includes('/audio/record/start')) {
+            return Promise.resolve(new Response('record failed', { status: 500, statusText: 'Internal Server Error' }))
+          }
+
+          return Promise.resolve(new Response('unexpected URL', { status: 404 }))
+        })
+
+        const result = await roomeq.performRoomMeasurement(0, 0.5)
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('Failed to start recording')
+      })
+
+      it('should fail when recording status returns error state', async () => {
+        vi.useFakeTimers()
+
+        mockApiFetch.mockImplementation((url: string) => {
+          if (url.includes('/audio/noise/start')) {
+            return Promise.resolve(new Response(JSON.stringify({
+              message: 'Noise started',
+              status: 'playing',
+              filename: 'noise.wav'
+            }), { status: 200, headers: { 'content-type': 'application/json' } }))
+          }
+
+          if (url.includes('/audio/record/start')) {
+            return Promise.resolve(new Response(JSON.stringify({
+              status: 'recording',
+              recording_id: 'rec-err',
+              filename: 'rec-err.wav',
+              duration: 0
+            }), { status: 200, headers: { 'content-type': 'application/json' } }))
+          }
+
+          if (url.includes('/audio/record/status/')) {
+            return Promise.resolve(new Response(JSON.stringify({
+              status: 'error',
+              recording_id: 'rec-err',
+              state: 'error'
+            }), { status: 200, headers: { 'content-type': 'application/json' } }))
+          }
+
+          return Promise.resolve(new Response('unexpected URL', { status: 404 }))
+        })
+
+        const promise = roomeq.performRoomMeasurement(0, 0.5)
+        await vi.runAllTimersAsync()
+        const result = await promise
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('Recording failed with error state')
+
+        vi.useRealTimers()
+      })
+
+      it('should fail when final FFT completion step returns no data', async () => {
+        vi.useFakeTimers()
+
+        mockApiFetch.mockImplementation((url: string) => {
+          if (url.includes('/audio/noise/start')) {
+            return Promise.resolve(new Response(JSON.stringify({
+              message: 'Noise started',
+              status: 'playing',
+              filename: 'noise.wav'
+            }), { status: 200, headers: { 'content-type': 'application/json' } }))
+          }
+
+          if (url.includes('/audio/record/start')) {
+            return Promise.resolve(new Response(JSON.stringify({
+              status: 'recording',
+              recording_id: 'rec-ok',
+              filename: 'rec-ok.wav',
+              duration: 0
+            }), { status: 200, headers: { 'content-type': 'application/json' } }))
+          }
+
+          if (url.includes('/audio/record/status/')) {
+            return Promise.resolve(new Response(JSON.stringify({
+              status: 'completed',
+              recording_id: 'rec-ok',
+              state: 'completed'
+            }), { status: 200, headers: { 'content-type': 'application/json' } }))
+          }
+
+          if (url.includes('/audio/analyze/fft-diff')) {
+            return Promise.resolve(new Response('failed', { status: 500, statusText: 'Internal Server Error' }))
+          }
+
+          return Promise.resolve(new Response('unexpected URL', { status: 404 }))
+        })
+
+        const promise = roomeq.performRoomMeasurement(0, 0.5)
+        await vi.runAllTimersAsync()
+        const result = await promise
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('Failed to complete FFT difference analysis')
+
+        vi.useRealTimers()
+      })
+
       it('should fail when recording does not complete before timeout', async () => {
         vi.useFakeTimers()
 
@@ -1555,6 +1911,145 @@ describe('RoomEQ API - Comprehensive Unit & Regression Tests', () => {
         expect(onError).not.toHaveBeenCalled()
         expect(onComplete).toHaveBeenCalledTimes(1)
         expect(onComplete).toHaveBeenCalledWith(undefined)
+      })
+
+      it('should return failure when stream start response is not ok', async () => {
+        mockApiFetch.mockResolvedValue(
+          new Response('failed', { status: 502, statusText: 'Bad Gateway' })
+        )
+
+        const onEvent = vi.fn()
+        const onError = vi.fn()
+        const onComplete = vi.fn()
+
+        const result = await roomeq.startNewRoomEQOptimizationStream(
+          {
+            measured_curve: { frequencies: [20, 100], magnitudes_db: [-3, -1] },
+            target_curve: { curve: [{ frequency: 20, target_db: 0, weight: null }] },
+            optimizer_params: {
+              qmax: 10,
+              mindb: -10,
+              maxdb: 3,
+              add_highpass: true,
+              acceptable_error: 0.5
+            },
+            sample_rate: 48000,
+            filter_count: 6
+          },
+          onEvent,
+          onError,
+          onComplete
+        )
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toContain('Failed to start optimization')
+        expect(onError).toHaveBeenCalledWith(expect.stringContaining('Failed to start optimization'))
+        expect(onComplete).not.toHaveBeenCalled()
+      })
+
+      it('should return failure when response body is missing', async () => {
+        mockApiFetch.mockResolvedValue({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          headers: new Headers({ 'content-type': 'text/event-stream' }),
+          body: null
+        } as unknown as Response)
+
+        const onEvent = vi.fn()
+        const onError = vi.fn()
+        const onComplete = vi.fn()
+
+        const result = await roomeq.startNewRoomEQOptimizationStream(
+          {
+            measured_curve: { frequencies: [20, 100], magnitudes_db: [-3, -1] },
+            target_curve: { curve: [{ frequency: 20, target_db: 0, weight: null }] },
+            optimizer_params: {
+              qmax: 10,
+              mindb: -10,
+              maxdb: 3,
+              add_highpass: true,
+              acceptable_error: 0.5
+            },
+            sample_rate: 48000,
+            filter_count: 6
+          },
+          onEvent,
+          onError,
+          onComplete
+        )
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toBe('No response body for streaming')
+        expect(onError).toHaveBeenCalledWith('No response body for streaming')
+      })
+
+      it('should ignore non-data lines and still complete when stream ends', async () => {
+        mockApiFetch.mockResolvedValue(createSseResponse([
+          ': keepalive\n',
+          'event: ping\n',
+          'data: {"type":"started","message":"ready"}\n'
+        ]))
+
+        const onEvent = vi.fn()
+        const onError = vi.fn()
+        const onComplete = vi.fn()
+
+        const result = await roomeq.startNewRoomEQOptimizationStream(
+          {
+            measured_curve: { frequencies: [20, 100], magnitudes_db: [-3, -1] },
+            target_curve: { curve: [{ frequency: 20, target_db: 0, weight: null }] },
+            optimizer_params: {
+              qmax: 10,
+              mindb: -10,
+              maxdb: 3,
+              add_highpass: true,
+              acceptable_error: 0.5
+            },
+            sample_rate: 48000,
+            filter_count: 6
+          },
+          onEvent,
+          onError,
+          onComplete
+        )
+
+        expect(result.success).toBe(true)
+        expect(onEvent).toHaveBeenCalledTimes(1)
+        expect(onComplete).toHaveBeenCalledTimes(1)
+        expect(onError).not.toHaveBeenCalled()
+      })
+
+      it('should report unknown error when a non-Error rejection occurs', async () => {
+        mockApiFetch.mockRejectedValue('sse bootstrap failed')
+
+        const onEvent = vi.fn()
+        const onError = vi.fn()
+        const onComplete = vi.fn()
+
+        const result = await roomeq.startNewRoomEQOptimizationStream(
+          {
+            measured_curve: { frequencies: [20, 100], magnitudes_db: [-3, -1] },
+            target_curve: { curve: [{ frequency: 20, target_db: 0, weight: null }] },
+            optimizer_params: {
+              qmax: 10,
+              mindb: -10,
+              maxdb: 3,
+              add_highpass: true,
+              acceptable_error: 0.5
+            },
+            sample_rate: 48000,
+            filter_count: 6
+          },
+          onEvent,
+          onError,
+          onComplete
+        )
+
+        expect(result.success).toBe(false)
+        expect(result.detail).toBe('Unknown error')
+        expect(onError).toHaveBeenCalledWith('Unknown error')
+        expect(onComplete).not.toHaveBeenCalled()
       })
     })
 

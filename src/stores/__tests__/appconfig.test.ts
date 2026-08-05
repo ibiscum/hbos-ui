@@ -1,105 +1,6 @@
-/**
- * APPCONFIG STORE - REGRESSION TEST SUITE
- *
- * PURPOSE:
- * --------
- * The appconfig store manages application-wide configuration for API connections and device settings:
- * - Radio player selection (mpd, etc.)
- * - Device IP, port, and API prefix configuration for 4 API types (audiocontrol, config, dsptoolkit, roomeq)
- * - Proxy detection (dev vs prod) for CORS handling
- * - URL builders for HTTP and WebSocket connections
- * - Loading state during config operations
- *
- * ARCHITECTURE:
- * - Config initialized from environment variables or defaults
- * - Environment: VITE_APP_DEVICE_IP, VITE_APP_DEVICE_PORT, VITE_APP_API_PREFIX, etc.
- * - Fallbacks: window.location.hostname (IP), 80 (port), /api/* (prefix)
- * - Proxy mode: Enabled in dev (!import.meta.env.PROD), disabled in prod
- *
- * DATA FLOW:
- * 1. Store initialization: Read env vars → Create default config → Setup state
- * 2. Get operations: getConfig(), getApiBaseUrl(), getWsBaseUrl(), etc.
- * 3. Set operations: updateConfig(), setRadioPlayer(), setApiConfig()
- * 4. URL generation: Build URLs respecting proxy, port, IP, prefix
- *
- * CRITICAL INCONSISTENCIES IDENTIFIED (10 Total):
- * -----------------------------------------------
- * 1. 🔴 CRITICAL: Massive code duplication in URL builders
- *    - getApiBaseUrl, getConfigApiBaseUrl, getDSPToolkitApiBaseUrl, getRoomEQApiBaseUrl
- *    - Lines 103-170: ~70 lines nearly identical, violates DRY principle
- *    - Impact: Hard to maintain, bug fixes must be applied 4 times
- *    - Fix: Extract common URL builder function
- *
- * 2. 🔴 CRITICAL: Inconsistent getter patterns
- *    - Lines 171-173: radioPlayer, apiConfig, configApiConfig are functions
- *    - Lines 179-185: getApiBaseUrl, getWsBaseUrl, etc. are methods
- *    - Impact: Confusing API, components don't know which pattern to use
- *    - Fix: Make all getters consistent (all functions or all methods)
- *
- * 3. 🟡 IMPORTANT: getWsBaseUrl doesn't support proxy
- *    - Line 119: Always connects directly "no proxy"
- *    - WebSocket in dev needs proxy support for CORS
- *    - Impact: WebSocket CORS fails in dev, only HTTP works
- *    - Fix: Add useProxy parameter to WebSocket URL builder
- *
- * 4. 🟡 IMPORTANT: No error handling in URL builders
- *    - Lines 103-170: No validation of deviceIP, devicePort, apiPrefix
- *    - Could produce invalid URLs like "http://undefined:NaN/undefined"
- *    - Impact: Silent failures, hard to debug
- *    - Fix: Add validation and error throwing
- *
- * 5. 🟡 IMPORTANT: window.location.origin access without check
- *    - Lines 109, 134, 159, 166: Uses window.location.origin
- *    - Not available in non-browser environments (SSR, testing)
- *    - Impact: Runtime errors in non-browser contexts
- *    - Fix: Add fallback or environment detection
- *
- * 6. 🟡 MEDIUM: No configuration validation in updateConfig
- *    - Line 84: Accepts any Partial<AppConfig> without validation
- *    - Could set invalid port numbers, empty strings, etc.
- *    - Impact: Config corruption, invalid URLs
- *    - Fix: Add validation before applying updates
- *
- * 7. 🟡 MEDIUM: Incomplete setApiConfig implementation
- *    - Line 96: Only updates audiocontrol_api
- *    - Missing setConfigApiConfig, setDSPToolkitApiConfig, setRoomEQApiConfig
- *    - Impact: Cannot easily update config_api, dsptoolkit_api, roomeq_api
- *    - Fix: Create generic setApiConfig(apiType, config) or individual setters
- *
- * 8. 🟡 MEDIUM: Missing error state indication
- *    - Lines 68-75: getConfig/updateConfig don't expose error information
- *    - Loading is cleared but error state is lost
- *    - Impact: Caller doesn't know if operation failed
- *    - Fix: Add error ref and expose error state
- *
- * 9. 🟡 MEDIUM: Port handling assumes HTTP defaults
- *    - Line 113: Port 80 treated as "no suffix needed"
- *    - WebSocket might use port 80 for ws:// and 443 for wss://
- *    - HTTPS would use port 443 (not 80)
- *    - Impact: Incorrect URL generation for HTTPS/WSS
- *    - Fix: Make port suffix logic smarter for protocol-aware handling
- *
- * 10. 🟡 MEDIUM: Inconsistent radioPlayer getter
- *    - Line 171: radioPlayer is a function getter
- *    - Other state (config, loading) are exposed as refs
- *    - Impact: Inconsistent access pattern
- *    - Fix: Expose radioPlayer as computed or ref, not function
- *
- * TEST COVERAGE:
- * ---------------
- * This regression test suite covers 60+ tests across 10 suites:
- * - State initialization: Verify default config, environment variable override
- * - Loading state: Test loading flag lifecycle
- * - Radio player: Getter and setter functionality
- * - URL building: HTTP, WebSocket, proxy mode, port handling
- * - Configuration updates: Partial updates, validation
- * - API config access: Multiple API endpoints
- * - Error scenarios: Invalid input, missing env vars
- * - Port handling: Default port 80 vs custom ports
- * - Proxy mode: Development vs production behavior
- *
- * PURPOSE: Establish behavioral baseline BEFORE fixes, preventing regression bugs
- * STATUS: All tests passing with current implementation ✅
+/*
+ * Regression-focused appconfig store tests.
+ * Keep assertions behavior-oriented and aligned with current implementation.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -216,6 +117,8 @@ describe('AppConfig Store - Regression Tests', () => {
       const result = await store.setApiConfig({
         deviceIP: '192.168.1.100',
         devicePort: 8080,
+        apiPrefix: '/api/audiocontrol',
+        useProxy: false,
       })
       expect(result).toBe(true)
       expect(store.config.audiocontrol_api.deviceIP).toBe('192.168.1.100')
@@ -239,6 +142,31 @@ describe('AppConfig Store - Regression Tests', () => {
       const store = useAppConfigStore()
       const api = store.configApiConfig
       expect(api).toEqual(store.config.config_api)
+    })
+
+    it('supports typed api config updates via new overload signature', async () => {
+      const store = useAppConfigStore()
+
+      const result = await store.setApiConfig('config', {
+        deviceIP: '10.0.0.20',
+        devicePort: 9001,
+        apiPrefix: '/api/config/v1',
+        useProxy: false,
+      })
+
+      expect(result).toBe(true)
+      expect(store.config.config_api.deviceIP).toBe('10.0.0.20')
+      expect(store.config.config_api.devicePort).toBe(9001)
+    })
+
+    it('uses empty object when overload config is omitted', async () => {
+      const store = useAppConfigStore()
+      const original = { ...store.config.dsptoolkit_api }
+
+      const result = await store.setApiConfig('dsptoolkit')
+
+      expect(result).toBe(true)
+      expect(store.config.dsptoolkit_api).toEqual(original)
     })
   })
 
@@ -347,6 +275,16 @@ describe('AppConfig Store - Regression Tests', () => {
       const store = useAppConfigStore()
       const url = store.getWsBaseUrl()
       expect(url).toMatch(/^ws:\/\//)
+    })
+
+    it('forceProxy uses browser origin and converts protocol to ws', () => {
+      const store = useAppConfigStore()
+      store.config.audiocontrol_api.apiPrefix = '/api/audiocontrol'
+
+      const url = store.getWsBaseUrl(true)
+
+      expect(url).toContain('/api/audiocontrol')
+      expect(url.startsWith('ws://') || url.startsWith('wss://')).toBe(true)
     })
   })
 
@@ -488,23 +426,115 @@ describe('AppConfig Store - Regression Tests', () => {
   })
 
   describe('Error Handling', () => {
-    it('returns false from updateConfig on error', async () => {
+    it('rejects invalid audiocontrol_api config and stores error message', async () => {
       const store = useAppConfigStore()
-      // This won't actually error in current implementation, but tests expected behavior
-      const result = await store.updateConfig({})
-      expect(typeof result).toBe('boolean')
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      const result = await store.updateConfig({
+        audiocontrol_api: {
+          deviceIP: '',
+          devicePort: 8080,
+          apiPrefix: '/api/audiocontrol',
+          useProxy: false,
+        },
+      })
+
+      expect(result).toBe(false)
+      expect(store.error).toBe('Invalid audiocontrol_api configuration')
+      expect(store.loading).toBe(false)
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Invalid audiocontrol_api configuration')
+
+      consoleErrorSpy.mockRestore()
     })
 
-    it('returns false from setRadioPlayer on error', async () => {
+    it('returns false from setRadioPlayer when player name is invalid', async () => {
       const store = useAppConfigStore()
       const result = await store.setRadioPlayer('')
-      expect(typeof result).toBe('boolean')
+      expect(result).toBe(false)
+      expect(store.error).toBe('Invalid radio player name')
     })
 
-    it('returns false from setApiConfig on error', async () => {
+    it('returns false from setApiConfig when validation fails', async () => {
       const store = useAppConfigStore()
-      const result = await store.setApiConfig({})
-      expect(typeof result).toBe('boolean')
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      const result = await store.setApiConfig('roomeq', {
+        deviceIP: '192.168.1.55',
+        devicePort: 70000,
+        apiPrefix: '/api/roomeq',
+        useProxy: false,
+      })
+
+      expect(result).toBe(false)
+      expect(store.error).toBe('Invalid roomeq_api configuration')
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Invalid roomeq_api configuration')
+
+      consoleErrorSpy.mockRestore()
+    })
+
+    it('rejects invalid config_api payload type', async () => {
+      const store = useAppConfigStore()
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      const result = await store.updateConfig({
+        config_api: {
+          deviceIP: '192.168.1.10',
+          devicePort: 8081,
+          apiPrefix: '/api/config/v1',
+          useProxy: 'yes' as unknown as boolean,
+        },
+      })
+
+      expect(result).toBe(false)
+      expect(store.error).toBe('Invalid config_api configuration')
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Invalid config_api configuration')
+
+      consoleErrorSpy.mockRestore()
+    })
+  })
+
+  describe('Validation Branches', () => {
+    it('rejects invalid dsptoolkit_api port bounds', async () => {
+      const store = useAppConfigStore()
+
+      const result = await store.updateConfig({
+        dsptoolkit_api: {
+          deviceIP: '192.168.1.11',
+          devicePort: 0,
+          apiPrefix: '/api/dsptoolkit',
+          useProxy: false,
+        },
+      })
+
+      expect(result).toBe(false)
+      expect(store.error).toBe('Invalid dsptoolkit_api configuration')
+    })
+
+    it('rejects malformed roomeq_api values', async () => {
+      const store = useAppConfigStore()
+
+      const result = await store.updateConfig({
+        roomeq_api: [] as unknown as AppConfig['roomeq_api'],
+      })
+
+      expect(result).toBe(false)
+      expect(store.error).toBe('Invalid roomeq_api configuration')
+    })
+  })
+
+  describe('Builder Guard Rails', () => {
+    it('returns empty string and warns when required URL fields are missing', () => {
+      const store = useAppConfigStore()
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      store.config.audiocontrol_api.deviceIP = ''
+      store.config.audiocontrol_api.useProxy = false
+
+      const url = store.getApiBaseUrl()
+
+      expect(url).toBe('')
+      expect(warnSpy).toHaveBeenCalledWith('Invalid API config: deviceIP=, apiPrefix=/api/audiocontrol')
+
+      warnSpy.mockRestore()
     })
   })
 

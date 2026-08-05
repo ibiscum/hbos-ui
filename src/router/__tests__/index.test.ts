@@ -36,6 +36,12 @@ vi.mock('@/views/library/index.vue', () => ({
   },
 }))
 
+vi.mock('@/views/library/albums/artist-album.vue', () => ({
+  default: {
+    template: '<div class="artist-album-view-stub">artist-album-view</div>',
+  },
+}))
+
 vi.mock('@/views/services/index.vue', () => ({
   default: {
     template: '<div class="services-view-stub">services-view</div>',
@@ -232,5 +238,24 @@ describe('router index', () => {
     await router.push('/path/that/does/not/exist')
 
     expect(router.currentRoute.value.name).toBe('now-playing')
+  })
+
+  it('loads all lazy-loaded route components', async () => {
+    const { router } = await loadRouter()
+
+    const loaders = router
+      .getRoutes()
+      .flatMap((route) => Object.values(route.components ?? {}))
+      .filter((component): component is () => Promise<{ default: unknown }> =>
+        typeof component === 'function',
+      )
+
+    expect(loaders.length).toBeGreaterThan(0)
+
+    const loadedModules = await Promise.all(loaders.map((loader) => loader()))
+
+    for (const loadedModule of loadedModules) {
+      expect(loadedModule).toHaveProperty('default')
+    }
   })
 })

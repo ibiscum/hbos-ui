@@ -1193,4 +1193,207 @@ describe('system.ts - Code Review & Regression Tests', () => {
       })
     })
   })
+
+  describe('Coverage Gap Tests', () => {
+    it('setSoundCardDtoverlay falls back to HTTP status when message is missing', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        json: async () => ({})
+      } as AnyType)
+
+      await expect(systemApi.setSoundCardDtoverlay({ dtoverlay: 'invalid-overlay' }))
+        .rejects.toThrow('HTTP error! status: 422')
+    })
+
+    it('updateHostname throws HTTP status when response is not ok', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 418
+      } as AnyType)
+
+      await expect(systemApi.updateHostname({ hostname: 'newhost' }))
+        .rejects.toThrow('HTTP error! status: 418')
+    })
+
+    it('getSoundCards throws HTTP status when response is not ok', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 502
+      } as AnyType)
+
+      await expect(systemApi.getSoundCards())
+        .rejects.toThrow('HTTP error! status: 502')
+    })
+
+    it('detectSoundCardLive throws API message on error response', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({ message: 'Live detection failed' })
+      } as AnyType)
+
+      await expect(systemApi.detectSoundCardLive())
+        .rejects.toThrow('Live detection failed')
+    })
+
+    it('detectSoundCardLive falls back to HTTP status when message is missing', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({})
+      } as AnyType)
+
+      await expect(systemApi.detectSoundCardLive())
+        .rejects.toThrow('HTTP error! status: 500')
+    })
+
+    it('setSoundCardDetection throws API message on error response', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ message: 'Detection toggle rejected' })
+      } as AnyType)
+
+      await expect(systemApi.setSoundCardDetection(true))
+        .rejects.toThrow('Detection toggle rejected')
+    })
+
+    it('setSoundCardDetection falls back to HTTP status when message is missing', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({})
+      } as AnyType)
+
+      await expect(systemApi.setSoundCardDetection(false))
+        .rejects.toThrow('HTTP error! status: 400')
+    })
+
+    it('getSoundCardDetectionStatus falls back to HTTP status when message is missing', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({})
+      } as AnyType)
+
+      await expect(systemApi.getSoundCardDetectionStatus())
+        .rejects.toThrow('HTTP error! status: 500')
+    })
+
+    it('disableSoundCardDetection falls back to HTTP status when message is missing', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        json: async () => ({})
+      } as AnyType)
+
+      await expect(systemApi.disableSoundCardDetection('DAC+'))
+        .rejects.toThrow('HTTP error! status: 409')
+    })
+
+    it('rebootSystem falls back to HTTP status when message is missing', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        json: async () => ({})
+      } as AnyType)
+
+      await expect(systemApi.rebootSystem())
+        .rejects.toThrow('HTTP error! status: 503')
+    })
+
+    it('executeScript falls back to HTTP status when message is missing', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: async () => ({})
+      } as AnyType)
+
+      await expect(systemApi.executeScript({ script: 'unknown-script' }))
+        .rejects.toThrow('HTTP error! status: 404')
+    })
+
+    it('getCacheStats throws HTTP status when response is not ok', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 503
+      } as AnyType)
+
+      await expect(systemApi.getCacheStats())
+        .rejects.toThrow('HTTP error! status: 503')
+    })
+
+    it('getBackgroundJobs throws HTTP status when response is not ok', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 503
+      } as AnyType)
+
+      await expect(systemApi.getBackgroundJobs())
+        .rejects.toThrow('HTTP error! status: 503')
+    })
+
+    it('checkFileExistence keeps full path as filename when path ends in slash', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: { exists: true } })
+      } as AnyType)
+
+      const result = await systemApi.checkFileExistence(['/tmp/folder/'])
+
+      expect(result[0].filename).toBe('/tmp/folder/')
+    })
+
+    it('getSetupStatus throws HTTP status when response is not ok', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 503
+      } as AnyType)
+
+      await expect(systemApi.getSetupStatus())
+        .rejects.toThrow('HTTP error! status: 503')
+    })
+
+    it('resetSetup returns success payload when response is ok', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ status: 'success', message: 'Setup reset' })
+      } as AnyType)
+
+      const result = await systemApi.resetSetup()
+
+      expect(result.status).toBe('success')
+      expect(result.message).toBe('Setup reset')
+    })
+
+    it('resetConfigDB returns success payload when response is ok', async () => {
+      const mockFetch = vi.mocked(apiFetch)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ status: 'success', message: 'Configuration reset' })
+      } as AnyType)
+
+      const result = await systemApi.resetConfigDB()
+
+      expect(result.status).toBe('success')
+      expect(result.message).toBe('Configuration reset')
+    })
+  })
 })

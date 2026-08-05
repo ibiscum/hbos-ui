@@ -1,493 +1,152 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { mount } from '@vue/test-utils'
+
 import App from '../App.vue'
 
-// Mock stores
-vi.mock('@/stores/player-web-socket', () => ({
-  usePlayerWebSocket: () => ({
-    wsController: {
-      disconnect: vi.fn(),
+const mockedStores = vi.hoisted(() => {
+  const wsController = {
+    disconnect: vi.fn(),
+  }
+
+  return {
+    playerStore: {
+      initPlayer: vi.fn(),
+      updateIntervalID: undefined as number | undefined,
+      clearPollingInterval: vi.fn(),
     },
-  }),
-}))
+    audioControls: {
+      progressIntervalID: undefined as number | undefined,
+      stopAutoProgress: vi.fn(),
+    },
+    playerWebSocket: {
+      wsController: wsController as { disconnect: () => void } | null,
+    },
+    wsController,
+  }
+})
 
 vi.mock('@/stores/player', () => ({
-  usePlayerStore: () => ({
-    initPlayer: vi.fn(),
-    updateIntervalID: undefined,
-    clearPollingInterval: vi.fn(),
-  }),
+  usePlayerStore: () => mockedStores.playerStore,
 }))
 
 vi.mock('@/stores/audio-controls', () => ({
-  useAudioControls: () => ({
-    progressIntervalID: undefined,
-    stopAutoProgress: vi.fn(),
-  }),
+  useAudioControls: () => mockedStores.audioControls,
+}))
+
+vi.mock('@/stores/player-web-socket', () => ({
+  usePlayerWebSocket: () => mockedStores.playerWebSocket,
 }))
 
 vi.mock('@/components/SecurityPrompt.vue', () => ({
   default: {
     name: 'SecurityPrompt',
-    template: '<div class="security-prompt"><slot /></div>',
+    template: '<div class="security-prompt" />',
   },
 }))
+
+function mountApp() {
+  return mount(App, {
+    global: {
+      stubs: {
+        RouterView: true,
+      },
+    },
+  })
+}
 
 describe('App.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+
+    mockedStores.playerStore.updateIntervalID = undefined
+    mockedStores.audioControls.progressIntervalID = undefined
+    mockedStores.playerWebSocket.wsController = mockedStores.wsController
   })
 
   afterEach(() => {
-    vi.clearAllMocks()
+    vi.restoreAllMocks()
   })
 
-  describe('Component rendering', () => {
-    it('renders RouterView', () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      expect(wrapper.vm).toBeDefined()
-    })
+  it('renders RouterView and SecurityPrompt', () => {
+    const wrapper = mountApp()
 
-    it('renders SecurityPrompt component', () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      expect(wrapper.vm).toBeDefined()
-    })
-
-    it('mounts without errors', () => {
-      expect(() => {
-        mount(App, {
-          global: {
-            stubs: {
-              RouterView: true,
-              SecurityPrompt: true,
-            },
-          },
-        })
-      }).not.toThrow()
-    })
+    expect(wrapper.findComponent({ name: 'RouterView' }).exists()).toBe(true)
+    expect(wrapper.find('.security-prompt').exists()).toBe(true)
   })
 
-  describe('Store initialization', () => {
-    it('accesses playerStore during setup', () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      expect(wrapper.vm).toBeDefined()
-    })
+  it('calls initPlayer during setup', () => {
+    mountApp()
 
-    it('accesses audioControls during setup', () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      expect(wrapper.vm).toBeDefined()
-    })
-
-    it('accesses playerWebSocket during setup', () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      expect(wrapper.vm).toBeDefined()
-    })
-
-    it('calls initPlayer on mount', async () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      await flushPromises()
-      expect(wrapper.vm).toBeDefined()
-    })
+    expect(mockedStores.playerStore.initPlayer).toHaveBeenCalledTimes(1)
   })
 
-  describe('Cleanup on unmount', () => {
-    it('unmounts without errors', async () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      expect(() => {
-        wrapper.unmount()
-      }).not.toThrow()
+  it('logs an error when initPlayer fails', () => {
+    const setupError = new Error('init failed')
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockedStores.playerStore.initPlayer.mockImplementationOnce(() => {
+      throw setupError
     })
 
-    it('executes onBeforeUnmount hook', async () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      await flushPromises()
-      expect(() => {
-        wrapper.unmount()
-      }).not.toThrow()
-    })
+    mountApp()
+
+    expect(errorSpy).toHaveBeenCalledWith('Failed to initialize player:', setupError)
   })
 
-  describe('Audio controls cleanup', () => {
-    it('checks progressIntervalID existence', async () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      await flushPromises()
-      wrapper.unmount()
-      expect(wrapper.vm).toBeDefined()
-    })
+  it('runs full cleanup on unmount when all controllers exist', () => {
+    mockedStores.audioControls.progressIntervalID = 1
+    mockedStores.playerStore.updateIntervalID = 1
 
-    it('handles progressIntervalID when undefined', async () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      await flushPromises()
-      expect(() => {
-        wrapper.unmount()
-      }).not.toThrow()
-    })
+    const wrapper = mountApp()
+    wrapper.unmount()
 
-    it('calls stopAutoProgress when progressIntervalID exists', async () => {
-      // This tests behavior when progressIntervalID is truthy
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      await flushPromises()
-      wrapper.unmount()
-      expect(wrapper.vm).toBeDefined()
-    })
+    expect(mockedStores.audioControls.stopAutoProgress).toHaveBeenCalledTimes(1)
+    expect(mockedStores.playerStore.clearPollingInterval).toHaveBeenCalledTimes(1)
+    expect(mockedStores.wsController.disconnect).toHaveBeenCalledTimes(1)
+    expect(mockedStores.playerWebSocket.wsController).toBeNull()
   })
 
-  describe('Player store cleanup', () => {
-    it('checks updateIntervalID existence', async () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      await flushPromises()
-      wrapper.unmount()
-      expect(wrapper.vm).toBeDefined()
-    })
+  it('skips optional cleanup steps when handles are missing', () => {
+    mockedStores.playerWebSocket.wsController = null
 
-    it('handles updateIntervalID when undefined', async () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      await flushPromises()
-      expect(() => {
-        wrapper.unmount()
-      }).not.toThrow()
-    })
+    const wrapper = mountApp()
+    wrapper.unmount()
 
-    it('calls clearPollingInterval when updateIntervalID exists', async () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      await flushPromises()
-      wrapper.unmount()
-      expect(wrapper.vm).toBeDefined()
-    })
+    expect(mockedStores.audioControls.stopAutoProgress).not.toHaveBeenCalled()
+    expect(mockedStores.playerStore.clearPollingInterval).not.toHaveBeenCalled()
+    expect(mockedStores.wsController.disconnect).not.toHaveBeenCalled()
   })
 
-  describe('WebSocket cleanup', () => {
-    it('checks wsController existence', async () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      await flushPromises()
-      wrapper.unmount()
-      expect(wrapper.vm).toBeDefined()
-    })
+  it('logs disconnect errors and still clears websocket reference', () => {
+    const disconnectError = new Error('disconnect failed')
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockedStores.playerWebSocket.wsController = {
+      disconnect: vi.fn(() => {
+        throw disconnectError
+      }),
+    }
 
-    it('disconnects WebSocket when wsController exists', async () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      await flushPromises()
-      wrapper.unmount()
-      expect(wrapper.vm).toBeDefined()
-    })
+    const wrapper = mountApp()
+    wrapper.unmount()
 
-    it('nullifies wsController after disconnect', async () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      await flushPromises()
-      wrapper.unmount()
-      expect(wrapper.vm).toBeDefined()
-    })
-
-    it('handles wsController when null or undefined', async () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      await flushPromises()
-      expect(() => {
-        wrapper.unmount()
-      }).not.toThrow()
-    })
+    expect(errorSpy).toHaveBeenCalledWith('Error disconnecting WebSocket:', disconnectError)
+    expect(mockedStores.playerWebSocket.wsController).toBeNull()
   })
 
-  describe('Multiple mount/unmount cycles', () => {
-    it('handles multiple mount cycles', async () => {
-      for (let i = 0; i < 3; i++) {
-        const wrapper = mount(App, {
-          global: {
-            stubs: {
-              RouterView: true,
-              SecurityPrompt: true,
-            },
-          },
-        })
-        await flushPromises()
-        wrapper.unmount()
-        await flushPromises()
-      }
-      expect(true).toBe(true)
+  it('logs cleanup errors when a cleanup step throws', () => {
+    const cleanupError = new Error('cleanup failed')
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    mockedStores.audioControls.progressIntervalID = 1
+    mockedStores.playerStore.updateIntervalID = 1
+    mockedStores.audioControls.stopAutoProgress.mockImplementationOnce(() => {
+      throw cleanupError
     })
 
-    it('cleanup works correctly after multiple mounts', async () => {
-      const wrapper1 = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      await flushPromises()
-      wrapper1.unmount()
-      await flushPromises()
+    const wrapper = mountApp()
+    wrapper.unmount()
 
-      const wrapper2 = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      await flushPromises()
-      expect(wrapper2.vm).toBeDefined()
-      wrapper2.unmount()
-    })
-  })
-
-  describe('Store references', () => {
-    it('playerStore is available', () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      expect(wrapper.vm).toBeDefined()
-    })
-
-    it('audioControls is available', () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      expect(wrapper.vm).toBeDefined()
-    })
-
-    it('playerWebSocket is available', () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      expect(wrapper.vm).toBeDefined()
-    })
-  })
-
-  describe('Hook execution order', () => {
-    it('onBeforeUnmount executes before unmount', async () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      await flushPromises()
-      expect(() => {
-        wrapper.unmount()
-      }).not.toThrow()
-    })
-
-    it('executes all cleanup operations during unmount', async () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      await flushPromises()
-      wrapper.unmount()
-      expect(wrapper.vm).toBeDefined()
-    })
-  })
-
-  describe('Component structure', () => {
-    it('has template section', () => {
-      expect(App).toBeDefined()
-    })
-
-    it('has script setup', () => {
-      expect(App).toBeDefined()
-    })
-
-    it('includes RouterView placeholder', () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      expect(wrapper.vm).toBeDefined()
-    })
-
-    it('includes SecurityPrompt component', () => {
-      const wrapper = mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      expect(wrapper.vm).toBeDefined()
-    })
-  })
-
-  describe('Initialization stability', () => {
-    it('initializes without console errors', () => {
-      const consoleSpy = vi.spyOn(console, 'error')
-      mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      expect(consoleSpy).not.toHaveBeenCalled()
-      consoleSpy.mockRestore()
-    })
-
-    it('initializes without console warnings', () => {
-      const consoleSpy = vi.spyOn(console, 'warn')
-      mount(App, {
-        global: {
-          stubs: {
-            RouterView: true,
-            SecurityPrompt: true,
-          },
-        },
-      })
-      expect(consoleSpy).not.toHaveBeenCalled()
-      consoleSpy.mockRestore()
-    })
+    expect(errorSpy).toHaveBeenCalledWith('Error during cleanup:', cleanupError)
+    expect(mockedStores.playerStore.clearPollingInterval).not.toHaveBeenCalled()
+    expect(mockedStores.wsController.disconnect).not.toHaveBeenCalled()
   })
 })

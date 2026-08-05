@@ -1,255 +1,208 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
-import Album from '@/views/library/albums/album.vue'
-import type { AlbumDetails } from '@/types/library'
+import { createPinia, setActivePinia } from 'pinia'
+import { ref, type Ref } from 'vue'
 
-// Mock the store
-vi.mock('@/stores/album', () => {
-  const mockAlbumStore = {
-    album: { value: null as AlbumDetails | null },
-    loading: { value: false },
-    getAlbumByAlbumId: vi.fn(),
-  }
+import AlbumView from '@/views/library/albums/album.vue'
+
+type AlbumShape = {
+  id?: string
+  tracks?: Array<{ id: string }>
+}
+
+const runtime = vi.hoisted(() => {
   return {
-    useAlbumStore: () => mockAlbumStore,
+    album: null as unknown as Ref<AlbumShape | null>,
+    loading: null as unknown as Ref<boolean>,
+    getAlbumByAlbumId: vi.fn(async () => undefined),
   }
 })
 
-// Mock components
+vi.mock('pinia', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('pinia')>()
+  return {
+    ...actual,
+    storeToRefs: <T extends object>(store: T): T => store,
+  }
+})
+
+vi.mock('@/stores/album', () => ({
+  useAlbumStore: () => ({
+    album: runtime.album,
+    loading: runtime.loading,
+    getAlbumByAlbumId: runtime.getAlbumByAlbumId,
+  }),
+}))
+
 vi.mock('@/components/BackRouter.vue', () => ({
   default: {
     name: 'BackRouter',
-    template: '<div data-test="back-router"><slot /></div>',
     props: ['to', 'loading'],
+    template:
+      '<div class="back-router-stub" :data-to-name="to?.name" :data-to-artist-id="to?.params?.artistId" :data-loading="loading ? \'yes\' : \'no\'"><slot /></div>',
   },
 }))
 
 vi.mock('@/components/AlbumDetailsCard.vue', () => ({
   default: {
     name: 'AlbumDetailsCard',
-    template: '<div data-test="album-details-card" />',
     props: ['album', 'loading'],
+    template:
+      '<div class="album-details-stub" :data-has-album="album ? \'yes\' : \'no\'" :data-loading="loading ? \'yes\' : \'no\'" />',
   },
 }))
 
 vi.mock('@/components/TracksCard.vue', () => ({
   default: {
     name: 'TracksCard',
-    template: '<div data-test="tracks-card" />',
     props: ['tracks', 'loading', 'album'],
+    template:
+      '<div class="tracks-card-stub" :data-tracks-len="tracks.length" :data-loading="loading ? \'yes\' : \'no\'" :data-has-album="album ? \'yes\' : \'no\'" />',
   },
 }))
 
-// Create a simple test router
-const createTestRouter = () => {
+function createTestRouter() {
   return createRouter({
     history: createMemoryHistory(),
     routes: [
-      {
-        path: '/album/:albumId',
-        name: 'album',
-        component: Album,
-      },
-      {
-        path: '/artist/:artistId',
-        name: 'artist-album',
-        component: { template: '<div>Artist</div>' },
-      },
-      {
-        path: '/albums',
-        name: 'albums',
-        component: { template: '<div>Albums</div>' },
-      },
+      { path: '/album/:albumId', name: 'album', component: AlbumView },
+      { path: '/artist/:artistId', name: 'artist-album', component: { template: '<div>Artist</div>' } },
+      { path: '/albums', name: 'albums', component: { template: '<div>Albums</div>' } },
     ],
   })
 }
 
-describe('Album.vue', () => {
-  beforeEach(() => {
-    setActivePinia(createPinia())
-    vi.restoreAllMocks()
+async function mountView(params: {
+  albumId?: string
+  from?: string
+  artistId?: string
+  artistName?: string
+} = {}) {
+  const router = createTestRouter()
+  await router.push({
+    name: 'album',
+    params: { albumId: params.albumId ?? 'album-1' },
+    query: {
+      ...(params.from ? { from: params.from } : {}),
+      ...(params.artistId ? { artistId: params.artistId } : {}),
+      ...(params.artistName ? { artistName: params.artistName } : {}),
+    },
+  })
+  await router.isReady()
+
+  const wrapper = mount(AlbumView, {
+    global: {
+      plugins: [router, createPinia()],
+    },
   })
 
-  it('renders the component structure', async () => {
-    const router = createTestRouter()
-    await router.push({ name: 'album', params: { albumId: 'test-album-id' } })
-    await router.isReady()
+  await flushPromises()
+  return { wrapper, router }
+}
 
-    const wrapper = mount(Album, {
-      global: {
-        plugins: [router],
-        stubs: {
-          BackRouter: true,
-          AlbumDetailsCard: true,
-          TracksCard: true,
-        },
-      },
-    })
+describe('album.vue consolidated unit and regression tests', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    runtime.album = ref(null)
+    runtime.loading = ref(false)
+    runtime.getAlbumByAlbumId.mockReset()
+    runtime.getAlbumByAlbumId.mockResolvedValue(undefined)
+  })
+
+  it('renders shell and loads album by route id on mount', async () => {
+    const { wrapper } = await mountView({ albumId: 'album-123' })
 
     expect(wrapper.find('.album').exists()).toBe(true)
     expect(wrapper.find('.breadcrumbs').exists()).toBe(true)
     expect(wrapper.find('.grid').exists()).toBe(true)
+    expect(runtime.getAlbumByAlbumId).toHaveBeenCalledWith('album-123')
   })
 
-  it('passes loading prop to child components', async () => {
-    const router = createTestRouter()
-    await router.push({ name: 'album', params: { albumId: 'test-album-id' } })
-    await router.isReady()
+  it('uses albums route and Albums label by default', async () => {
+    const { wrapper } = await mountView({ albumId: 'album-1' })
 
-    const wrapper = mount(Album, {
-      global: {
-        plugins: [router],
-        stubs: {
-          BackRouter: true,
-          AlbumDetailsCard: true,
-          TracksCard: true,
-        },
-      },
-    })
-
-    // Verify loading is passed to both child components
-    const stubs = wrapper.vm.$options.components
-    expect(stubs).toBeDefined()
+    const backRouter = wrapper.get('.back-router-stub')
+    expect(backRouter.attributes('data-to-name')).toBe('albums')
+    expect(backRouter.text()).toBe('Albums')
   })
 
-  it('calls getAlbumByAlbumId on mount', async () => {
-    const { useAlbumStore } = await import('@/stores/album')
-    const mockStore = useAlbumStore()
-    const getAlbumSpy = vi.spyOn(mockStore, 'getAlbumByAlbumId')
-
-    const router = createTestRouter()
-    await router.push({
-      name: 'album',
-      params: { albumId: 'album-123' },
-    })
-    await router.isReady()
-
-    mount(Album, {
-      global: {
-        plugins: [router],
-        stubs: {
-          BackRouter: true,
-          AlbumDetailsCard: true,
-          TracksCard: true,
-        },
-      },
+  it('uses artist back route when query has from=artist with artistId', async () => {
+    const { wrapper } = await mountView({
+      albumId: 'album-1',
+      from: 'artist',
+      artistId: 'artist-42',
     })
 
-    await new Promise(resolve => setTimeout(resolve, 0))
-
-    expect(getAlbumSpy).toHaveBeenCalledWith('album-123')
+    const backRouter = wrapper.get('.back-router-stub')
+    expect(backRouter.attributes('data-to-name')).toBe('artist-album')
+    expect(backRouter.attributes('data-to-artist-id')).toBe('artist-42')
   })
 
-  it('computes backRoute to albums by default', async () => {
-    const router = createTestRouter()
-    await router.push({ name: 'album', params: { albumId: 'test-album-id' } })
-    await router.isReady()
-
-    const wrapper = mount(Album, {
-      global: {
-        plugins: [router],
-        stubs: {
-          BackRouter: true,
-          AlbumDetailsCard: true,
-          TracksCard: true,
-        },
-      },
+  it('uses artistName as back text when from=artist and artistName exists', async () => {
+    const { wrapper } = await mountView({
+      albumId: 'album-1',
+      from: 'artist',
+      artistId: 'artist-42',
+      artistName: 'The Artist',
     })
 
-    // The backRoute computed should default to albums
-    // Note: We can't directly access computed in the test due to Vue's reactivity,
-    // but we can check the component renders without errors
-    expect(wrapper.find('[data-test="back-router"]').exists() || wrapper.find('.breadcrumbs').exists()).toBe(true)
+    expect(wrapper.get('.back-router-stub').text()).toBe('The Artist')
   })
 
-  it('computes backRoute to artist page when from=artist', async () => {
-    const router = createTestRouter()
-    await router.push({
-      name: 'album',
-      params: { albumId: 'test-album-id' },
-      query: { from: 'artist', artistId: 'artist-123' },
-    })
-    await router.isReady()
-
-    const wrapper = mount(Album, {
-      global: {
-        plugins: [router],
-        stubs: {
-          BackRouter: true,
-          AlbumDetailsCard: true,
-          TracksCard: true,
-        },
-      },
+  it('falls back to Albums text when from=artist but artistName is missing', async () => {
+    const { wrapper } = await mountView({
+      albumId: 'album-1',
+      from: 'artist',
+      artistId: 'artist-42',
     })
 
-    expect(wrapper.find('.breadcrumbs').exists()).toBe(true)
+    expect(wrapper.get('.back-router-stub').text()).toBe('Albums')
   })
 
-  it('computes backText from query parameter when from=artist', async () => {
-    const router = createTestRouter()
-    await router.push({
-      name: 'album',
-      params: { albumId: 'test-album-id' },
-      query: { from: 'artist', artistId: 'artist-123', artistName: 'Test Artist' },
-    })
-    await router.isReady()
-
-    const wrapper = mount(Album, {
-      global: {
-        plugins: [router],
-        stubs: {
-          BackRouter: true,
-          AlbumDetailsCard: true,
-          TracksCard: true,
-        },
-      },
+  it('falls back to albums route when from=artist but artistId is missing', async () => {
+    const { wrapper } = await mountView({
+      albumId: 'album-1',
+      from: 'artist',
+      artistName: 'Nameless Id',
     })
 
-    expect(wrapper.find('[data-test="back-router"]').exists() || wrapper.find('.breadcrumbs').exists()).toBe(true)
+    expect(wrapper.get('.back-router-stub').attributes('data-to-name')).toBe('albums')
   })
 
-  it('defaults backText to Albums when no artistName in query', async () => {
-    const router = createTestRouter()
-    await router.push({
-      name: 'album',
-      params: { albumId: 'test-album-id' },
-      query: { from: 'artist' },
-    })
-    await router.isReady()
+  it('passes tracks to TracksCard and falls back to empty array when album/tracks missing', async () => {
+    runtime.album.value = { id: 'album-1', tracks: [{ id: 'track-1' }, { id: 'track-2' }] }
+    const { wrapper: withTracks } = await mountView()
+    expect(withTracks.get('.tracks-card-stub').attributes('data-tracks-len')).toBe('2')
 
-    const wrapper = mount(Album, {
-      global: {
-        plugins: [router],
-        stubs: {
-          BackRouter: true,
-          AlbumDetailsCard: true,
-          TracksCard: true,
-        },
-      },
-    })
+    runtime.album.value = { id: 'album-2' }
+    const { wrapper: noTracks } = await mountView({ albumId: 'album-2' })
+    expect(noTracks.get('.tracks-card-stub').attributes('data-tracks-len')).toBe('0')
 
-    expect(wrapper.find('.breadcrumbs').exists()).toBe(true)
+    runtime.album.value = null
+    const { wrapper: noAlbum } = await mountView({ albumId: 'album-3' })
+    expect(noAlbum.get('.tracks-card-stub').attributes('data-tracks-len')).toBe('0')
   })
 
-  it('passes album tracks to TracksCard with fallback to empty array', async () => {
-    const router = createTestRouter()
-    await router.push({ name: 'album', params: { albumId: 'test-album-id' } })
-    await router.isReady()
+  it('propagates loading state to BackRouter and child cards', async () => {
+    runtime.loading.value = true
+    runtime.album.value = { id: 'album-1', tracks: [] }
 
-    const wrapper = mount(Album, {
-      global: {
-        plugins: [router],
-        stubs: {
-          BackRouter: true,
-          AlbumDetailsCard: true,
-          TracksCard: true,
-        },
-      },
-    })
+    const { wrapper } = await mountView()
 
-    // Component should render without error
-    expect(wrapper.find('[data-test="tracks-card"]').exists() || wrapper.find('.grid').exists()).toBe(true)
+    expect(wrapper.get('.back-router-stub').attributes('data-loading')).toBe('yes')
+    expect(wrapper.get('.album-details-stub').attributes('data-loading')).toBe('yes')
+    expect(wrapper.get('.tracks-card-stub').attributes('data-loading')).toBe('yes')
+  })
+
+  it('logs mount fetch failures without throwing', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const failure = new Error('fetch failed')
+    runtime.getAlbumByAlbumId.mockRejectedValueOnce(failure)
+
+    await mountView({ albumId: 'album-fail' })
+
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to load album:', failure)
+    consoleSpy.mockRestore()
   })
 })

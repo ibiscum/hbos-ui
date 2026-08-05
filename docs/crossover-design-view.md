@@ -43,6 +43,15 @@ Test file: `src/views/sound/__tests__/crossover-design.test.ts`
 - active-channel watcher reloads backend capabilities
 - unmount removes keyboard listeners to avoid duplicate bypass behavior
 
+### Component-level modal coverage
+
+- `src/components/speaker-eq/__tests__/AddFilterModal.test.ts` covers add-filter modal interaction contracts.
+- `src/components/speaker-eq/__tests__/BackendInfoModal.test.ts` covers backend-info modal display and close contracts.
+
+### Component-level filter-item coverage
+
+- `src/components/speaker-eq/__tests__/EqFilterItem.test.ts` covers filter-card rendering and per-control event contracts.
+
 ## Notes for Future Changes
 
 - If channel naming changes, keep title and tab-display normalization tests updated (`iir_*` prefix stripping).

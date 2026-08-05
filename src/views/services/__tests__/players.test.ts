@@ -208,7 +208,9 @@ vi.mock('@/components/PlayerCard.vue', () => ({
         <button type="button" class="save-config-btn" @click="$emit('save-config')">Save</button>
         <button type="button" class="cancel-config-btn" @click="$emit('cancel-config')">Cancel</button>
         <button type="button" class="update-external-setting-btn" @click="$emit('update-external-setting', 'quality', 'high')">Update External</button>
+        <button type="button" class="update-external-missing-btn" @click="$emit('update-external-setting', 'missing', 'on')">Update Missing External</button>
         <button type="button" class="update-toslink-btn" @click="$emit('update-toslink-sensitivity', 'high')">Update TOSLink</button>
+        <button type="button" class="update-airplay-btn" @click="$emit('update-airplay-version', 2)">Update Airplay</button>
       </article>
     `,
   },
@@ -217,8 +219,15 @@ vi.mock('@/components/PlayerCard.vue', () => ({
 const mountView = () => mount(PlayersView)
 
 describe('services/players view consolidated unit and regression tests', () => {
+  const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+  const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+
   beforeEach(() => {
     vi.clearAllMocks()
+
+    mocks.checkSystemdServiceExists.mockImplementation(async (serviceName: string) => ({
+      data: { exists: mocks.serviceExistenceByName[serviceName] ?? false },
+    }))
 
     mocks.expertModeRef.value = false
 
@@ -329,6 +338,37 @@ describe('services/players view consolidated unit and regression tests', () => {
       await flushPromises()
       expect(roonCard().attributes('data-expanded')).toBe('no')
     })
+
+    it('handles component load failure by logging and keeping builtin shell rendered', async () => {
+      mocks.getExternalPlayers.mockRejectedValueOnce(new Error('load failed'))
+
+      const wrapper = mountView()
+      await flushPromises()
+
+      expect(wrapper.get('.page-content-stub').attributes('data-title')).toBe('Players')
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load service status:', expect.any(Error))
+    })
+
+    it('marks a service unavailable if existence check throws and prevents toggling it', async () => {
+      mocks.expertModeRef.value = true
+      mocks.checkSystemdServiceExists.mockImplementation(async (serviceName: string) => {
+        if (serviceName === 'raat') {
+          throw new Error('systemctl unavailable')
+        }
+        return { data: { exists: mocks.serviceExistenceByName[serviceName] ?? false } }
+      })
+
+      const wrapper = mountView()
+      await flushPromises()
+
+      await wrapper.get('[data-name="Roon"] .toggle-btn').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[data-name="Roon"] .player-error-stub').text()).toContain('Service is not installed')
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to check existence for raat:', expect.any(Error))
+      expect(mocks.enableNowService).not.toHaveBeenCalled()
+      expect(mocks.disableNowService).not.toHaveBeenCalled()
+    })
   })
 
   describe('regression coverage', () => {
@@ -356,6 +396,54 @@ describe('services/players view consolidated unit and regression tests', () => {
       expect(wrapper.get('[data-name="Roon"] .player-error-stub').text()).toContain(
         'Not allowed to change the service state',
       )
+    })
+
+    it('enables inactive regular service on toggle', async () => {
+      mocks.serviceStatusByName.raat = {
+        active: 'inactive',
+        enabled: 'disabled',
+        allowed_operations: ['start', 'stop', 'enable', 'disable'],
+      }
+
+      const wrapper = mountView()
+      await flushPromises()
+
+      await wrapper.get('[data-name="Roon"] .toggle-btn').trigger('click')
+      await flushPromises()
+
+      expect(mocks.enableNowService).toHaveBeenCalledWith('raat')
+      expect(mocks.disableNowService).not.toHaveBeenCalled()
+    })
+
+    it('surfaces generic regular service error when toggle fails without 403', async () => {
+      mocks.serviceStatusByName.raat = {
+        active: 'inactive',
+        enabled: 'disabled',
+        allowed_operations: ['start', 'stop', 'enable', 'disable'],
+      }
+      mocks.enableNowService.mockRejectedValueOnce(new Error('backend timeout'))
+
+      const wrapper = mountView()
+      await flushPromises()
+
+      await wrapper.get('[data-name="Roon"] .toggle-btn').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[data-name="Roon"] .player-error-stub').text()).toContain('Failed to change service state')
+    })
+
+    it('blocks toggle for allow_change=false regular services', async () => {
+      const wrapper = mountView()
+      await flushPromises()
+
+      await wrapper.get('[data-name="Local music"] .toggle-btn').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[data-name="Local music"] .player-error-stub').text()).toContain(
+        'This service cannot be changed',
+      )
+      expect(mocks.enableNowService).not.toHaveBeenCalled()
+      expect(mocks.disableNowService).not.toHaveBeenCalled()
     })
 
     it('keeps external config expanded and exposes error when settings save fails', async () => {
@@ -396,6 +484,23 @@ describe('services/players view consolidated unit and regression tests', () => {
       expect(externalCard().attributes('data-expanded')).toBe('no')
     })
 
+    it('ignores unknown external setting keys and preserves previous value payload', async () => {
+      const wrapper = mountView()
+      await flushPromises()
+
+      const externalCard = () => wrapper.get('[data-name="Zeta Player"]')
+
+      await externalCard().get('.toggle-config-btn').trigger('click')
+      await flushPromises()
+      await externalCard().get('.update-external-missing-btn').trigger('click')
+      await externalCard().get('.save-config-btn').trigger('click')
+      await flushPromises()
+
+      expect(mocks.saveExternalPlayerSettings).toHaveBeenCalledWith('zzz-player', {
+        quality: 'standard',
+      })
+    })
+
     it('keeps TOSLink config expanded and sets player error when sensitivity save fails', async () => {
       mocks.expertModeRef.value = true
       mocks.getTOSLinkStatus.mockResolvedValueOnce({
@@ -423,6 +528,209 @@ describe('services/players view consolidated unit and regression tests', () => {
       expect(mocks.setTOSLinkSensitivity).toHaveBeenCalledWith('high')
       expect(toslinkCard().attributes('data-expanded')).toBe('yes')
       expect(toslinkCard().get('.player-error-stub').text()).toContain('write failed')
+    })
+
+    it('does not toggle TOSLink when status disallows changes', async () => {
+      mocks.expertModeRef.value = true
+
+      const wrapper = mountView()
+      await flushPromises()
+
+      await wrapper.get('[data-name="TOSLink"] .toggle-btn').trigger('click')
+      await flushPromises()
+
+      expect(mocks.enableTOSLink).not.toHaveBeenCalled()
+      expect(mocks.disableTOSLink).not.toHaveBeenCalled()
+    })
+
+    it('enables TOSLink and refreshes status after toggle', async () => {
+      mocks.expertModeRef.value = true
+      mocks.getTOSLinkStatus
+        .mockResolvedValueOnce({
+          available: true,
+          enabled: false,
+          signalDetected: false,
+          allowChange: true,
+          requiresDSP: true,
+          sensitivity: 'medium',
+        })
+        .mockResolvedValueOnce({
+          available: true,
+          enabled: true,
+          signalDetected: true,
+          allowChange: true,
+          requiresDSP: true,
+          sensitivity: 'high',
+        })
+
+      const wrapper = mountView()
+      await flushPromises()
+
+      await wrapper.get('[data-name="TOSLink"] .toggle-btn').trigger('click')
+      await new Promise((resolve) => setTimeout(resolve, 120))
+      await flushPromises()
+
+      expect(mocks.enableTOSLink).toHaveBeenCalledTimes(1)
+      expect(mocks.disableTOSLink).not.toHaveBeenCalled()
+      expect(mocks.getTOSLinkStatus).toHaveBeenCalledTimes(2)
+    })
+
+    it('disables TOSLink when currently enabled', async () => {
+      mocks.expertModeRef.value = true
+      mocks.getTOSLinkStatus
+        .mockResolvedValueOnce({
+          available: true,
+          enabled: true,
+          signalDetected: true,
+          allowChange: true,
+          requiresDSP: true,
+          sensitivity: 'medium',
+        })
+        .mockResolvedValueOnce({
+          available: true,
+          enabled: false,
+          signalDetected: false,
+          allowChange: true,
+          requiresDSP: true,
+          sensitivity: 'medium',
+        })
+
+      const wrapper = mountView()
+      await flushPromises()
+
+      await wrapper.get('[data-name="TOSLink"] .toggle-btn').trigger('click')
+      await new Promise((resolve) => setTimeout(resolve, 120))
+      await flushPromises()
+
+      expect(mocks.disableTOSLink).toHaveBeenCalledTimes(1)
+      expect(mocks.enableTOSLink).not.toHaveBeenCalled()
+    })
+
+    it('logs refresh errors after TOSLink toggle when status refresh fails', async () => {
+      mocks.expertModeRef.value = true
+      mocks.getTOSLinkStatus
+        .mockResolvedValueOnce({
+          available: true,
+          enabled: false,
+          signalDetected: false,
+          allowChange: true,
+          requiresDSP: true,
+          sensitivity: 'medium',
+        })
+        .mockRejectedValueOnce(new Error('refresh failed'))
+
+      const wrapper = mountView()
+      await flushPromises()
+
+      await wrapper.get('[data-name="TOSLink"] .toggle-btn').trigger('click')
+      await new Promise((resolve) => setTimeout(resolve, 120))
+      await flushPromises()
+
+      expect(mocks.enableTOSLink).toHaveBeenCalledTimes(1)
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to refresh status for alsa-toslink:', expect.any(Error))
+    })
+
+    it('logs non-Error TOSLink toggle failures even when refresh clears transient error state', async () => {
+      mocks.expertModeRef.value = true
+      mocks.getTOSLinkStatus
+        .mockResolvedValueOnce({
+          available: true,
+          enabled: false,
+          signalDetected: false,
+          allowChange: true,
+          requiresDSP: true,
+          sensitivity: 'medium',
+        })
+        .mockResolvedValueOnce({
+          available: true,
+          enabled: false,
+          signalDetected: false,
+          allowChange: true,
+          requiresDSP: true,
+          sensitivity: 'medium',
+        })
+      mocks.enableTOSLink.mockRejectedValueOnce('raw failure')
+
+      const wrapper = mountView()
+      await flushPromises()
+
+      await wrapper.get('[data-name="TOSLink"] .toggle-btn').trigger('click')
+      await new Promise((resolve) => setTimeout(resolve, 120))
+      await flushPromises()
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to toggle TOSLink:', 'raw failure')
+      expect(mocks.getTOSLinkStatus).toHaveBeenCalledTimes(2)
+    })
+
+    it('saves TOSLink sensitivity successfully and closes config section', async () => {
+      mocks.expertModeRef.value = true
+      mocks.getTOSLinkStatus.mockResolvedValueOnce({
+        available: true,
+        enabled: true,
+        signalDetected: true,
+        allowChange: true,
+        requiresDSP: true,
+        sensitivity: 'medium',
+      })
+
+      const wrapper = mountView()
+      await flushPromises()
+
+      const toslinkCard = () => wrapper.get('[data-name="TOSLink"]')
+
+      await toslinkCard().get('.toggle-config-btn').trigger('click')
+      await flushPromises()
+      expect(toslinkCard().attributes('data-expanded')).toBe('yes')
+
+      await toslinkCard().get('.update-toslink-btn').trigger('click')
+      await toslinkCard().get('.save-config-btn').trigger('click')
+      await flushPromises()
+
+      expect(mocks.setTOSLinkSensitivity).toHaveBeenCalledWith('high')
+      expect(toslinkCard().attributes('data-expanded')).toBe('no')
+      expect(consoleLogSpy).toHaveBeenCalledWith('TOSLink sensitivity saved successfully: high')
+      expect(consoleLogSpy).toHaveBeenCalledWith('Configuration saved for TOSLink')
+    })
+
+    it('treats Airplay update as no-op when the card has non-object config', async () => {
+      mocks.expertModeRef.value = true
+      mocks.getExternalPlayers.mockResolvedValueOnce([
+        {
+          name: 'Airplay',
+          provided_by: 'community-airplay',
+          systemd_service: 'airplay-player',
+          icon_url: '/icons/airplay.svg',
+          allow_change: true,
+          maintainer_name: 'Air Team',
+          maintainer_url: 'https://example.com/airplay',
+          settings: [],
+        },
+      ])
+      mocks.serviceExistenceByName['airplay-player'] = true
+      mocks.serviceStatusByName['airplay-player'] = {
+        active: 'inactive',
+        enabled: 'disabled',
+        allowed_operations: ['start', 'stop', 'enable', 'disable'],
+      }
+
+      const wrapper = mountView()
+      await flushPromises()
+
+      await wrapper.get('[data-name="Airplay"] .update-airplay-btn').trigger('click')
+      await flushPromises()
+
+      expect(consoleLogSpy).not.toHaveBeenCalledWith('Airplay version updated to 2')
+      expect(wrapper.get('[data-name="Airplay"] .player-name').text()).toBe('Airplay')
+    })
+
+    it('accepts update-airplay event from non-Airplay cards as a no-op', async () => {
+      const wrapper = mountView()
+      await flushPromises()
+
+      await wrapper.get('[data-name="Roon"] .update-airplay-btn').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[data-name="Roon"] .player-name').text()).toBe('Roon')
     })
   })
 })

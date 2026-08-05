@@ -1,93 +1,6 @@
-/**
- * ALBUM STORE - REGRESSION TEST SUITE
- *
- * PURPOSE:
- * --------
- * The album store (`src/stores/album.ts`) manages album library state including:
- * - Album display and caching (albums vs allAlbums arrays)
- * - Search filtering across album names and artists
- * - Sorting modes: release_date (desc/asc), artist (asc), random shuffle
- * - Genre filtering with API-backed album ID mapping
- * - Album detail views and cover art URL generation
- * - Loading/loaded state flags for async API operations
- *
- * Used by views: Albums.vue, AlbumsByCategory.vue, ArtistAlbum.vue
- * Dependencies: useLibraryFetch (HTTP), useToastStore (errors), useLibraryStore, useAppConfigStore
- *
- * DATA FLOW:
- * ----------
- * 1. API Methods (getAlbums, getAlbumByArtistId, getAlbumByAlbumId):
- *    - Fetch from /library/:activeLibrary/albums endpoints
- *    - Transform API response into display format ($id, $title, $subtitle, $note, $cover_src)
- *    - Store in both `allAlbums` (full cache) and `albums` (current view)
- *    - Set loading/loaded flags for state tracking
- *
- * 2. Filtering Pipeline:
- *    - setSearchQuery() → filterAlbums() → updates `albums` from `allAlbums`
- *    - setGenreFilter() → fetches album IDs for genres → filterAlbums()
- *    - Both search and genre filters combine via genreAlbumIds Set
- *
- * 3. Sorting Pipeline:
- *    - sortedAlbums computed property reads from `albums`
- *    - Applies sortBy mode: release_date (with secondary sort by name), artist, random
- *    - respects sortOrder: asc/desc (applies only to release_date)
- *    - random sort uses randomKeys Map rebuilt on shuffle
- *
- * 4. State Management:
- *    - loading: true during API calls, false when done
- *    - loaded: should be true after successful fetch (SEE ISSUE #1)
- *    - albums: filtered display array
- *    - allAlbums: full library cache for filtering
- *    - album: single album detail object
- *
- * CRITICAL ISSUES IDENTIFIED (6 Total):
- * ------------------------------------
- * 1. 🔴 CRITICAL: getAlbums() never sets loaded = true
- *    - Line 79-105: loading flag set but loaded never updated
- *    - Impact: State machine broken, components can't detect load completion
- *    - Fix: Add loaded.value = true after successful fetch
- *
- * 2. 🔴 CRITICAL: getAlbumByArtistId() missing loading flag reset
- *    - Line 107-135: Early return on error doesn't reset loading flag
- *    - Impact: UI stuck in infinite loading state
- *    - Fix: Add finally block to ensure loading.value = false
- *
- * 3. 🟡 MEDIUM: randomKeys Map not exposed in store return
- *    - Line 29-30: Defined but Line 312 return statement omits it
- *    - Impact: Cannot test/debug shuffle state
- *    - Fix: Add randomKeys to return object
- *
- * 4. 🟡 MEDIUM: genreAlbumIds Set not exposed in store return
- *    - Line 36: Defined but Line 312 return statement omits it
- *    - Impact: Cannot debug genre filtering
- *    - Fix: Add genreAlbumIds to return object
- *
- * 5. 🟡 MEDIUM: Incomplete null checking in album mapping
- *    - Line 81-87: artist[0] and release_date checked, but id/name not checked
- *    - Impact: Silent data failures if API returns album without id/name
- *    - Fix: Add filter to exclude invalid albums, add defaults for id/name
- *
- * 6. 🟡 MEDIUM: Fragmented error handling patterns
- *    - Line 79-155: Different error handling in each API method
- *    - Impact: Hard to maintain, inconsistent state cleanup
- *    - Fix: Create unified API error handler
- *
- * TEST COVERAGE:
- * ---------------
- * This regression test suite covers 90+ tests across 14 suites:
- * - State initialization: Verify all initial state values
- * - Cover URL generation: Test URL construction and special characters
- * - Search functionality: Album/artist search, case-insensitive, trimming
- * - Genre filtering: Filter state management and API integration
- * - Sort functionality: All 3 sort modes, secondary sort by name, sort order toggle
- * - Shuffle: Random key generation and sort behavior
- * - Data transformation: Empty artists fallback, missing dates, year extraction
- * - Backward compatibility: Legacy sortedAlbumsByReleaseDate property
- * - Edge cases: Empty arrays, single items, null handling
- * - State mutations: Array independence and detail object lifecycle
- *
- * PURPOSE: Establish behavioral baseline BEFORE fixes, preventing regression bugs
- * STATUS: All 959 tests passing ✅
+/*
+ * Regression-focused album store tests.
+ * Keep assertions behavior-oriented and aligned with current store implementation.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -95,11 +8,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import { useAlbumStore } from '../album'
 import type { Album, AlbumDetails, AlbumsResponse, AlbumResponse, AlbumByArtistResponse } from '@/types/library'
 
-// Enhanced mocks with realistic return values
 const mockLibraryFetch = vi.fn()
-const mockToastStore = vi.fn()
-const mockLibraryStore = vi.fn()
-const mockAppConfigStore = vi.fn()
 
 vi.mock('@/composables/useLibraryFetch', () => ({
   useLibraryFetch: () => mockLibraryFetch,

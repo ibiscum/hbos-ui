@@ -92,7 +92,7 @@ Relevance logic:
 
 ## Test Coverage
 
-Consolidated tests live in [src/stores/__tests__/player-web-socket.regression.test.ts](src/stores/__tests__/player-web-socket.regression.test.ts).
+Consolidated tests live in [src/stores/__tests__/player-web-socket.test.ts](src/stores/__tests__/player-web-socket.test.ts).
 
 Covered scenarios include:
 - Reconnect vs manual disconnect behavior.
