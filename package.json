@@ -41,10 +41,10 @@
     "vue3-toastify": "^0.2.9"
   },
   "devDependencies": {
-    "@tsconfig/node22": "^22.0.5",
+    "@tsconfig/node24": "^24.0.4",
     "@types/d3": "^7.4.3",
     "@types/d3-graphviz": "^2.6.10",
-    "@types/node": "^22.20.1",
+    "@types/node": "^24.13.3",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vitest/coverage-v8": "4.1.10",
     "@vue/eslint-config-prettier": "^10.2.0",

@@ -3,9 +3,10 @@ import { getSetupStatus, resetSetup } from '@/api/system'
 
 let setupChecked = false
 let setupCompleted = false
+const baseUrl = (import.meta as ImportMeta & { env: { BASE_URL?: string } }).env.BASE_URL || '/'
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(baseUrl),
   routes: [
     {
       path: '/setup',
