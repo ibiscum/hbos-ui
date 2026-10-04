@@ -12,8 +12,8 @@ importers:
         specifier: ^14.4.0
         version: 14.4.0(vue@3.5.40(typescript@5.9.3))
       apexcharts:
-        specifier: ^5.16.0
-        version: 5.16.0
+        specifier: ^7.6.1
+        version: 7.6.1
       chart.js:
         specifier: ^4.5.1
         version: 4.5.1
@@ -46,7 +46,7 @@ importers:
         version: 4.6.4(vue@3.5.40(typescript@5.9.3))
       vue3-apexcharts:
         specifier: ^1.11.1
-        version: 1.11.1(apexcharts@5.16.0)(vue@3.5.40(typescript@5.9.3))
+        version: 1.11.1(apexcharts@7.6.1)(vue@3.5.40(typescript@5.9.3))
       vue3-toastify:
         specifier: ^0.2.9
         version: 0.2.9(vue@3.5.40(typescript@5.9.3))
@@ -1021,6 +1021,11 @@ packages:
 
   '@volar/typescript@2.4.28':
     resolution: {integrity: sha512-Ja6yvWrbis2QtN4ClAKreeUZPVYMARDYZl9LMEv1iQ1QdepB6wn0jTRxA9MftYmYa4DQ4k/DaSZpFPUfxl8giw==}
+    peerDependencies:
+      typescript: '*'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
 
   '@vue/babel-helper-vue-transform-on@1.5.0':
     resolution: {integrity: sha512-0dAYkerNhhHutHZ34JtTl2czVQHUNWv6xEbkdF5W+Yrv5pCWsqjeORdOgbtW2I9gWlt+wBmVn+ttqN9ZxR5tzA==}
@@ -1208,8 +1213,12 @@ packages:
     resolution: {integrity: sha512-BJ8/l4R5LRE7hW9WdSuGYrLSHi2ynxeFpDFbH0K/CgNeY/tyhk+vO6TYxXC5r5CpUhNVX310xzPsN/H9lCdfOA==}
     engines: {node: '>=14'}
 
-  apexcharts@5.16.0:
-    resolution: {integrity: sha512-ULO3Gqrm0/26uwBcYz49u181uIp8Fy6BQQgg9QUDajs+JAs/EbXxiAmdc6BLy1JY29/JXroM7P0j0t2JPDApdg==}
+  apex-commons@0.8.1:
+    resolution: {integrity: sha512-F7fqJVh0smeTu1d86uuRSNNZvaM/l11GNQMbu6oAiSvuXp+K8KCufg0oZTy2VQBEEipRLAdFqkHnphlVpTG0Gw==}
+
+  apexcharts@7.6.1:
+    resolution: {integrity: sha512-IeAgHCYk7G91X6zlLHZTd9MSQxnYeAMKDfSHn9WXCYYmVZisY5g1PkNBgG1U+1t6pXwkJutTtnq/UVyY3dELHA==}
+    engines: {node: ^20.19.0 || ^22.12.0 || >=24.0.0}
 
   assertion-error@2.0.1:
     resolution: {integrity: sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==}
@@ -2402,6 +2411,7 @@ packages:
     engines: {node: '>=v14.21.3'}
     peerDependencies:
       vite: ^6.0.0 || ^7.0.0 || ^8.0.0
+      vue: '*'
 
   vite-plugin-vue-inspector@6.0.0:
     resolution: {integrity: sha512-OpyITJLgZNibxlrik1EmRtvXHDjLRxNPsWkGFTERZs2LgMEdG4W0WoFt5GIgp3a3jRou+eJR8U1zOBk/XQgEbw==}
@@ -3478,11 +3488,13 @@ snapshots:
 
   '@volar/source-map@2.4.28': {}
 
-  '@volar/typescript@2.4.28':
+  '@volar/typescript@2.4.28(typescript@5.9.3)':
     dependencies:
       '@volar/language-core': 2.4.28
       path-browserify: 1.0.1
       vscode-uri: 3.2.0
+    optionalDependencies:
+      typescript: 5.9.3
 
   '@vue/babel-helper-vue-transform-on@1.5.0': {}
 
@@ -3735,7 +3747,11 @@ snapshots:
 
   ansis@4.3.1: {}
 
-  apexcharts@5.16.0: {}
+  apex-commons@0.8.1: {}
+
+  apexcharts@7.6.1:
+    dependencies:
+      apex-commons: 0.8.1
 
   assertion-error@2.0.1: {}
 
@@ -4886,10 +4902,10 @@ snapshots:
       vite: 6.4.3(@types/node@24.13.3)(jiti@2.7.0)(sass-embedded@1.103.1)(sass@1.103.1)
       vite-plugin-inspect: 11.4.1(vite@6.4.3(@types/node@24.13.3)(jiti@2.7.0)(sass-embedded@1.103.1)(sass@1.103.1))
       vite-plugin-vue-inspector: 6.0.0(supports-color@8.1.1)(vite@6.4.3(@types/node@24.13.3)(jiti@2.7.0)(sass-embedded@1.103.1)(sass@1.103.1))
+      vue: 3.5.40(typescript@5.9.3)
     transitivePeerDependencies:
       - '@nuxt/kit'
       - supports-color
-      - vue
 
   vite-plugin-vue-inspector@6.0.0(supports-color@8.1.1)(vite@6.4.3(@types/node@24.13.3)(jiti@2.7.0)(sass-embedded@1.103.1)(sass@1.103.1)):
     dependencies:
@@ -4995,13 +5011,13 @@ snapshots:
 
   vue-tsc@3.3.11(typescript@5.9.3):
     dependencies:
-      '@volar/typescript': 2.4.28
+      '@volar/typescript': 2.4.28(typescript@5.9.3)
       '@vue/language-core': 3.3.11
       typescript: 5.9.3
 
-  vue3-apexcharts@1.11.1(apexcharts@5.16.0)(vue@3.5.40(typescript@5.9.3)):
+  vue3-apexcharts@1.11.1(apexcharts@7.6.1)(vue@3.5.40(typescript@5.9.3)):
     dependencies:
-      apexcharts: 5.16.0
+      apexcharts: 7.6.1
       vue: 3.5.40(typescript@5.9.3)
 
   vue3-toastify@0.2.9(vue@3.5.40(typescript@5.9.3)):
